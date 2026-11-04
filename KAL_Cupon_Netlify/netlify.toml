@@ -1,0 +1,7 @@
+# Netlify site config. Publish only the static site; keep function source outside it.
+[build]
+  publish = "site"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"

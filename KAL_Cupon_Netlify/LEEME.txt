@@ -1,0 +1,107 @@
+KAL CUPÓN ORGANIZADOR — BÚSQUEDA Y GUARDADO DE ESCUDOS
+
+QUÉ INCLUYE
+- Busca equipos y ligas desde API-Football; limpia puntos, guiones y símbolos antes de consultar.
+- Permite elegir candidatos y muestra una vista previa del escudo; si el catálogo no encuentra un equipo, permite guardar manualmente una URL de API-Football.
+- La sección “Logos” reúne equipos de cupones guardados y en revisión; permite buscar, elegir o pegar una URL, guardar y actualizar cada escudo. Desde cada partido de Mercados también se abre la edición de los escudos de ambos equipos.
+- Muestra el escudo directamente desde API-Football y también intenta guardarlo en IndexedDB del navegador para reutilizarlo.
+- Guarda también los resultados de búsqueda. El botón no repite las consultas al proveedor si ya hay resultados guardados.
+- Limita a tres búsquedas nuevas por minuto para proteger el cupo.
+- Si el proveedor no tiene una imagen, muestra las iniciales del equipo.
+- La clave API se mantiene solo en Netlify.
+
+PASOS
+1) Crea una cuenta en API-Football y activa el plan Free. Copia tu API key del panel. El plan Free publica actualmente 100 solicitudes diarias y un límite de 10 por minuto.
+2) En Netlify agrega la variable de entorno API_FOOTBALL_KEY con tu clave real. Marca “Contiene valores secretos”; puedes dejar “Todos los ámbitos”. No envíes la clave por chat.
+3) Descomprime este ZIP y publica el contenido completo con Netlify CLI o un repositorio Git conectado. Deben ir juntas las carpetas site y netlify, y los archivos netlify.toml y LEEME.txt.
+4) Después de publicar, Netlify debe mostrar las funciones: escudos, logo, partido, jugadores y catalogo.
+5) En la página publicada, pega un cupón, pulsa “Leer y revisar”, pulsa “Buscar logos”, elige los resultados y pulsa “Aplicar selecciones”.
+6) Si aparece un aviso de cuota, consulta Usage en el panel API-Football. Si se agotó el límite por minuto, espera un minuto; si el cupo diario está en cero, espera a que se renueve.
+
+NETLIFY CLI
+- Abre PowerShell dentro de la carpeta KAL_Cupon_Netlify, donde está netlify.toml.
+- Ejecuta:
+  npx netlify-cli login
+  npx netlify-cli link
+  npx netlify-cli deploy --prod
+- Selecciona tu sitio actual cuando aparezca la pregunta de enlace.
+
+NOTAS
+- Sin iniciar sesión, los logos se guardan localmente. Con la cuenta Supabase configurada, el catálogo de escudos también se sincroniza entre dispositivos.
+- La opción “Borrar cupones y movimientos” conserva el catálogo local de escudos y logos, incluidas las imágenes guardadas en IndexedDB.
+- Si una competición no aparece en el catálogo, puedes añadir su URL manualmente.
+- Los datos de cupones de file:// y del dominio Netlify están separados; exporta/importa un respaldo para trasladarlos.
+
+
+ACTUALIZACIÓN: MEJORAS DE CUPONES Y SINCRONIZACIÓN
+- Logos: la lista separa equipos pendientes de equipos con escudo guardado. Cada equipo puede buscar/actualizar el escudo y quitarse de la lista. Los logos guardados se conservan al borrar cupones.
+- Calendario: muestra escudos, nombres y competencia; al pulsar un partido abre su cupón.
+- Inicio: muestra cupones ganados, perdidos, anulados/cash out, importes y una gráfica de balance neto.
+- Cupones guardados: tarjetas ordenadas con equipos, escudos, estado y montos; incluye registrar cash out.
+- Si todos los mercados de un cupón ya están liquidados y alguno fue anulado, la app solicita el retorno final real que pagó la casa.
+- Casas rápidas: Hondubet, Doradobet, Betpro y Catraplay. Se agregan con saldo inicial cero.
+
+CUENTAS Y NUBE (CONFIGURACIÓN ÚNICA)
+La cuenta en la nube usa Supabase. La app no recibe ni almacena la contraseña de la cuenta; la autenticación se procesa mediante Supabase. La dirección del proyecto y su clave pública se guardan en el navegador. Para sincronizar entre dispositivos, crea un proyecto Supabase, copia la URL y la clave pública (anon/publishable) en Configuración y ejecuta este SQL desde el SQL Editor:
+
+create table if not exists public.kal_user_data (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.kal_user_data enable row level security;
+create policy "read own KAL data" on public.kal_user_data for select to authenticated using ((select auth.uid()) = user_id);
+create policy "insert own KAL data" on public.kal_user_data for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "update own KAL data" on public.kal_user_data for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+Después, abre Configuración en KAL, pega URL y clave pública, crea la cuenta con tu correo y contraseña e inicia sesión. Si solicita verificar el correo, confirma el mensaje y vuelve a iniciar sesión. En los demás dispositivos abre el mismo sitio, pega la misma URL y clave pública e inicia sesión con la misma cuenta. La primera sincronización combina registros locales y remotos; los cambios guardados se envían automáticamente. Los escudos también se sincronizan.
+
+IMPORTANTE
+- Nunca compartas la clave service_role; usa solo anon o publishable.
+- Descarga respaldos periódicos. Sin configurar Supabase, el resto de KAL sigue funcionando localmente.
+
+
+MEJORA DE CALENDARIO Y FICHA DE PARTIDO
+- Calendario muestra fecha y hora en cada encuentro y conserva el agrupado por día; los partidos con fecha/hora disponible se ordenan cronológicamente.
+- Mercados se ordena por fecha y hora y muestra esos datos junto a cada partido.
+- Al pulsar un partido en Calendario, Mercados, el cupón guardado o la vista previa se abre una ficha común con fondo de estadio, escudos, competición, fecha/hora y mercados para marcar.
+
+
+NUEVAS MEJORAS
+- En Logos, “Buscar con URL” pide solo el ID de API-Football y forma automáticamente la dirección oficial para escudos de equipos y ligas. Al guardarlo, se reutiliza en los partidos y dispositivos sincronizados.
+- Al abrir la ficha de un partido, las pestañas Mercados y Cupones muestran los datos locales. Análisis, Estadísticas y Eventos consultan API-Football al abrirse; la cobertura y la disponibilidad pueden variar por liga y fecha. Las cuotas muestran probabilidad implícita; los porcentajes de predicción se identifican como datos de API-Football. No se inventan posiciones, lesiones, estadísticas ni nivel de confianza cuando no hay datos.
+- Para conectar la ficha con API-Football, ambos escudos deben llevar un ID numérico del proveedor y el partido debe tener fecha.
+- En mercados de goleador/remates y otros mercados de jugador, “Buscar foto del jugador” consulta por nombre y equipo; las fotos dependen de los datos de API-Football.
+
+- Corrección móvil: al abrir la ficha, la página de fondo queda fija y solo se desplaza el contenido del partido.
+- Corrección de análisis: la temporada se obtiene de la fecha del encuentro y una tabla no disponible ya no bloquea las predicciones restantes.
+
+- Los partidos y mercados ahora se agrupan ignorando acentos y sufijos comunes de clubes (FC, SK, CF, etc.); se mantienen los nombres originales guardados en los cupones.
+- La ficha muestra tarjetas de mercado más compactas, especialmente en teléfonos.
+
+ACTUALIZACIÓN: DETECCIÓN Y FICHA DEL PARTIDO
+- Los partidos repetidos se consolidan comparando los nombres sin tildes y sin sufijos habituales como FC, SK, CF, FK, SC, AFC y similares. Se conservan los nombres que venían en el cupón.
+- La ficha del partido ahora es más compacta. En móvil, la cabecera y las pestañas permanecen visibles y se desplaza solo la información del partido.
+- Al consultar el análisis, la búsqueda contempla el día anterior y posterior para cubrir cambios de fecha por zona horaria. La tabla de posiciones ya no impide mostrar las demás respuestas si API-Football no tiene la temporada.
+- El importador detecta país y competencia cuando el texto del cupón los incluye. Si aplicas un resultado de liga desde “Buscar logos”, también actualiza automáticamente el nombre de la competencia, país y bandera del partido.
+- En Logos se puede buscar un país por código ISO de dos letras (por ejemplo, ES o GB) y una liga por su ID. API-Football no asigna un ID numérico a los países; el código ISO es el identificador admitido por su consulta de países.
+- Las búsquedas de nombres limpian tildes y signos no admitidos por el proveedor. Si API-Football no tiene ese partido, jugador o estadística, la app lo indica sin fabricar datos.
+- “Buscar foto del jugador” muestra errores y reestablece el botón al terminar; acepta nombres con tildes y sufijos de equipo.
+
+CORRECCIONES DE FICHA DE PARTIDO
+- El modal móvil usa ahora un área de desplazamiento propia con altura limitada; la cabecera y las pestañas permanecen visibles mientras se desplaza la información.
+- Análisis muestra forma y estadísticas de temporada cuando API-Football no publica una predicción, y consulta H2H por separado. La tabla ausente se explica en pantalla.
+- Estadísticas, eventos y alineaciones pueden no existir antes del inicio del encuentro o en ligas sin esa cobertura. Usa “Actualizar datos” dentro de la ficha para volver a consultar.
+- La búsqueda de fotos del jugador tiene límite de espera, consulta el plantel actual si falla el índice de temporada y avisa si la imagen no está disponible.
+- Las respuestas de partidos se pueden actualizar manualmente; la consulta de partidos encontrados se reutiliza temporalmente para reducir solicitudes repetidas.
+
+
+FOTOS DE JUGADORES
+- El buscador acepta el ID del equipo enviado por la pantalla, busca primero en la temporada indicada y recurre al plantel actual si no encuentra al jugador.
+- Al encontrarlo, guarda la foto en el catálogo de Logos junto al nombre del jugador, club y país; la foto aparece también en la tarjeta del mercado. El catálogo usa el mismo respaldo/sincronización de logos que la app.
+
+
+AJUSTE DEL CATÁLOGO DE JUGADORES
+- La sección Logos reúne todos los mercados detectados de remates, goleador, anotador y jugador en cupones guardados y en el borrador actual. Desde la tarjeta se puede buscar la foto.
+- La búsqueda usa primero Football Players Profiles de API-Football por apellido; ya no depende de que coincidan el ID del club y la temporada. Guarda el nombre del jugador, su nacionalidad, el club asociado y la URL de foto.
+- La foto se muestra directamente desde la URL pública de API-Football tanto en Logos como en la tarjeta del mercado.
