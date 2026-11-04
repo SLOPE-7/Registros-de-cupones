@@ -123,3 +123,14 @@ Diseño
 - Menú inferior con 5 accesos (Inicio, Agenda, Mercados, Cupones y Más). En "Más" están Logos, Casas y balances, Estadísticas y Ajustes.
 - Inicio: indicadores en una fila; primero pegas el cupón, luego revisas la vista previa y al final completas los datos.
 - Logos: cada lista (equipos sin escudo, con escudo, jugadores, ligas, eliminados…) es una sección que se expande y se contrae con su contador. La app recuerda cuáles dejaste abiertas y, al buscar, abre las que tienen resultados.
+
+
+VERSIÓN 5 — MODO OSCURO Y FICHA DEL PARTIDO
+- Corrección: Estadísticas, Eventos y Análisis mostraban "The Season field is required". La función "partido" ahora envía la temporada que exige API-Football (y prueba la otra temporada si el partido no aparece).
+- Nueva paleta azul noche, dorado y verde. Modo oscuro predeterminado; en Ajustes → Apariencia puedes elegir Oscuro, Claro o Automático (según el teléfono). El botón ☀/☾ del encabezado cambia rápido entre oscuro y claro.
+- Inicio es ahora un panel: indicadores, botón "Registrar nuevo cupón", partidos de hoy (por jugar, en juego, liquidados) y resumen de apuestas.
+- "Nuevo cupón" es una pantalla propia con el lector. La vista previa muestra cada partido resumido (equipos, fecha, mercados y cuotas); los campos se editan solo al tocar "✎ Editar".
+- Agenda con atajos Hoy, Mañana, Semana y Todos, y tarjetas de partido con escudos, hora, competición, "EN VIVO" y número de mercados.
+- Ficha del partido: encabezado más compacto; mercados en tarjetas pequeñas con cuota y barra de probabilidad implícita; la opción marcada se rellena de color; marcar un resultado ya no te devuelve arriba; los mercados ya marcados se guardan en la sección plegable "Ya marcados".
+- Mercados: el historial de resultados es una sección plegable con contador.
+- Balances: tarjeta con el banco actual (suma de todas las casas) y el resultado neto.

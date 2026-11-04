@@ -37,7 +37,18 @@ export default async (request) => {
     const fixtureKey = [home, away, date, league || ""].join("|");
     let candidates = fixtureCache.get(fixtureKey);
     if (!candidates || candidates.until <= now) {
-      candidates = await call("fixtures", { team: home, from: shift(-1), to: shift(1), timezone: "America/Tegucigalpa" });
+      // API-Football exige la temporada cuando se busca por rango de fechas. Las ligas europeas usan
+      // el año de inicio (2026 para 2026/27); las de año natural usan el año del partido. Entre enero
+      // y julio se prueban ambas, empezando por la que más se usa.
+      const year = Number(date.slice(0, 4)), month = Number(date.slice(5, 7));
+      const seasons = [...new Set([month >= 7 ? year : year - 1, year])];
+      const isMatch = x => { const h = String(x.teams?.home?.id), a = String(x.teams?.away?.id); return (h === String(home) && a === String(away)) || (h === String(away) && a === String(home)); };
+      candidates = [];
+      for (const s of seasons) {
+        const rows = await call("fixtures", { team: home, season: String(s), from: shift(-1), to: shift(1), timezone: "America/Tegucigalpa" });
+        candidates.push(...rows);
+        if (rows.some(isMatch)) break;
+      }
       fixtureCache.set(fixtureKey, { rows: candidates, until: now + 600000 });
       if (fixtureCache.size > 180) fixtureCache.delete(fixtureCache.keys().next().value);
     } else candidates = candidates.rows;
@@ -97,7 +108,6 @@ export default async (request) => {
     return reply(200, data);
   } catch (e) {
     const message = e?.name === "TimeoutError" ? "La consulta tardó demasiado. Inténtalo otra vez." : (e?.message || "No se pudo obtener información del partido.");
-    if (mode === "analysis" && /season.*required|required.*season/i.test(message)) return reply(200, { available: true, predictions: null, standings: [], standingsError: "API-Football no devolvió la tabla para la temporada de este encuentro." });
     return reply(502, { error: message });
   }
 };
