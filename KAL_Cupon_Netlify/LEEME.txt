@@ -134,3 +134,9 @@ VERSIÓN 5 — MODO OSCURO Y FICHA DEL PARTIDO
 - Ficha del partido: encabezado más compacto; mercados en tarjetas pequeñas con cuota y barra de probabilidad implícita; la opción marcada se rellena de color; marcar un resultado ya no te devuelve arriba; los mercados ya marcados se guardan en la sección plegable "Ya marcados".
 - Mercados: el historial de resultados es una sección plegable con contador.
 - Balances: tarjeta con el banco actual (suma de todas las casas) y el resultado neto.
+
+
+VERSIÓN 5.1
+- Mis cupones: por defecto solo se ven los pendientes. Los ganados, perdidos y nulos / cash out quedan archivados en sus pestañas (con contador); "Todos" muestra el historial completo.
+- Regla del cupón perdido: si un mercado se marca como perdido, todo su cupón queda perdido. Sus partidos y mercados desaparecen de Agenda, Mercados (Pendiente), Inicio y de los pendientes de la ficha del partido (allí pasan a "Ya marcados y cerrados" con la etiqueta "cupón perdido"). Si el mismo partido también está en otro cupón que sigue vivo, se sigue mostrando por ese cupón.
+- API-Football: el aviso "Free plans do not have access to this season" ahora se explica en español. El plan gratis solo permite temporadas 2022–2024, así que Análisis, Estadísticas y Eventos de partidos actuales requieren un plan de pago. Los escudos y las fotos de jugadores sí funcionan con el plan gratis.

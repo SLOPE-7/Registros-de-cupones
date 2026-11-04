@@ -1,3 +1,4 @@
+const PLAN_MSG = "Tu plan gratis de API-Football solo permite consultar las temporadas 2022 a 2024, por eso no hay datos de la temporada actual. Para consultarla hace falta un plan de pago de API-Football.";
 const cache = globalThis.__kalCatalogCache || (globalThis.__kalCatalogCache = new Map());
 export default async (request) => {
   const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" };
@@ -18,7 +19,7 @@ export default async (request) => {
     if (r.status === 429) throw Error("Se alcanzó el límite de API-Football. Espera a que se renueve la cuota.");
     if (!r.ok) throw Error("API-Football respondió con error HTTP " + r.status + ".");
     const body = await r.json();
-    if (body.errors && Object.keys(body.errors).length) throw Error(Object.values(body.errors).flat().map(String).join(" ").slice(0, 180));
+    if (body.errors && Object.keys(body.errors).length) { if (/free plans? do not have access|plan.*season/i.test(JSON.stringify(body.errors))) throw Error(PLAN_MSG); } if (body.errors && Object.keys(body.errors).length) throw Error(Object.values(body.errors).flat().map(String).join(" ").slice(0, 180));
     const data = body.response || []; cache.set(cacheKey, { data, until: Date.now() + 86400000 }); return data;
   };
   try {

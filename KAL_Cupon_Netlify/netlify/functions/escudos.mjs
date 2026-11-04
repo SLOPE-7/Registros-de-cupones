@@ -1,3 +1,4 @@
+const PLAN_MSG = "Tu plan gratis de API-Football solo permite consultar las temporadas 2022 a 2024, por eso no hay datos de este partido. Para ver estadísticas, eventos y análisis de partidos actuales hace falta un plan de pago de API-Football.";
 const lookupWindows = globalThis.__kalCrestLookupWindows || (globalThis.__kalCrestLookupWindows = new Map());
 const apiResultCache = globalThis.__kalCrestApiResultCache || (globalThis.__kalCrestApiResultCache = new Map());
 
@@ -33,7 +34,7 @@ export default async (request) => {
     if (response.status === 429) throw new Error("Se alcanzó el límite de consultas de API-Football. Espera a que se renueve la cuota.");
     if (!response.ok) throw new Error("API-Football respondió con error HTTP " + response.status + ".");
     const data = await response.json();
-    if (data.errors && Object.keys(data.errors).length) {
+    if (data.errors && Object.keys(data.errors).length) { if (/free plans? do not have access|plan.*season/i.test(JSON.stringify(data.errors))) throw Error(PLAN_MSG); } if (data.errors && Object.keys(data.errors).length) {
       const detail = Object.values(data.errors).flat().map(String).join(" ").slice(0, 180);
       if (/token|api.?key|unauthori[sz]ed|invalid key/i.test(detail)) throw new Error("API-Football rechazó la clave. Verifica API_FOOTBALL_KEY y vuelve a publicar.");
       if (/request|quota|limit|too many/i.test(detail)) throw new Error("API-Football bloqueó temporalmente la consulta: puede haberse alcanzado el límite de 10 por minuto o el cupo diario de 100. Revisa el panel Usage y vuelve a intentar cuando se renueve.");

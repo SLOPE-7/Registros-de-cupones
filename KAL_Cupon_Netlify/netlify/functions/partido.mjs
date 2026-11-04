@@ -1,3 +1,4 @@
+const PLAN_MSG = "Tu plan gratis de API-Football solo permite consultar las temporadas 2022 a 2024, por eso no hay datos de este partido. Para ver estadísticas, eventos y análisis de partidos actuales hace falta un plan de pago de API-Football.";
 const cache = globalThis.__kalMatchDataCache || (globalThis.__kalMatchDataCache = new Map());
 const fixtureCache = globalThis.__kalFixtureCache || (globalThis.__kalFixtureCache = new Map());
 const windows = globalThis.__kalMatchWindows || (globalThis.__kalMatchWindows = new Map());
@@ -26,7 +27,7 @@ export default async (request) => {
     if (r.status === 429) throw Error("Se alcanzó el límite de API-Football. Espera a que se renueve la cuota.");
     if (!r.ok) throw Error("API-Football respondió con error HTTP " + r.status + ".");
     const body = await r.json();
-    if (body.errors && Object.keys(body.errors).length) throw Error(Object.values(body.errors).flat().join(" ").slice(0, 180));
+    if (body.errors && Object.keys(body.errors).length) { if (/free plans? do not have access|plan.*season/i.test(JSON.stringify(body.errors))) throw Error(PLAN_MSG); } if (body.errors && Object.keys(body.errors).length) throw Error(Object.values(body.errors).flat().join(" ").slice(0, 180));
     return body.response || [];
   };
   try {
