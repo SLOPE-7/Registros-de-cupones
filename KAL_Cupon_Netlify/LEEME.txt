@@ -105,3 +105,21 @@ AJUSTE DEL CATÁLOGO DE JUGADORES
 - La sección Logos reúne todos los mercados detectados de remates, goleador, anotador y jugador en cupones guardados y en el borrador actual. Desde la tarjeta se puede buscar la foto.
 - La búsqueda usa primero Football Players Profiles de API-Football por apellido; ya no depende de que coincidan el ID del club y la temporada. Guarda el nombre del jugador, su nacionalidad, el club asociado y la URL de foto.
 - La foto se muestra directamente desde la URL pública de API-Football tanto en Logos como en la tarjeta del mercado.
+
+
+VERSIÓN 4 — CORRECCIONES Y NUEVO DISEÑO
+Errores corregidos
+- Jugadores: los mercados de equipo (por ejemplo "Total de remates - Como" o "Marcador correcto 2-1") ya no aparecen como jugadores.
+- Jugadores: el código del club (COM, NAP, RMA…) ya no se mezcla con el nombre; se usa para identificar el club correcto. Los nombres guardados antes con el código se limpian solos al abrir la app.
+- Mercados: la vista "Pendiente" muestra solo mercados que siguen vivos. Si un cupón se perdió, se cobró (cash out) o se anuló, sus mercados desaparecen de Pendiente. "Todos" muestra el historial completo.
+- Agenda: los partidos de cupones perdidos ya no aparecen como pendientes.
+- Eliminar un cupón ahora también quita su apuesta automática del balance de la casa ("Deshacer" la recupera).
+- Nube (Supabase): los cupones, casas y movimientos eliminados ya no reaparecen al sincronizar, y se conserva la versión más reciente de cada cupón (los resultados marcados no se pierden). Los catálogos de logos se combinan en lugar de reemplazarse.
+- El respaldo descargado ahora incluye escudos, logos y fotos de jugadores.
+
+Diseño
+- Pantallas más compactas y ordenadas, pensadas primero para el teléfono.
+- Encabezado con el nombre de la sección y botón "+ Nuevo cupón" que lleva directo al lector.
+- Menú inferior con 5 accesos (Inicio, Agenda, Mercados, Cupones y Más). En "Más" están Logos, Casas y balances, Estadísticas y Ajustes.
+- Inicio: indicadores en una fila; primero pegas el cupón, luego revisas la vista previa y al final completas los datos.
+- Logos: cada lista (equipos sin escudo, con escudo, jugadores, ligas, eliminados…) es una sección que se expande y se contrae con su contador. La app recuerda cuáles dejaste abiertas y, al buscar, abre las que tienen resultados.
