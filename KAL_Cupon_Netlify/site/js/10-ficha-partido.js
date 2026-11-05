@@ -268,6 +268,7 @@ function matchMarketCard(x) {
         (x.coupons.size === 1 ? "" : "es") +
         "</small>") +
     "</div>" +
+    progressBlock(x) +
     (bet && !photo && !currentMatchRef?.draft
       ? '<button type="button" class="btn sm player-photo-button" data-player-photo="' +
         esc(x.key) +
@@ -302,6 +303,7 @@ function renderMatchMarkets(merged) {
     (currentMatchRef?.draft
       ? '<div class="notice">Vista previa del cupón. Guarda el cupón para marcar resultados.</div>'
       : "") +
+    finishMatchButton(all[0].f, pending) +
     (pending.length
       ? pending.map(matchMarketCard).join("")
       : '<div class="empty small"><strong>Todo marcado ✓</strong>No quedan mercados pendientes en este partido.</div>') +

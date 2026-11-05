@@ -32,6 +32,13 @@ function mergeDatabases(local, remote) {
     resultHistory: list(local.resultHistory, remote.resultHistory),
     actionHistory: (local.actionHistory || []).slice(-100),
     deleted,
+    progress: (() => {
+      const out = { ...(remote.progress || {}) };
+      Object.entries(local.progress || {}).forEach(([k, v]) => {
+        if (!out[k] || String(v?.updatedAt || "") >= String(out[k]?.updatedAt || "")) out[k] = v;
+      });
+      return out;
+    })(),
     settings:
       String(remote.settings?.updatedAt || "") > String(local.settings?.updatedAt || "")
         ? remote.settings

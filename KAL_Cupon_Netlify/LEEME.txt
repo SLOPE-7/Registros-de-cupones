@@ -203,3 +203,14 @@ Organización del código (site/)
 Pruebas automáticas (pruebas/)
 - node pruebas/ejecutar.mjs  (desde la carpeta KAL_Cupon_Netlify; necesita Playwright: npm i -D playwright && npx playwright install chromium)
 - Revisan el lector, la detección de jugadores, la regla del cupón perdido, Mercados, Agenda, Mis cupones, eliminar y deshacer, guardado rápido, buscador, avisos, presupuesto, rachas, modo sin conexión y las funciones de Netlify (con API simulada).
+
+
+VERSIÓN 9 — BARRA DE PROGRESO DE MERCADOS
+- En la ficha del partido, los mercados de "Más de / Menos de" (goles, córners, tarjetas, remates y remates a puerta, de equipo o de jugador) tienen una barra y botones － / ＋. Entiende "Más de 2.5", "Menos de 9.5", "+2.5", "Over 2.5" y "2+".
+- "Más de": al llegar a la línea se marca Ganado solo. "Menos de": al pasarse se marca Perdido solo. Si restas, vuelve a Pendiente. Todo queda en el historial y se puede deshacer.
+- Mercados de jugador "Incl. suplente": botón "＋ Agregar suplente". Escribe su nombre y se busca su foto en API-Football (si no aparece, por ID). Cada jugador tiene su contador y la barra suma ambos. El suplente queda en Logos con su foto.
+- "🏁 Terminó el partido": marca de una vez los "Más de" que no llegaron (perdidos) y los "Menos de" que no se pasaron (ganados), mostrando antes el resumen.
+- Agenda, Partidos de hoy y Mercados muestran el progreso en miniatura (p. ej. "Goles 2/3 · Mbappe 1/2").
+- Un mismo mercado comparte barra en todos los cupones donde aparece. El progreso se guarda en los datos de KAL, se sincroniza con la nube y entra en los respaldos.
+- El conteo es manual con el plan gratis de API-Football. Con un plan de pago se podría conectar para que avance solo.
+- Código: site/js/17-progreso.js y site/css/11-progreso.css. Pruebas: sección 9 de pruebas/ejecutar.mjs (59 pruebas en total).

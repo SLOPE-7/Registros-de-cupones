@@ -182,6 +182,7 @@ function importBackup(file) {
         actionHistory: Array.isArray(incoming.actionHistory) ? incoming.actionHistory : [],
         deleted: {},
         settings: incoming.settings && typeof incoming.settings === "object" ? incoming.settings : {},
+        progress: incoming.progress && typeof incoming.progress === "object" ? incoming.progress : {},
       };
       if (obj.logos) mergeLogoStores(obj.logos);
       indexSavedCrests();
@@ -637,6 +638,7 @@ try {
       actionHistory: Array.isArray(d.actionHistory) ? d.actionHistory : [],
       deleted: d.deleted && typeof d.deleted === "object" ? d.deleted : {},
       settings: d.settings && typeof d.settings === "object" ? d.settings : {},
+      progress: d.progress && typeof d.progress === "object" ? d.progress : {},
     };
   } else {
     const old = JSON.parse(localStorage.getItem(OLD) || "[]");

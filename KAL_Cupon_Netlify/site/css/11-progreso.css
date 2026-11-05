@@ -1,0 +1,187 @@
+/* Barra de progreso de mercados de línea (V9). Azul = avance, verde = superado, naranja/rojo = "Menos de" en riesgo. */
+.pg {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+}
+.pg-seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  height: 10px;
+}
+.pg-seg i {
+  border-radius: 3px;
+  background: var(--bar);
+  transition: background 0.25s;
+}
+.pg-seg i.on {
+  background: var(--gain, #3b8fe0);
+}
+.pg-seg.is-good i.on {
+  background: var(--won);
+}
+.pg-seg.is-under i.on {
+  background: var(--gain, #3b8fe0);
+}
+.pg-seg.is-risk i.on {
+  background: #e0a21b;
+}
+.pg-seg.is-bad i.on {
+  background: var(--lost);
+}
+.pg-track {
+  height: 10px;
+  border-radius: 6px;
+  background: var(--bar);
+  overflow: hidden;
+}
+.pg-track i {
+  display: block;
+  height: 100%;
+  background: var(--gain, #3b8fe0);
+  border-radius: 6px;
+  transition: width 0.25s;
+}
+.pg-track.is-good i {
+  background: var(--won);
+}
+.pg-track.is-risk i {
+  background: #e0a21b;
+}
+.pg-track.is-bad i {
+  background: var(--lost);
+}
+.pg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.pg-head > span:first-child b {
+  font-size: 17px;
+}
+.pg-head small {
+  flex: 1;
+  color: var(--ink2);
+  font-size: 11px;
+}
+.pg-ctrl {
+  display: flex;
+  gap: 6px;
+}
+.pg-btn {
+  width: 38px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.1s;
+}
+.pg-btn:active {
+  transform: scale(0.92);
+}
+.pg-btn.plus {
+  background: linear-gradient(135deg, #ffd96a, #f0b429);
+  border-color: #f0b429;
+  color: #1a1405;
+}
+.pg-player {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 38px 26px 38px auto;
+  gap: 7px;
+  align-items: center;
+}
+.pg-photo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #f4f7fb;
+  font-size: 10px;
+}
+.pg-name {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-name small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.pg-num {
+  text-align: center;
+  font-size: 16px;
+  color: var(--ink);
+}
+.pg-mini-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+.pg-add-sub {
+  justify-self: start;
+}
+.pg-finish {
+  width: 100%;
+  margin-bottom: 2px;
+}
+.pg-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 36px;
+}
+.marketrow .pg-chips {
+  padding-left: 0;
+  margin-top: 3px;
+}
+.pg-chip {
+  font-size: 10.5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--ink2);
+  font-weight: 700;
+}
+.pg-chip.ok {
+  background: var(--won-bg);
+  color: var(--won);
+}
+:root[data-theme="dark"] .pg {
+  background: #0f1828;
+}
+:root[data-theme="dark"] .pg-btn {
+  background: #18243b;
+  color: #fff;
+}
+:root[data-theme="dark"] .pg-btn.plus {
+  background: linear-gradient(135deg, #ffd96a, #f0b429);
+  color: #1a1405;
+}
+@keyframes kalpop {
+  50% {
+    transform: scale(1.08);
+  }
+}
+.mk-card.st-won .pg-head b {
+  animation: kalpop 0.4s ease;
+}

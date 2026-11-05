@@ -207,6 +207,53 @@ section("7. App instalable y sin conexión");
   await ctx.close();
 }
 
+// ---------- 9. Barra de progreso de mercados ----------
+section("9. Barra de progreso de mercados");
+{
+  const now = Date.now(), day = isoDay(now), time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
+  const db = { coupons: [{ id: "P", name: "Progreso", created: new Date(now).toISOString(), houseId: "", type: "parlay", stake: 10, odds: 5, payout: 50,
+    fixtures: [{ id: "f", home: "Real Madrid", away: "Juventus", competition: "UEFA Liga Campeones", dateISO: day, time, markets: [
+      { market: "Total de goles", pick: "Más de 2.5", odd: "1.8", settlement: "pending" },
+      { market: "Total Tiros De Esquina", pick: "Menos de 2.5", odd: "2.1", settlement: "pending" },
+      { market: "Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente", pick: "Más de 1.5", odd: "1.9", settlement: "pending" },
+      { market: "Total de tarjetas", pick: "Más de 4.5", odd: "1.7", settlement: "pending" },
+      { market: "1x2", pick: "1", odd: "1.5", settlement: "pending" }] }] }], houses: [], transactions: [], resultHistory: [], actionHistory: [] };
+  const { ctx, page } = await open(db);
+  const u = await page.evaluate(() => {
+    const L = (market, pick) => { const r = parseLine({ market, pick }, { home: "Real Madrid", away: "Juventus" }); return r ? r.dir + ":" + r.goal + ":" + r.cat + (r.incl ? ":suplente" : "") : null; };
+    return [L("Total de goles", "Más de 2.5"), L("Total Tiros De Esquina", "Menos de 9.5"), L("Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"),
+            L("Remates (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"), L("Tarjetas", "+3.5"), L("Jugador remates a puerta", "Mbappe 2+"), L("1x2", "1"), L("Ambos equipos marcan", "Sí")];
+  });
+  check("entiende las líneas (goles, córners, remates, tarjetas, 2+)", u.map(String).join("|") === "over:3:goles|under:10:córners|over:2:a puerta:suplente|over:2:remates:suplente|over:4:tarjetas|over:2:a puerta|null|null", u.map(String).join("|"));
+  await page.evaluate(() => document.querySelector("#todayList .agenda-match").click()); await page.waitForTimeout(150);
+  const card = (txt) => `.mk-card:has-text("${txt}")`;
+  check("muestra barra solo en mercados de línea", (await page.$$(".match-tab-content .pg")).length === 4);
+  for (let i = 0; i < 3; i++) { await page.click(`${card("Total de goles")} .pg-btn.plus`); await page.waitForTimeout(80); }
+  check("Más de 2.5 goles: con 3 se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
+  check("avisa con un mensaje de mercado ganado", /Mercado ganado/.test(await page.$eval("#toast", (e) => e.textContent)));
+  await page.click("[data-marked-toggle]");
+  await page.click(`.marked-fold ${card("Total de goles")} .pg-btn:not(.plus)`); await page.waitForTimeout(100);
+  check("si restas, vuelve a pendiente", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "pending");
+  for (let i = 0; i < 3; i++) { await page.click(`.match-tab-content > ${card("Tiros De Esquina")} .pg-btn.plus`); await page.waitForTimeout(80); }
+  check("Menos de 2.5 córners: con 3 se marca perdido solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[1].settlement)) === "lost");
+  await page.evaluate(() => { db.coupons[0].fixtures[0].markets[1].settlement = "pending"; db.progress = {}; save(); renderAll(); });
+  await page.click(`.match-tab-content > ${card("Mbappe")} .pg-btn.plus`); await page.waitForTimeout(80);
+  page.promptAnswer = "Endrick";
+  await page.click(`${card("Mbappe")} [data-pg-sub-add]`); await page.waitForTimeout(400);
+  check("agrega al suplente con su nombre", (await page.$eval(card("Mbappe"), (e) => e.innerText)).includes("Endrick"));
+  await page.click(`${card("Mbappe")} .pg-player:has-text("Endrick") .pg-btn.plus`); await page.waitForTimeout(150);
+  check("Mbappé 1 + suplente 1 = 2: remates a puerta ganado", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[2].settlement)) === "won");
+  await page.click(".match-close"); await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  check("la Agenda muestra el progreso en miniatura", /Goles 0\/3/.test(await page.$eval("#agendaList", (e) => e.innerText)), await page.$eval("#agendaList", (e) => e.innerText.replace(/\s+/g, " ")));
+  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(150);
+  await page.click(`${card("tarjetas")} .pg-btn.plus`); await page.waitForTimeout(80);
+  await page.click("[data-pg-finish]"); await page.waitForTimeout(200);
+  const st = await page.evaluate(() => db.coupons[0].fixtures[0].markets.map((m) => m.settlement).join(","));
+  check("Terminó el partido: Más de sin llegar → perdido, Menos de → ganado", st === "lost,won,won,lost,pending", st);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {
