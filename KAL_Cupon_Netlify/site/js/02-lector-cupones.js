@@ -113,6 +113,9 @@ function splitEarlyPayout(pick) {
     ? { pick: String(pick).slice(0, m.index).trim(), early: true }
     : { pick: String(pick || "").trim(), early: false };
 }
+// Línea del importe apostado. "Apuesta" solo cuenta si va sola o seguida del importe
+// (así "Apuesta sin empate: 1" se lee como mercado y no como importe).
+const STAKE_LINE_RE = /^(?:VALOR APOSTADO|IMPORTE APOSTADO|STAKE)\b|^APUESTA\s*(?::|L\b|\$|\d|$)/i;
 function parseCoupon(raw) {
   const lines = String(raw || "")
     .replace(/\r/g, "")
@@ -146,7 +149,7 @@ function parseCoupon(raw) {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     let v;
-    if (/^(?:VALOR APOSTADO|IMPORTE APOSTADO|APUESTA|STAKE)\b/i.test(l)) {
+    if (STAKE_LINE_RE.test(l)) {
       v = getAmount(l, lines[i + 1]);
       if (v !== null) meta.stake = v;
     } else if (/^(?:CUOTAS|CUOTA TOTAL|ODDS)\s*:?/i.test(l)) {
@@ -245,7 +248,7 @@ function parseCoupon(raw) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/^competitor\s+logo$/i.test(line)) continue;
-    if (/^(?:VALOR APOSTADO|IMPORTE APOSTADO|APUESTA|STAKE)\b/i.test(line)) {
+    if (STAKE_LINE_RE.test(line)) {
       financialSummary = true;
       continue;
     }

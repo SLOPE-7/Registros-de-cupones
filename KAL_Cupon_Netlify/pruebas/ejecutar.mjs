@@ -98,6 +98,28 @@ section("1. Lector de cupones y detección de jugadores");
     return changed + ":" + db.coupons[0].fixtures[0].markets[0].pick + ":" + db.coupons[0].fixtures[0].markets[0].earlyPayout;
   });
   check("limpia cupones ya guardados con 'pago anticipado'", mig === "true:1:true", mig);
+  // Cupón real (Europa League + Conference League, 16 partidos) pegado tal cual desde la casa de apuestas.
+  const realRaw = fs.readFileSync(path.join(ROOT, "pruebas/cupon-real-1.txt"), "utf8");
+  const real = await page.evaluate((raw) => {
+    const p = parseCoupon(raw);
+    return {
+      n: p.fixtures.length,
+      sinMercado: p.fixtures.filter((f) => !f.markets.length).map((f) => f.home),
+      sinCuota: p.fixtures.filter((f) => f.markets.some((m) => !m.odd)).map((f) => f.home),
+      sinCompeticion: p.fixtures.filter((f) => !/europa league|conference league/i.test(f.competition)).map((f) => f.home),
+      anderlecht: p.fixtures.find((f) => /anderlecht/i.test(f.home))?.markets[0],
+      celtic: p.fixtures.find((f) => /celtic/i.test(f.home))?.markets[0],
+      early: p.fixtures.filter((f) => f.markets[0]?.earlyPayout).length,
+      meta: p.meta,
+    };
+  }, realRaw);
+  check("cupón real: 16 partidos, todos con mercado", real.n === 16 && !real.sinMercado.length, JSON.stringify(real.sinMercado));
+  check("cupón real: todas las cuotas leídas", !real.sinCuota.length, JSON.stringify(real.sinCuota));
+  check("cupón real: competición en todos (Europa / Conference League)", !real.sinCompeticion.length, JSON.stringify(real.sinCompeticion));
+  check("cupón real: 'Apuesta sin empate' es un mercado, no el importe", real.anderlecht?.market === "Apuesta sin empate" && real.anderlecht?.odd === "1.45", JSON.stringify(real.anderlecht));
+  check("cupón real: hándicap con su línea '2 (0:2)'", real.celtic?.market === "Hándicap 1x2" && real.celtic?.pick === "2 (0:2)", JSON.stringify(real.celtic));
+  check("cupón real: 8 selecciones con pago anticipado", real.early === 8, String(real.early));
+  check("cupón real: importe, cuota total, bono y ganancia", real.meta.stake === 10 && real.meta.odds === 37.48 && real.meta.bonus === 21.88 && real.meta.payout === 396.7, JSON.stringify(real.meta));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

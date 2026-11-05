@@ -230,3 +230,4 @@ VERSIÓN 10.2 — CORRECCIONES DESDE CAPTURAS REALES
 - Lector: reconoce la línea "Región o país, Competición" para más de 70 países y regiones (incluida "Europa, UEFA …").
 - Lector: lee la cuota sola en su línea ("1.47", "@1.47", "Cuota 1.47") y al final de la selección ("… @1.80"), además de "Cuotas: 1.47".
 - "• pago anticipado" se separa de la selección y se muestra como etiqueta "⚡ Pago anticipado". Los cupones ya guardados se limpian solos.
+- V10.3: "Apuesta sin empate" ya no se confunde con la línea del importe apostado. Se agregó un cupón real de 16 partidos (pruebas/cupon-real-1.txt) a las pruebas automáticas (74 en total).
