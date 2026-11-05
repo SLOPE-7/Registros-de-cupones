@@ -158,3 +158,19 @@ Estadísticas → "Tu rendimiento"
 - Acierto por tipo de mercado, por rango de cuota y por competición, con la rentabilidad "suelta" (si cada mercado se hubiera apostado por separado a 1 unidad).
 - Resultado y ROI por casa de apuestas.
 - Cada mercado cuenta una sola vez aunque esté en varios cupones; los nulos no cuentan en el % de acierto.
+
+
+VERSIÓN 7 — AVISOS DE PARTIDOS, PRESUPUESTO Y RACHAS
+Avisos de partidos (notificaciones del teléfono)
+- En Más → Ajustes → "Avisos de partidos" pulsa "Activar avisos en este teléfono" y acepta el permiso.
+- En iPhone solo funciona con KAL instalada en la pantalla de inicio (iOS 16.4 o superior).
+- Elige cuántos minutos antes avisar (5, 10, 15, 30 o 60) y si quieres otro aviso cuando el partido empiece.
+- Llegan aunque KAL esté cerrada. Se avisa de los partidos con mercados pendientes de cupones vivos en los próximos 7 días; al perderse un cupón, sus partidos dejan de avisarse.
+- "Enviar prueba" manda una notificación al momento para comprobar que funciona.
+- Con la app abierta también aparece un aviso arriba de la pantalla (se puede desactivar).
+- Funcionamiento: la función "avisos" guarda los próximos partidos de cada teléfono y la función programada "avisos-envio" revisa cada 5 minutos qué avisos tocan. Usa Netlify Blobs (incluido en Netlify) y crea sola sus claves; no hay que configurar nada.
+- Archivos nuevos: package.json (Netlify instala @netlify/blobs y web-push al publicar), netlify/lib/avisos-comun.mjs, netlify/functions/avisos.mjs y netlify/functions/avisos-envio.mjs.
+
+Presupuesto mensual y rachas
+- En Inicio, "Define tu presupuesto mensual": barra con lo apostado este mes, aviso al 80 % y al superar el 100 %. El presupuesto se sincroniza con la nube.
+- Aviso en Inicio cuando llevas 3 o más cupones perdidos seguidos.

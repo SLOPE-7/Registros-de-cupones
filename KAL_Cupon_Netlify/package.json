@@ -1,0 +1,10 @@
+{
+  "name": "kal-cupon-organizador",
+  "private": true,
+  "type": "module",
+  "description": "Funciones de Netlify para KAL (API-Football y avisos de partidos).",
+  "dependencies": {
+    "@netlify/blobs": "8.2.0",
+    "web-push": "3.6.7"
+  }
+}
