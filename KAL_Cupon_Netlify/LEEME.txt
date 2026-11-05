@@ -175,3 +175,31 @@ Presupuesto mensual y rachas
 - En Inicio, "Define tu presupuesto mensual": barra con lo apostado este mes, aviso al 80 % y al superar el 100 %. El presupuesto se sincroniza con la nube.
 - Aviso en Inicio cuando llevas 3 o más cupones perdidos seguidos.
 - Las notificaciones muestran la hora del partido, la competición y los mercados pendientes (hasta 3, y "y N más"). En iPhone siempre aparece el ícono de KAL: iOS no permite mostrar otras imágenes en notificaciones de apps web.
+
+
+VERSIÓN 8 — CÓDIGO ORDENADO, BUSCADOR Y GUARDADO RÁPIDO
+Buscador global
+- Botón 🔎 en el encabezado. Escribe un equipo, un jugador o el nombre de un cupón (al menos 2 letras).
+- Equipos: partidos y % de mercados acertados. Jugadores: club, mercados y su estado. Cupones: estado e importe.
+- Incluye los cupones archivados. Toca un partido para abrir su ficha o un cupón para ir a él.
+
+Guardar más rápido
+- La casa de apuestas se elige sola: por su nombre en el texto, por el formato del texto (comparado con tus cupones guardados de cada casa) o, si no hay pistas, la última que usaste. Debajo se explica el motivo.
+- Botones con tus importes habituales debajo de "Importe apostado".
+- Se recuerda si marcas "Registrar la apuesta en el balance".
+- Barra fija "Guardar cupón" con el resumen (selecciones, importe, cuota y casa) mientras revisas la vista previa.
+
+Organización del código (site/)
+- index.html: solo la estructura de las pantallas.
+- css/: estilos por capas, en orden (01-base … 10-buscador-guardado). Cada capa ajusta a las anteriores.
+- js/: lógica por temas, en orden de carga:
+    01-nucleo · 02-lector-cupones · 03-reglas-cupones · 04-escudos · 05-nuevo-cupon-resultados
+    06-agenda-mercados · 07-logos-jugadores · 08-cupones-casas-estadisticas · 09-nube · 10-ficha-partido
+    11-navegacion-eventos · 12-tema · 13-app-instalable · 14-avisos-presupuesto · 15-guardado-rapido
+    16-buscador · 99-arranque (inicia la app; siempre el último)
+  Los archivos comparten sus funciones y variables. Para añadir uno nuevo, agrégalo en index.html antes de 99-arranque.js y en la lista SHELL de sw.js.
+- sw.js: modo sin conexión. Si agregas o renombras archivos, súbele la versión (CACHE = 'kal-vN').
+
+Pruebas automáticas (pruebas/)
+- node pruebas/ejecutar.mjs  (desde la carpeta KAL_Cupon_Netlify; necesita Playwright: npm i -D playwright && npx playwright install chromium)
+- Revisan el lector, la detección de jugadores, la regla del cupón perdido, Mercados, Agenda, Mis cupones, eliminar y deshacer, guardado rápido, buscador, avisos, presupuesto, rachas, modo sin conexión y las funciones de Netlify (con API simulada).

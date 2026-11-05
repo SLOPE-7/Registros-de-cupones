@@ -3,8 +3,35 @@
 //   conexión, se usa la copia guardada.
 // - Iconos y manifiesto se sirven desde la caché.
 // - Las funciones de Netlify (API-Football) nunca se guardan: siempre van a la red.
-const CACHE = 'kal-v7';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-32.png'];
+const CACHE = 'kal-v9';
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-32.png',
+  '/css/01-base.css',
+  '/css/02-tema-claro.css',
+  '/css/03-ficha-partido.css',
+  '/css/04-mercados-compactos.css',
+  '/css/05-compacto.css',
+  '/css/06-tema-oscuro-componentes.css',
+  '/css/07-cupones-app.css',
+  '/css/08-estadisticas.css',
+  '/css/09-avisos-presupuesto.css',
+  '/css/10-buscador-guardado.css',
+  '/js/01-nucleo.js',
+  '/js/02-lector-cupones.js',
+  '/js/03-reglas-cupones.js',
+  '/js/04-escudos.js',
+  '/js/05-nuevo-cupon-resultados.js',
+  '/js/06-agenda-mercados.js',
+  '/js/07-logos-jugadores.js',
+  '/js/08-cupones-casas-estadisticas.js',
+  '/js/09-nube.js',
+  '/js/10-ficha-partido.js',
+  '/js/11-navegacion-eventos.js',
+  '/js/12-tema.js',
+  '/js/13-app-instalable.js',
+  '/js/14-avisos-presupuesto.js',
+  '/js/15-guardado-rapido.js',
+  '/js/16-buscador.js',
+  '/js/99-arranque.js'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -21,13 +48,16 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith('/.netlify/')) return;
-  if (req.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+  // Página, estilos y lógica: primero la red (así llegan las actualizaciones) y, sin conexión, la copia guardada.
+  // Imágenes (íconos): primero la copia guardada.
+  const isImage = /\.(png|jpe?g|svg|webp|ico)$/i.test(url.pathname);
+  if (!isImage) {
+    const cacheKey = req.mode === 'navigate' || url.pathname === '/' ? '/index.html' : url.pathname;
     event.respondWith(
       fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(cache => cache.put('/index.html', copy));
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(cache => cache.put(cacheKey, copy)); }
         return res;
-      }).catch(() => caches.match('/index.html').then(r => r || caches.match('/')))
+      }).catch(() => caches.match(cacheKey).then(r => r || caches.match('/')))
     );
     return;
   }

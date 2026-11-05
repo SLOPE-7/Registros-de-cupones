@@ -1,0 +1,796 @@
+/* Diseño compacto (V4): barra lateral, encabezado, menú inferior, Logos plegable. */
+/* ===== KAL V4 · diseño compacto y ordenado (sobrescribe las capas anteriores) ===== */
+:root {
+  --r: 12px;
+  --gap: 10px;
+  --pad: 12px;
+}
+body {
+  font-size: 14px;
+  line-height: 1.4;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* Barra lateral */
+.app {
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+aside {
+  padding: 16px 10px;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
+}
+.brand {
+  font-size: 22px;
+  padding: 4px 8px 12px;
+}
+nav {
+  gap: 3px;
+}
+nav button,
+.navbtn {
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+.side-new {
+  width: 100%;
+  padding: 9px;
+}
+.sidebox {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 11px;
+  border: 1px solid #4c9872;
+  border-radius: 10px;
+}
+.sidebox strong {
+  font-size: 20px;
+}
+/* Encabezado */
+main {
+  padding: 12px 16px 32px;
+  max-width: 1280px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+}
+.top:after {
+  font-size: 70px;
+  top: -18px;
+  right: 30%;
+}
+.top-brand {
+  display: none;
+  font-weight: 900;
+  color: #ffe477;
+  white-space: nowrap;
+}
+.top h1,
+#viewTitle {
+  font-size: 18px;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: auto;
+}
+.top-new {
+  flex: 0 0 auto;
+}
+/* Paneles y elementos base */
+.panel {
+  border-radius: var(--r);
+  margin-bottom: var(--gap);
+  box-shadow: 0 2px 10px #2445310a;
+}
+.ph {
+  padding: 10px var(--pad);
+  gap: 8px;
+}
+.ph h2 {
+  font-size: 15px;
+}
+.ph h3,
+.pb h3 {
+  font-size: 14px;
+  margin: 6px 0;
+}
+.pb {
+  padding: var(--pad);
+}
+.grid {
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: var(--gap);
+}
+.field {
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.field label,
+.field > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.input,
+textarea,
+select {
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+}
+textarea {
+  min-height: 150px;
+}
+.btn {
+  padding: 7px 11px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.btn.sm {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.row {
+  gap: 6px;
+}
+.notice {
+  padding: 8px 10px;
+  font-size: 12px;
+  margin: 8px 0;
+  border-radius: 9px;
+}
+.empty {
+  padding: 16px 8px;
+  font-size: 13px;
+}
+.badge {
+  font-size: 11px;
+  padding: 2px 7px;
+}
+.cards {
+  gap: 8px;
+}
+.coupon,
+.listitem,
+.agenda-match {
+  border-radius: 11px;
+}
+.couponhead {
+  padding: 8px 10px;
+}
+.couponbody {
+  padding: 8px 10px;
+}
+.listitem {
+  padding: 9px;
+  margin-bottom: 6px;
+}
+/* Indicadores */
+.stats {
+  gap: 6px;
+  margin-bottom: var(--gap);
+}
+.stat {
+  padding: 8px 10px;
+  border-radius: 10px;
+  min-width: 0;
+}
+.stat strong {
+  font-size: 18px;
+  line-height: 1.15;
+}
+.stat span {
+  font-size: 11px;
+  line-height: 1.2;
+  display: block;
+}
+.kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.dashboard-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.balance-chart {
+  padding: 10px;
+}
+.balance-chart svg {
+  height: 110px;
+}
+/* Inicio: lector a la izquierda, vista previa y datos a la derecha */
+#view-home .left .panel:first-child .row .btn {
+  flex: 1;
+}
+.draft-fields {
+  gap: 6px;
+}
+/* Agenda */
+.agenda-day {
+  margin: 4px 0 10px;
+}
+.agenda-day h3 {
+  font-size: 13px;
+  margin: 8px 2px 4px;
+  text-transform: capitalize;
+}
+.agenda-match {
+  padding: 9px 10px;
+  margin: 6px 0;
+}
+.agenda-match .team-crest,
+.agenda-match .team-fallback {
+  width: 28px;
+  height: 28px;
+}
+/* Cupones guardados */
+.saved-metrics {
+  gap: 6px;
+}
+.saved-metrics span {
+  padding: 6px 8px;
+}
+.saved-fixtures {
+  gap: 5px;
+  margin: 8px 0;
+}
+.saved-fixture .team-crest,
+.saved-fixture .team-fallback {
+  width: 22px;
+  height: 22px;
+}
+/* Logos: secciones plegables y tarjetas compactas */
+.logos-panel .ph {
+  align-items: flex-start;
+}
+.logo-totals {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.logo-stat {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #f5f9f2;
+}
+.logo-toolbar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.logo-search {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.logo-help {
+  margin: 4px 0 10px;
+}
+.fold {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  margin-bottom: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.fold-head {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+  background: #f6faf3;
+}
+.fold-head:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+.fold-title {
+  flex: 1;
+  min-width: 0;
+}
+.fold-count {
+  min-width: 24px;
+  text-align: center;
+  font-size: 12px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e3efe0;
+  color: #1d5c3f;
+}
+.fold-icon {
+  transition: transform 0.2s;
+  font-size: 14px;
+  color: var(--muted);
+}
+.fold.is-open .fold-icon {
+  transform: rotate(180deg);
+}
+.fold-body {
+  display: none;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--line);
+}
+.fold.is-open .fold-body {
+  display: block;
+}
+.fold-hint {
+  margin: 0 0 8px;
+}
+.logo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 6px;
+}
+.logo-card {
+  padding: 8px 10px;
+  border-radius: 10px;
+  gap: 6px;
+  display: grid;
+}
+.logo-card-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.logo-card-top .team-crest,
+.logo-card-top .team-fallback,
+.player-logo-thumb {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+}
+.logo-team-info {
+  min-width: 0;
+  flex: 1;
+}
+.logo-team-info strong {
+  display: block;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logo-team-info span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logo-status {
+  font-size: 10px;
+  padding: 2px 7px;
+  flex: 0 0 auto;
+}
+.logo-card-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.logo-card-actions .btn {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.logo-options:empty {
+  display: none;
+}
+.logo-empty {
+  padding: 10px;
+  font-size: 12px;
+  grid-column: 1/-1;
+}
+.logo-hero {
+  display: none;
+}
+/* Casas, estadísticas y ajustes */
+.bookmaker-grid {
+  gap: 6px;
+}
+.bookmaker-card {
+  padding: 8px;
+}
+.account-box {
+  padding: 10px;
+  border-radius: 10px;
+}
+table th,
+table td {
+  padding: 6px 8px;
+  font-size: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+/* Menú inferior y menú "Más" */
+.more-menu {
+  position: fixed;
+  z-index: 30;
+  right: 8px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px #0d2a1b33;
+  padding: 6px;
+  display: grid;
+  min-width: 200px;
+}
+.more-menu[hidden] {
+  display: none;
+}
+.more-menu button {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.more-menu button span {
+  width: 20px;
+  text-align: center;
+}
+.more-menu button:hover,
+.more-menu button.active {
+  background: #edf5e9;
+  color: #0b6042;
+  font-weight: 700;
+}
+@media (min-width: 621px) {
+  .more-menu {
+    display: none !important;
+  }
+}
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 170px minmax(0, 1fr);
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  main {
+    padding: 8px 10px calc(76px + env(safe-area-inset-bottom));
+  }
+  .top {
+    padding: 9px 12px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    position: sticky;
+    top: 6px;
+    z-index: 8;
+  }
+  .top-brand {
+    display: inline;
+  }
+  .top h1,
+  #viewTitle {
+    font-size: 16px;
+    width: auto;
+  }
+  .top-new {
+    padding: 5px 9px;
+    font-size: 12px;
+  }
+  .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .kpis .stat {
+    padding: 6px 5px;
+    text-align: center;
+  }
+  .kpis .stat strong {
+    font-size: 15px;
+  }
+  .kpis .stat span {
+    font-size: 9.5px;
+  }
+  .dashboard-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .dashboard-stats .stat {
+    padding: 6px;
+  }
+  .dashboard-stats .stat strong {
+    font-size: 14px;
+  }
+  .dashboard-stats .stat span {
+    font-size: 10px;
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ph {
+    padding: 9px 10px;
+  }
+  .pb {
+    padding: 10px;
+  }
+  textarea {
+    min-height: 120px;
+  }
+  .mobile {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 4px 2px calc(4px + env(safe-area-inset-bottom));
+  }
+  .mobile button {
+    font-size: 10px;
+    padding: 4px 0;
+    gap: 1px;
+  }
+  .mobile button span {
+    font-size: 17px;
+  }
+  .logo-grid {
+    grid-template-columns: 1fr;
+  }
+  .logos-panel .ph {
+    flex-direction: column;
+  }
+  .catalog-lookup-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+/* V4 · ajustes por pantalla */
+.mobile button,
+.mobile button.active,
+.mobile button:hover {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0;
+}
+.mobile button {
+  color: #708477;
+  position: relative;
+}
+.mobile button.active {
+  color: #0b6042;
+  font-weight: 700;
+}
+.mobile button.active:before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: 28%;
+  right: 28%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: #e9b949;
+}
+.stats.kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+#view-calendar .stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+#view-calendar .stat,
+.kpis .stat {
+  text-align: center;
+}
+.agenda-match-link {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  align-items: stretch !important;
+}
+.agenda-teams {
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr) auto minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+}
+.agenda-teams .team-side {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.agenda-teams .team-side:nth-of-type(1) {
+  text-align: right;
+}
+.agenda-vs {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+.agenda-match-info {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.agenda-match-info b {
+  color: var(--text);
+}
+.agenda-match-info .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+}
+.agenda-match-info .team-crest {
+  width: 16px;
+  height: 16px;
+}
+.market-filters {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.saved-coupon .couponhead {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+.result-badge {
+  flex: 0 0 auto;
+  font-size: 12px;
+  padding: 3px 9px;
+}
+.saved-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+.saved-metrics span {
+  padding: 6px 7px !important;
+  gap: 1px !important;
+  min-width: 0;
+}
+.saved-metrics small {
+  font-size: 10px;
+}
+.saved-metrics b {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.saved-fixture {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, auto) auto minmax(0, auto) 22px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px !important;
+  font-size: 13px;
+  text-align: left;
+}
+.saved-fixture span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.saved-fixture small {
+  margin-left: 0 !important;
+  text-align: right;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.saved-coupon .couponbody > .row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+.saved-coupon .couponbody > .row .btn {
+  white-space: nowrap;
+  padding: 6px 4px;
+}
+.bookmaker-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+.bookmaker-card {
+  min-width: 0;
+  overflow: hidden;
+  padding: 7px !important;
+  gap: 6px;
+}
+.bookmaker-card strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bookmaker-card small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.bookmaker-mark {
+  flex: 0 0 30px;
+  width: 30px !important;
+  height: 30px !important;
+  font-size: 15px !important;
+  overflow: hidden;
+}
+.betpro .bookmaker-mark {
+  font-size: 8px !important;
+  letter-spacing: -0.3px;
+}
+@media (max-width: 620px) {
+  .stats.kpis,
+  #view-calendar .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+  #view-calendar .stat {
+    padding: 6px 4px;
+  }
+  #view-calendar .stat strong {
+    font-size: 16px;
+  }
+  #view-calendar .stat span {
+    font-size: 9.5px;
+  }
+  .market-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .saved-fixture {
+    grid-template-columns: 22px auto auto auto 22px;
+    justify-content: start;
+  }
+  .saved-fixture small {
+    grid-column: 1/-1;
+    text-align: left;
+  }
+  .bookmaker-card small {
+    display: none;
+  }
+  .bookmaker-card:after {
+    content: "＋";
+    margin-left: auto;
+    color: var(--muted);
+  }
+  .bookmaker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  #view-calendar .ph {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  #view-calendar .ph .row {
+    width: 100%;
+  }
+  #view-calendar .ph .row .input {
+    max-width: none !important;
+  }
+}

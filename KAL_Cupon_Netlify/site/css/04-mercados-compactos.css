@@ -1,0 +1,136 @@
+/* Tarjetas compactas del resumen de mercados. */
+/* KAL_MARKETS_COMPACT_V1 */
+[data-market-card] {
+  overflow: hidden;
+}
+[data-market-card] > .couponhead {
+  padding: 8px 10px;
+  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+[data-market-card] .market-match-open {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+[data-market-card] .agenda-teams {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 22px minmax(0, 1fr) 30px;
+  gap: 6px;
+  align-items: center;
+}
+[data-market-card] .agenda-teams .team-crest,
+[data-market-card] .agenda-teams .team-fallback {
+  width: 30px;
+  height: 30px;
+}
+[data-market-card] .agenda-teams strong {
+  font-size: 13px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+[data-market-card] .agenda-teams strong:nth-of-type(1) {
+  text-align: right;
+}
+[data-market-card] .agenda-teams strong:nth-of-type(2) {
+  text-align: left;
+}
+[data-market-card] .agenda-vs {
+  text-align: center;
+}
+[data-market-card] .market-match-open > .marketmeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  margin-top: 5px;
+  line-height: 1.25;
+}
+[data-market-card] .market-head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+[data-market-card] .market-head-actions .btn {
+  padding: 6px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+[data-market-card] > .couponbody {
+  padding: 6px 10px;
+}
+[data-market-card] .marketrow {
+  gap: 7px;
+  padding: 7px 0;
+}
+[data-market-card] .marketname {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  line-height: 1.25;
+}
+[data-market-card] .market-player-photo {
+  width: 30px;
+  height: 30px;
+  margin-right: 7px;
+}
+[data-market-card] .statusbtns {
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+[data-market-card] .statusbtns button {
+  min-width: 32px;
+  padding: 5px 6px;
+  font-size: 11px;
+}
+@media (max-width: 760px) {
+  [data-market-card] > .couponhead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+  [data-market-card] .market-head-actions {
+    justify-content: flex-end;
+  }
+  [data-market-card] .marketrow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  [data-market-card] .statusbtns {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+  [data-market-card] .statusbtns button {
+    width: 100%;
+    min-height: 31px;
+  }
+}
+@media (max-width: 420px) {
+  [data-market-card] > .couponhead {
+    padding: 7px 8px;
+  }
+  [data-market-card] .agenda-teams {
+    grid-template-columns: 26px minmax(0, 1fr) 18px minmax(0, 1fr) 26px;
+    gap: 4px;
+  }
+  [data-market-card] .agenda-teams .team-crest,
+  [data-market-card] .agenda-teams .team-fallback {
+    width: 26px;
+    height: 26px;
+  }
+  [data-market-card] .agenda-teams strong {
+    font-size: 12px;
+  }
+  [data-market-card] .market-head-actions .btn {
+    padding: 5px 7px;
+    font-size: 10px;
+  }
+  [data-market-card] > .couponbody {
+    padding: 5px 8px;
+  }
+  [data-market-card] .marketrow {
+    padding: 6px 0;
+  }
+}

@@ -1,0 +1,223 @@
+/* Buscador global y guardado rápido (V8). */
+/* Buscador: hoja a pantalla completa en el teléfono, ventana centrada en computadora. */
+.search-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #070b14);
+  padding: calc(10px + env(safe-area-inset-top)) 12px 12px;
+}
+.search-sheet[hidden] {
+  display: none;
+}
+body.search-open {
+  overflow: hidden;
+}
+.search-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.search-top .input {
+  flex: 1;
+  font-size: 16px;
+}
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 20px;
+}
+.search-group {
+  margin-bottom: 14px;
+}
+.search-group h3 {
+  font-size: 13px;
+  margin: 4px 2px 6px;
+  color: var(--ink2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.search-group h3 small {
+  font-size: 11px;
+  margin-left: 4px;
+}
+.search-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 9px 10px;
+  margin-bottom: 8px;
+  display: grid;
+  gap: 5px;
+}
+.search-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+.search-head b {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+}
+.search-head small {
+  font-size: 11.5px;
+  color: var(--ink2);
+}
+.search-head .team-crest,
+.search-head .team-fallback,
+.search-photo {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.search-photo {
+  background: #f4f7fb;
+}
+.search-fixture {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface2);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.search-fixture span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-fixture small {
+  color: var(--ink2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.search-coupon {
+  margin-bottom: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.search-more {
+  font-size: 11px;
+  color: var(--ink2);
+  padding-left: 4px;
+}
+:root[data-theme="dark"] .search-sheet {
+  background: #070b14;
+}
+:root[data-theme="dark"] .search-card,
+:root[data-theme="dark"] .search-coupon {
+  background: var(--panel2);
+}
+:root[data-theme="dark"] .search-fixture {
+  background: #0f1828;
+}
+@media (min-width: 700px) {
+  .search-sheet {
+    inset: 6vh 50% auto auto;
+    transform: translateX(50%);
+    width: min(640px, 94vw);
+    max-height: 84vh;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px #000a;
+  }
+}
+.saved-coupon.flash {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  transition: outline-color 1s;
+}
+/* Guardado rápido */
+.field-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--ink2);
+  margin-top: 3px;
+  min-height: 0;
+}
+.field-hint:empty {
+  display: none;
+}
+.stake-chips {
+  margin-top: 5px;
+  gap: 5px;
+}
+.stake-chips .chip {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.save-bar {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  width: min(560px, calc(100% - 16px));
+  display: none;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--gold);
+  background: var(--surface);
+  box-shadow: 0 10px 26px #0006;
+}
+body[data-view="new"] .save-bar:not([hidden]) {
+  display: flex;
+}
+.save-bar-info {
+  flex: 1;
+  min-width: 0;
+}
+.save-bar-info b {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+.save-bar-info small {
+  display: block;
+  font-size: 11px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.save-bar .btn {
+  flex: 0 0 auto;
+  padding: 9px 14px;
+}
+body[data-view="new"] main {
+  padding-bottom: calc(140px + env(safe-area-inset-bottom));
+}
+:root[data-theme="dark"] .save-bar {
+  background: #111a2c;
+}
+@media (min-width: 621px) {
+  .save-bar {
+    bottom: 16px;
+  }
+}
+@media (max-width: 480px) {
+  #searchBtn {
+    width: 34px;
+  }
+}
+/* Los campos de una misma fila no se estiran cuando el de al lado tiene una nota debajo. */
+.row > .field {
+  align-self: flex-start;
+}

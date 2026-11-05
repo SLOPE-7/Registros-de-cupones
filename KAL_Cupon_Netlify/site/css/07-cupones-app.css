@@ -1,0 +1,103 @@
+/* Cupones archivados, app instalada y avisos de Inicio (V5.1–V6). */
+/* V5.1 · cupones archivados y mercados de cupones cerrados */
+.coupon-filter {
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.coupon-filter::-webkit-scrollbar {
+  display: none;
+}
+.coupon-filter .chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.coupon-filter .chip b {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-left: 2px;
+}
+.mk-card.is-closed {
+  opacity: 0.72;
+}
+.mk-closed {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--lost);
+}
+
+/* V6 · app instalada y avisos de Inicio */
+@media (display-mode: standalone) {
+  main {
+    padding-top: calc(8px + env(safe-area-inset-top));
+  }
+  .top {
+    top: calc(4px + env(safe-area-inset-top)) !important;
+  }
+}
+.home-notice {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 24px;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.home-notice.warn {
+  border-color: #c79a2b;
+}
+.hn-ico {
+  font-size: 20px;
+  text-align: center;
+}
+.home-notice b {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+.home-notice small {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink2);
+  line-height: 1.3;
+}
+.hn-close {
+  border: 0;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+}
+.install-help {
+  margin-bottom: 12px;
+}
+.install-steps {
+  margin: 4px 0 6px;
+  padding-left: 20px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.ios-share {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.notice.ok {
+  background: var(--won-bg);
+  border-color: var(--won);
+  color: var(--won);
+}
+:root[data-theme="dark"] .home-notice {
+  background: var(--panel2);
+}
+:root[data-theme="dark"] .home-notice.warn {
+  background: #1c1a10;
+  border-color: #5a4a17;
+}
