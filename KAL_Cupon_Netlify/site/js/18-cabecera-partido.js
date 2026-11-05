@@ -48,7 +48,7 @@ const COMPETITION_THEMES = [
   [/sudamericana/, "sudamericana", "#00163a", "#0b4f9c", "#5ec2ff", "rays"],
   // Copas y supercopas nacionales
   [
-    /fa cup|copa fa|community shield/,
+    /fa cup|copa fa|copa de inglaterra|community shield/,
     "fa-cup",
     "#0a1a3a",
     "#1d3f8a",
@@ -67,10 +67,10 @@ const COMPETITION_THEMES = [
   ],
   [/copa del rey/, "copa-del-rey", "#330009", "#8a0020", "#f6c344", "stars", /espana|spain/],
   [/supercopa( de espana)?\b/, "supercopa-espana", "#2a050b", "#8e1526", "#f6c344", "stars", /espana|spain/],
-  [/coppa italia|supercoppa/, "coppa-italia", "#001538", "#0b3fa8", "#3ad07a", "stars", /italia|italy/],
-  [/dfb|pokal|supercup/, "dfb-pokal", "#1a0003", "#7a0010", "#ffcc00", "stars", /alemania|germany/],
+  [/coppa italia|copa de italia|supercoppa|supercopa de italia/, "coppa-italia", "#001538", "#0b3fa8", "#3ad07a", "stars", /italia|italy/],
+  [/dfb|pokal|supercup|copa de alemania|supercopa de alemania/, "dfb-pokal", "#1a0003", "#7a0010", "#ffcc00", "stars", /alemania|germany/],
   [
-    /coupe de france|trophee des champions/,
+    /coupe de france|copa de francia|trophee des champions|supercopa de francia/,
     "coupe-france",
     "#0a1230",
     "#1c2d73",
@@ -79,7 +79,7 @@ const COMPETITION_THEMES = [
     /francia|france/,
   ],
   [
-    /taca|liga portugal cup|allianz cup/,
+    /taca|copa de portugal|liga portugal cup|allianz cup|league cup.*portugal/,
     "taca-portugal",
     "#001f12",
     "#00663a",
@@ -87,7 +87,7 @@ const COMPETITION_THEMES = [
     "stars",
     /portugal/,
   ],
-  [/knvb|beker/, "knvb", "#2a1000", "#a84400", "#ffffff", "stars", /holanda|paises bajos|netherlands/],
+  [/knvb|beker|copa de (los )?paises bajos|copa de holanda/, "knvb", "#2a1000", "#a84400", "#ffffff", "stars", /holanda|paises bajos|netherlands/],
   [
     /scottish cup|copa de escocia/,
     "scottish-cup",

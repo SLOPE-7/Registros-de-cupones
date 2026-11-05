@@ -233,13 +233,15 @@ function parseCoupon(raw) {
       const colon = part.indexOf(":");
       let market = colon > 0 ? part.slice(0, colon).trim() : part,
         pick = colon > 0 ? part.slice(colon + 1).trim() : "";
+      const ep = splitEarlyPayout(pick);
       current.markets.push({
         market: market || "BetBuilder",
-        pick,
+        pick: ep.pick,
         odd: "",
         builder: true,
         builderOdd: odd || "",
         settlement: "pending",
+        ...(ep.early ? { earlyPayout: true } : {}),
       });
     }
     current.builderOdd = odd || "";

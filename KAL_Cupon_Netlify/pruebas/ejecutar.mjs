@@ -120,6 +120,27 @@ section("1. Lector de cupones y detección de jugadores");
   check("cupón real: hándicap con su línea '2 (0:2)'", real.celtic?.market === "Hándicap 1x2" && real.celtic?.pick === "2 (0:2)", JSON.stringify(real.celtic));
   check("cupón real: 8 selecciones con pago anticipado", real.early === 8, String(real.early));
   check("cupón real: importe, cuota total, bono y ganancia", real.meta.stake === 10 && real.meta.odds === 37.48 && real.meta.bonus === 21.88 && real.meta.payout === 396.7, JSON.stringify(real.meta));
+  // Cupón real 2: BetBuilder, jugador dentro del BetBuilder y copas nacionales.
+  const real2 = await page.evaluate((raw) => {
+    const p = parseCoupon(raw);
+    const roma = p.fixtures[0], torino = p.fixtures[1], mg = p.fixtures[3];
+    const player = torino.markets.find((m) => /Douvikas/.test(m.market));
+    return {
+      n: p.fixtures.length,
+      romaMarkets: roma.markets.map((m) => m.market + "=" + m.pick + "@" + m.builderOdd + (m.earlyPayout ? "⚡" : "")).join(" | "),
+      torinoN: torino.markets.length,
+      player: parsePlayerBet(player, torino),
+      playerLine: parseLine(player, torino),
+      homeGoals: parseLine(mg.markets[1], mg)?.goal,
+      themes: p.fixtures.map((f) => competitionTheme(f).id).join(","),
+      meta: p.meta,
+    };
+  }, fs.readFileSync(path.join(ROOT, "pruebas/cupon-real-2.txt"), "utf8"));
+  check("cupón real 2: BetBuilder separado en selecciones con su cuota", real2.n === 10 && real2.romaMarkets === "1x2=1@1.40 | Total Tiros De Esquina=Más de 5.5@1.40⚡" && real2.torinoN === 3, real2.romaMarkets);
+  check("cupón real 2: jugador dentro del BetBuilder con '( COM)'", real2.player?.name === "Anastasios Douvikas" && real2.player?.code === "COM" && real2.playerLine?.incl === true && real2.playerLine?.goal === 1, JSON.stringify(real2.player));
+  check("cupón real 2: '1 total de goles: Más de 0.5' tiene barra (meta 1)", real2.homeGoals === 1);
+  check("cupón real 2: temas de Serie A, Copa de Alemania, EFL Cup y Copa del Rey", real2.themes === "serie-a,serie-a,dfb-pokal,dfb-pokal,dfb-pokal,league-cup,copa-del-rey,copa-del-rey,copa-del-rey,pais", real2.themes);
+  check("cupón real 2: importe 15 y cuota 7.45 (ganancia vacía sin error)", real2.meta.stake === 15 && real2.meta.odds === 7.45 && real2.meta.payout === null, JSON.stringify(real2.meta));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
