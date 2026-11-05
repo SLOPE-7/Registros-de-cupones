@@ -13,6 +13,7 @@ syncAlerts().catch(() => {});
 }
 $("raw").value = localStorage.getItem(DRAFT) || "";
 cleanSavedPlayerNames();
+if (migrateEarlyPayout()) save();
 indexSavedCrests();
 renderAll();
 initCrestImageCache();

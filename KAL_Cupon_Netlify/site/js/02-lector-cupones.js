@@ -17,6 +17,102 @@ function inferCompetitionCountry(value) {
   if (/world cup|mundial|amistoso internacional/.test(n)) return "Internacional";
   return "";
 }
+// Línea con "País o región, Competición" (p. ej. "Europa, UEFA Europa League" o "España, LaLiga").
+const LEAGUE_LINE_RE = new RegExp(
+  "^(?:" +
+    [
+      "Europa",
+      "Mundo",
+      "Internacional",
+      "Internacionales",
+      "Sudamérica",
+      "Sudamerica",
+      "Norteamérica",
+      "CONCACAF",
+      "CONMEBOL",
+      "UEFA",
+      "FIFA",
+      "Inglaterra",
+      "España",
+      "Italia",
+      "Francia",
+      "Alemania",
+      "Portugal",
+      "Países Bajos",
+      "Paises Bajos",
+      "Holanda",
+      "Escocia",
+      "Gales",
+      "Bélgica",
+      "Belgica",
+      "Turquía",
+      "Turquia",
+      "Grecia",
+      "Austria",
+      "Suiza",
+      "Dinamarca",
+      "Noruega",
+      "Suecia",
+      "Finlandia",
+      "Polonia",
+      "República Checa",
+      "Chequia",
+      "Croacia",
+      "Serbia",
+      "Ucrania",
+      "Rusia",
+      "Rumania",
+      "Hungría",
+      "Hungria",
+      "Irlanda",
+      "Chipre",
+      "Israel",
+      "Brasil",
+      "Argentina",
+      "Uruguay",
+      "Colombia",
+      "Chile",
+      "Perú",
+      "Peru",
+      "Ecuador",
+      "Paraguay",
+      "Bolivia",
+      "Venezuela",
+      "México",
+      "Mexico",
+      "Estados Unidos",
+      "EE\\.UU\\.",
+      "Canadá",
+      "Canada",
+      "Honduras",
+      "Costa Rica",
+      "Guatemala",
+      "El Salvador",
+      "Panamá",
+      "Panama",
+      "Nicaragua",
+      "Arabia Saudita",
+      "Arabia Saudí",
+      "Japón",
+      "Japon",
+      "Corea del Sur",
+      "China",
+      "Australia",
+      "Marruecos",
+      "Egipto",
+      "Catar",
+      "Qatar",
+    ].join("|") +
+    ")\\s*,",
+  "i",
+);
+// Quita la etiqueta de promoción "• pago anticipado" de la selección (se guarda aparte como earlyPayout).
+function splitEarlyPayout(pick) {
+  const m = String(pick || "").match(/\s*[•·-]?\s*pago anticipado\s*$/i);
+  return m
+    ? { pick: String(pick).slice(0, m.index).trim(), early: true }
+    : { pick: String(pick || "").trim(), early: false };
+}
 function parseCoupon(raw) {
   const lines = String(raw || "")
     .replace(/\r/g, "")
@@ -160,11 +256,7 @@ function parseCoupon(raw) {
       setDate(dm, line);
       continue;
     }
-    if (
-      /^(?:Inglaterra|España|Italia|Francia|Alemania|Portugal|Países Bajos|Holanda|Escocia|Honduras|México|Estados Unidos)\s*,/i.test(
-        line,
-      )
-    ) {
+    if (LEAGUE_LINE_RE.test(line)) {
       league = line;
       continue;
     }
@@ -226,19 +318,34 @@ function parseCoupon(raw) {
       }
       continue;
     }
+    const loneOdd = line.match(/^(?:@\s*|cuotas?\s*:?\s*|odds\s*:?\s*)?(\d{1,3}[.,]\d{1,3})$/i);
+    if (loneOdd && current.markets.length) {
+      const last = current.markets[current.markets.length - 1];
+      if (!last.builder && !last.odd) {
+        last.odd = loneOdd[1].replace(",", ".");
+        if (current.markets.length === 1) current.totalOdds = last.odd;
+        continue;
+      }
+    }
     if (
       /^(?:1x2|1x|x2|12|más de|menos de|over|under|ambos(?: equipos marcan)?|total(?: de goles)?|córners|corners|tarjetas|remates|disparos|resultado|doble oportunidad|hándicap|handicap|\d+\s+total)/i.test(
         line,
       ) ||
       /^[^:]{2,70}:\s*\S+/.test(line)
-    )
+    ) {
+      const rawPick = line.includes(":") ? line.slice(line.indexOf(":") + 1).trim() : "";
+      const ep = splitEarlyPayout(rawPick);
+      // Cuota pegada al final de la selección, p. ej. "1 • pago anticipado @1.47"
+      const tailOdd = ep.pick.match(/\s+@\s*(\d{1,3}[.,]\d{1,3})$/);
       current.markets.push({
         market: line.includes(":") ? line.split(":")[0].trim() : line,
-        pick: line.includes(":") ? line.slice(line.indexOf(":") + 1).trim() : "",
-        odd: "",
+        pick: tailOdd ? ep.pick.slice(0, tailOdd.index).trim() : ep.pick,
+        odd: tailOdd ? tailOdd[1].replace(",", ".") : "",
         builder: false,
         settlement: "pending",
+        ...(ep.early ? { earlyPayout: true } : {}),
       });
+    }
   }
   finalize();
   const unique = [],
@@ -271,4 +378,32 @@ function parseCoupon(raw) {
     unique.push(f);
   }
   return { fixtures: unique, meta: { ...meta, duplicateFixtures } };
+}
+
+// Una sola vez por cupón: separa "• pago anticipado" de las selecciones ya guardadas.
+function migrateEarlyPayout() {
+  const moved = new Map();
+  db.coupons.forEach((c) =>
+    c.fixtures.forEach((f) =>
+      f.markets.forEach((m) => {
+        const ep = splitEarlyPayout(m.pick);
+        if (!ep.early) return;
+        const oldKey = marketKey(f, m);
+        m.pick = ep.pick;
+        m.earlyPayout = true;
+        moved.set(oldKey, marketKey(f, m));
+      }),
+    ),
+  );
+  if (!moved.size) return false;
+  if (db.progress)
+    for (const [a, b] of moved)
+      if (db.progress[a] && !db.progress[b]) {
+        db.progress[b] = db.progress[a];
+        delete db.progress[a];
+      }
+  (db.resultHistory || []).forEach((h) => {
+    if (moved.has(h.key)) h.key = moved.get(h.key);
+  });
+  return true;
 }

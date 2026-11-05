@@ -222,3 +222,11 @@ VERSIÓN 10 — CABECERA DEL PARTIDO CON IDENTIDAD
 - El logo de la competición aparece como marca de agua detrás del "VS" y la bandera del país en la esquina.
 - Código: site/js/18-cabecera-partido.js y site/css/12-cabecera-partido.css. Para añadir una competición, agrega una línea en COMPETITION_THEMES.
 - V10.1: lista ampliada. Selecciones (Nations League, eliminatorias UEFA/CONMEBOL/CONCACAF, amistosos, Mundial, Eurocopa, Copa América, Copa Oro, Liga de Naciones CONCACAF) con la bandera de cada selección detrás de su escudo. Copas y supercopas (FA Cup, Carabao, Copa del Rey, Supercopa de España, Coppa Italia, DFB-Pokal, Coupe de France, Taça, KNVB, Supercopa de la UEFA). Segundas divisiones (Championship, Hypermotion, Serie B, 2. Bundesliga, Ligue 2…), Escocia, Bélgica, Turquía, Brasil, Argentina, Arabia Saudita. Si una liga se llama igual en otro país (Bundesliga de Austria, Serie A de Brasil, Superliga…), usa los colores de ese país. 36 países con colores propios.
+
+
+VERSIÓN 10.2 — CORRECCIONES DESDE CAPTURAS REALES
+- iPhone (app instalada): la cabecera del partido ya no queda debajo de la hora y la batería.
+- La app se actualiza sola: al volver a abrirla busca versión nueva y, si la hay, se recarga una vez.
+- Lector: reconoce la línea "Región o país, Competición" para más de 70 países y regiones (incluida "Europa, UEFA …").
+- Lector: lee la cuota sola en su línea ("1.47", "@1.47", "Cuota 1.47") y al final de la selección ("… @1.80"), además de "Cuotas: 1.47".
+- "• pago anticipado" se separa de la selección y se muestra como etiqueta "⚡ Pago anticipado". Los cupones ya guardados se limpian solos.

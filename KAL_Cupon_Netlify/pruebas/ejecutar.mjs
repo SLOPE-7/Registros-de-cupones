@@ -83,6 +83,21 @@ section("1. Lector de cupones y detección de jugadores");
   check("jugador en formato anidado", r.nested?.name === "Nico Paz", JSON.stringify(r.nested));
   check("club correcto por código (NAP → Napoli)", r.club.club === "Napoli" && r.hoj?.code === "NAP");
   check("mercados de equipo no son jugadores", r.team1 === null && r.team2 === null);
+  const v = await page.evaluate(() => {
+    const p = parseCoupon("Europa, UEFA Europa League\nReal Sociedad\nvs.\nOlympique Lyonnais\n05/11/2026 • 11:45\nAmbos equipos marcan: Sí\n1.47\nEuropa, UEFA Liga Campeones\nBayer Leverkusen\nvs.\nMarseille\n05/11/2026 • 14:00\n1x2: 1 • pago anticipado\n@1.75\nTotal de goles: Más de 2.5 @1.80");
+    const [a, b] = p.fixtures;
+    return { comp: a.competition, country: a.country, odd1: a.markets[0].odd, comp2: b.competition, pick: b.markets[0].pick, early: b.markets[0].earlyPayout, odd2: b.markets[0].odd, odd3: b.markets[1]?.odd };
+  });
+  check("lee la línea 'Europa, competición'", v.comp === "UEFA Europa League" && v.country === "Europa" && v.comp2 === "UEFA Liga Campeones", JSON.stringify(v));
+  check("lee la cuota sola en su línea (1.47 y @1.75)", v.odd1 === "1.47" && v.odd2 === "1.75", JSON.stringify(v));
+  check("lee la cuota al final de la selección (@1.80)", v.odd3 === "1.80", JSON.stringify(v));
+  check("separa '• pago anticipado' de la selección", v.pick === "1" && v.early === true, JSON.stringify(v));
+  const mig = await page.evaluate(() => {
+    db = { coupons: [{ id: "x", name: "x", created: "2026-11-01", fixtures: [{ home: "A", away: "B", dateISO: "2026-11-05", time: "10:00", markets: [{ market: "1x2", pick: "1 • pago anticipado", settlement: "pending" }] }] }], houses: [], transactions: [], resultHistory: [], actionHistory: [] };
+    const changed = migrateEarlyPayout();
+    return changed + ":" + db.coupons[0].fixtures[0].markets[0].pick + ":" + db.coupons[0].fixtures[0].markets[0].earlyPayout;
+  });
+  check("limpia cupones ya guardados con 'pago anticipado'", mig === "true:1:true", mig);
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

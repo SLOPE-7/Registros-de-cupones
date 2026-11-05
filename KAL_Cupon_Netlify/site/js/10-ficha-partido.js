@@ -248,6 +248,7 @@ function matchMarketCard(x) {
     esc(x.m.market || "Mercado") +
     "</strong>" +
     (x.m.pick ? "<b>" + esc(x.m.pick) + "</b>" : "") +
+    (x.m.earlyPayout ? '<span class="mk-tag">⚡ Pago anticipado</span>' : "") +
     '</div><span class="mk-odd">' +
     (odd > 1 ? esc(String(odd.toFixed(2))) : "—") +
     "</span></div>" +

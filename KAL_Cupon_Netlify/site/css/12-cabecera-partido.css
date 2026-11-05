@@ -148,3 +148,24 @@
     font-size: 96px;
   }
 }
+/* App instalada en iPhone: la cabecera deja espacio para la hora y la batería (antes una regla anterior lo anulaba). */
+@media (max-width: 600px) {
+  .match-stadium,
+  .match-stadium.themed {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+  }
+  .match-close {
+    top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
+  }
+}
+/* Etiqueta de promoción en la tarjeta del mercado. */
+.mk-tag {
+  justify-self: start;
+  margin-top: 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--void-bg);
+  color: var(--void);
+}

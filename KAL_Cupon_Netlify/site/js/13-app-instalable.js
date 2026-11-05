@@ -105,4 +105,23 @@ async function protectStorage() {
   } catch {}
 }
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost"))
-  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  window.addEventListener("load", () => {
+    // Si ya había una versión instalada y llega otra, se recarga una vez para usar la nueva.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController && !reloaded) {
+        reloaded = true;
+        location.reload();
+      }
+    });
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => {
+        // Busca versión nueva cada vez que vuelves a la app.
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
+  });
