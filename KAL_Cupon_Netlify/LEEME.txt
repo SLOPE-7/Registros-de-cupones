@@ -140,3 +140,21 @@ VERSIÓN 5.1
 - Mis cupones: por defecto solo se ven los pendientes. Los ganados, perdidos y nulos / cash out quedan archivados en sus pestañas (con contador); "Todos" muestra el historial completo.
 - Regla del cupón perdido: si un mercado se marca como perdido, todo su cupón queda perdido. Sus partidos y mercados desaparecen de Agenda, Mercados (Pendiente), Inicio y de los pendientes de la ficha del partido (allí pasan a "Ya marcados y cerrados" con la etiqueta "cupón perdido"). Si el mismo partido también está en otro cupón que sigue vivo, se sigue mostrando por ese cupón.
 - API-Football: el aviso "Free plans do not have access to this season" ahora se explica en español. El plan gratis solo permite temporadas 2022–2024, así que Análisis, Estadísticas y Eventos de partidos actuales requieren un plan de pago. Los escudos y las fotos de jugadores sí funcionan con el plan gratis.
+
+
+VERSIÓN 6 — APP INSTALABLE Y ESTADÍSTICAS DE RENDIMIENTO
+App instalable
+- KAL se puede instalar en el teléfono con su propio ícono. En iPhone: abre el sitio en Safari → Compartir → "Agregar a inicio". En Android: menú → "Instalar aplicación" (o el botón "Instalar" que aparece en Inicio).
+- Instalada, abre a pantalla completa, funciona sin conexión (los datos de API-Football sí necesitan internet) y el teléfono conserva mejor los datos.
+- La app pide al navegador que no borre sus datos.
+- Recordatorio en Inicio si pasa más de una semana sin descargar un respaldo (no aparece si usas la sincronización en la nube).
+- Archivos nuevos: site/manifest.webmanifest, site/sw.js y la carpeta site/icons. netlify.toml incluye cabeceras para que las actualizaciones lleguen enseguida.
+
+Estadísticas → "Tu rendimiento"
+- Periodo: 30 días, 90 días, este año o todo.
+- ROI y resultado neto, % de cupones ganados, % de mercados acertados y rachas.
+- Conclusión automática: tu tipo de mercado más fiable y el que más te falla (con al menos 3 resultados).
+- Gráfica de resultado neto por mes (azul = ganancia, naranja = pérdida; colores elegidos para que se distingan también con daltonismo).
+- Acierto por tipo de mercado, por rango de cuota y por competición, con la rentabilidad "suelta" (si cada mercado se hubiera apostado por separado a 1 unidad).
+- Resultado y ROI por casa de apuestas.
+- Cada mercado cuenta una sola vez aunque esté en varios cupones; los nulos no cuentan en el % de acierto.
