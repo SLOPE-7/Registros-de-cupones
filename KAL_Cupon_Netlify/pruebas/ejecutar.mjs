@@ -229,7 +229,19 @@ section("9. Barra de progreso de mercados");
   const card = (txt) => `.mk-card:has-text("${txt}")`;
   check("muestra barra solo en mercados de línea", (await page.$$(".match-tab-content .pg")).length === 4);
   check("cabecera con el tema de la competición (Champions → estrellas)", (await page.$eval(".match-stadium", (e) => e.dataset.pattern)) === "stars");
-  check("tema por competición y por país", (await page.evaluate(() => [competitionTheme({ competition: "Premier League" }).pattern, competitionTheme({ competition: "Liga Nacional", country: "Honduras" }).pattern, competitionTheme({ competition: "Otra liga", country: "España" }).c2].join())) === "stripes,pitch,#8e1526");
+  const themes = await page.evaluate(() => [
+    ["UEFA Liga Campeones", "Europa"], ["UEFA Europa League", ""], ["UEFA Conference League", ""], ["Supercopa de la UEFA", ""],
+    ["Premier League", "Inglaterra"], ["Championship", "Inglaterra"], ["FA Cup", "Inglaterra"], ["Carabao Cup", "Inglaterra"],
+    ["LaLiga", "España"], ["LaLiga Hypermotion", "España"], ["Copa del Rey", "España"], ["Supercopa de España", "España"],
+    ["Serie A", "Italia"], ["Coppa Italia", "Italia"], ["Bundesliga", "Alemania"], ["DFB Pokal", "Alemania"], ["Bundesliga", "Austria"],
+    ["Ligue 1", "Francia"], ["Eredivisie", "Países Bajos"], ["Liga Portugal", "Portugal"], ["Premiership", "Escocia"], ["Super Lig", "Turquía"],
+    ["Serie A", "Brasil"], ["Superliga", "Dinamarca"], ["Liga Nacional", "Honduras"],
+    ["UEFA Nations League", ""], ["Eliminatorias UEFA Mundial", ""], ["Eliminatorias CONMEBOL", ""], ["Amistosos Internacionales", ""],
+    ["Copa Mundial de la FIFA", ""], ["Eurocopa", ""], ["Copa América", ""], ["CONCACAF Liga de Naciones", ""], ["Copa Oro", ""],
+  ].map(([competition, country]) => competitionTheme({ competition, country }).id).join(","));
+  check("temas de ligas, copas, competiciones europeas y selecciones", themes === "champions,europa-league,conference,uefa-super-cup,premier-league,english-football-league,fa-cup,league-cup,laliga,laliga-2,copa-del-rey,supercopa-espana,serie-a,coppa-italia,bundesliga,dfb-pokal,pais,ligue-1,eredivisie,primeira-liga,scottish-premiership,super-lig,pais,pais,liga-nacional,nations-league,qualifiers,qualifiers,friendlies,world-cup,euro,copa-america,concacaf-nations,gold-cup", themes);
+  const flags = await page.evaluate(() => ["España", "Inglaterra", "Países Bajos", "Estados Unidos", "Honduras", "Costa de Marfil", "Brasil Sub 20", "Real Madrid"].map(nationFlag).join(" "));
+  check("banderas de selecciones (y ninguna para clubes)", flags.split(" ").filter(Boolean).length === 7 && !flags.trim().endsWith("🇪🇸 "), flags);
   for (let i = 0; i < 3; i++) { await page.click(`${card("Total de goles")} .pg-btn.plus`); await page.waitForTimeout(80); }
   check("Más de 2.5 goles: con 3 se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
   check("avisa con un mensaje de mercado ganado", /Mercado ganado/.test(await page.$eval("#toast", (e) => e.textContent)));

@@ -126,3 +126,25 @@
 [data-pattern="stars"] .hero-bg:before {
   opacity: 0.85;
 }
+/* Partidos de selecciones: bandera grande y transparente detrás de cada equipo. */
+.hero-nation {
+  position: absolute;
+  top: 50%;
+  font-size: 120px;
+  line-height: 1;
+  opacity: 0.2;
+  transform: translateY(-50%) rotate(-8deg);
+  filter: saturate(1.2);
+}
+.hero-nation.left {
+  left: -18px;
+}
+.hero-nation.right {
+  right: -18px;
+  transform: translateY(-50%) rotate(8deg);
+}
+@media (max-width: 420px) {
+  .hero-nation {
+    font-size: 96px;
+  }
+}
