@@ -141,6 +141,19 @@ section("1. Lector de cupones y detección de jugadores");
   check("cupón real 2: '1 total de goles: Más de 0.5' tiene barra (meta 1)", real2.homeGoals === 1);
   check("cupón real 2: temas de Serie A, Copa de Alemania, EFL Cup y Copa del Rey", real2.themes === "serie-a,serie-a,dfb-pokal,dfb-pokal,dfb-pokal,league-cup,copa-del-rey,copa-del-rey,copa-del-rey,pais", real2.themes);
   check("cupón real 2: importe 15 y cuota 7.45 (ganancia vacía sin error)", real2.meta.stake === 15 && real2.meta.odds === 7.45 && real2.meta.payout === null, JSON.stringify(real2.meta));
+  // Tres cupones reales de Doradobet (ligas, Europa/Conference League y Champions, con jugadores).
+  const dorado = await page.evaluate((raws) => raws.map((raw) => {
+    const p = parseCoupon(raw);
+    return {
+      n: p.fixtures.length, sel: p.fixtures.reduce((s, f) => s + f.markets.length, 0), meta: p.meta,
+      faltan: p.fixtures.flatMap((f) => [!f.markets.length && f.home + " sin mercado", !f.competition && f.home + " sin competición", ...f.markets.filter((m) => !(m.odd || m.builderOdd)).map((m) => f.home + " sin cuota")]).filter(Boolean),
+      jugadores: p.fixtures.flatMap((f) => f.markets.map((m) => { const b = parsePlayerBet(m, f); return b ? b.name + "=" + playerClubForCode(b.code, f).club : null; }).filter(Boolean)),
+    };
+  }), [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/doradobet-${n}.txt`), "utf8")));
+  check("Doradobet: 42 partidos y 75 selecciones sin datos faltantes", dorado.map((d) => d.n).join() === "23,11,8" && dorado.map((d) => d.sel).join() === "45,16,14" && dorado.every((d) => !d.faltan.length), JSON.stringify(dorado.map((d) => [d.n, d.sel, d.faltan])));
+  check("Doradobet: importes y cuotas totales", dorado.map((d) => d.meta.stake + "@" + d.meta.odds).join() === "4.4@184.28,50@11.94,50@5.77", dorado.map((d) => d.meta.stake + "@" + d.meta.odds).join());
+  const jug = dorado.flatMap((d) => d.jugadores).join(" | ");
+  check("Doradobet: 8 jugadores con su club (BET, SCP, BEN, MNU, GAL, BRU, BAY, COM)", jug === "Nicolo Tresoldi=Club Brugge KV | Abdessamad Ezzalzouli=Real Betis | Harry Kane=Bayern Munich | Luis Suárez=Sporting Lisboa | Gianluca Prestianni=SL Benfica | Victor Osimhen=Galatasaray SK | Anastasios Douvikas=Como | Bryan Mbeumo=Manchester United", jug);
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

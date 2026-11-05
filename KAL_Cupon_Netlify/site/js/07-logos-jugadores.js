@@ -189,6 +189,50 @@ function saveCatalogItem() {
   toast("Datos guardados y vinculados con los partidos correspondientes.");
 }
 const playerTeamAliases = {
+  // Códigos que usan las casas de apuestas (añadidos con cupones reales de Doradobet).
+  BET: "real betis",
+  SCP: "sporting",
+  SPO: "sporting",
+  BEN: "benfica",
+  SLB: "benfica",
+  POR: "porto",
+  FCP: "porto",
+  MNU: "manchester united",
+  MUFC: "manchester united",
+  GAL: "galatasaray",
+  FEN: "fenerbahce",
+  BES: "besiktas",
+  BRU: "club brugge",
+  CLB: "club brugge",
+  AJA: "ajax",
+  AJX: "ajax",
+  FEY: "feyenoord",
+  PSV: "psv",
+  LEV: "leverkusen",
+  B04: "leverkusen",
+  BVB: "borussia dortmund",
+  RBL: "rb leipzig",
+  ROM: "roma",
+  LAZ: "lazio",
+  ATA: "atalanta",
+  FIO: "fiorentina",
+  NEW: "newcastle",
+  OM: "marseille",
+  MAR: "marseille",
+  OL: "lyon",
+  LYO: "lyon",
+  LIL: "lille",
+  LOSC: "lille",
+  MON: "monaco",
+  ASM: "monaco",
+  SEV: "sevilla",
+  VIL: "villarreal",
+  RSO: "real sociedad",
+  ATH: "athletic",
+  GIR: "girona",
+  CEL: "celtic",
+  RAN: "rangers",
+  SHA: "shakhtar",
   AVL: "aston villa",
   COM: "como 1907",
   COMO: "como 1907",
@@ -481,9 +525,10 @@ function playerClubForCode(code, fixture) {
     if (
       (aliasNorm &&
         (aliasNorm === compact ||
-          compact.startsWith(aliasNorm + " ") ||
+          (" " + compact + " ").includes(" " + aliasNorm + " ") ||
           aliasNorm.startsWith(compact) ||
           teamEventKey(alias) === teamEventKey(name))) ||
+      (!aliasNorm && lower.length >= 3 && words.some((w) => w.length > 3 && w.startsWith(lower))) ||
       lower === initials ||
       lower === generic ||
       letters.startsWith(lower)
