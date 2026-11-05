@@ -865,7 +865,11 @@ function renderMatchDetail(ref = currentMatchRef) {
         ? prevScroll.scrollTop
         : 0;
   $("matchModalContent").innerHTML =
-    '<header class="match-stadium"><div class="match-competition">' +
+    '<header class="match-stadium themed" ' +
+    heroAttrs(f) +
+    ">" +
+    heroDecor(f) +
+    '<div class="match-competition">' +
     logo +
     "<span>" +
     esc(comp) +
@@ -913,6 +917,7 @@ function renderMatchDetail(ref = currentMatchRef) {
     content +
     "</div></section>";
   showCrestImagesIn($("matchModalContent"));
+  applyTeamColors($("matchModalContent").querySelector(".match-stadium"), f);
   showPlayerPhotoImagesIn($("matchModalContent"));
   if (keepScroll) {
     const sc = $("matchModalContent").querySelector(".match-modal-markets");

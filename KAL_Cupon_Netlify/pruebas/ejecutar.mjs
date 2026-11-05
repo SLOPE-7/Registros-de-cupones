@@ -228,6 +228,8 @@ section("9. Barra de progreso de mercados");
   await page.evaluate(() => document.querySelector("#todayList .agenda-match").click()); await page.waitForTimeout(150);
   const card = (txt) => `.mk-card:has-text("${txt}")`;
   check("muestra barra solo en mercados de línea", (await page.$$(".match-tab-content .pg")).length === 4);
+  check("cabecera con el tema de la competición (Champions → estrellas)", (await page.$eval(".match-stadium", (e) => e.dataset.pattern)) === "stars");
+  check("tema por competición y por país", (await page.evaluate(() => [competitionTheme({ competition: "Premier League" }).pattern, competitionTheme({ competition: "Liga Nacional", country: "Honduras" }).pattern, competitionTheme({ competition: "Otra liga", country: "España" }).c2].join())) === "stripes,pitch,#8e1526");
   for (let i = 0; i < 3; i++) { await page.click(`${card("Total de goles")} .pg-btn.plus`); await page.waitForTimeout(80); }
   check("Más de 2.5 goles: con 3 se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
   check("avisa con un mensaje de mercado ganado", /Mercado ganado/.test(await page.$eval("#toast", (e) => e.textContent)));

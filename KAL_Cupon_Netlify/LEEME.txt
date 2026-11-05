@@ -214,3 +214,10 @@ VERSIÓN 9 — BARRA DE PROGRESO DE MERCADOS
 - Un mismo mercado comparte barra en todos los cupones donde aparece. El progreso se guarda en los datos de KAL, se sincroniza con la nube y entra en los respaldos.
 - El conteo es manual con el plan gratis de API-Football. Con un plan de pago se podría conectar para que avance solo.
 - Código: site/js/17-progreso.js y site/css/11-progreso.css. Pruebas: sección 9 de pruebas/ejecutar.mjs (59 pruebas en total).
+
+
+VERSIÓN 10 — CABECERA DEL PARTIDO CON IDENTIDAD
+- La cabecera de la ficha del partido cambia según la competición: Champions (azul con estrellas), Europa League (naranja), Conference (verde), Premier (morado con rayas), LaLiga (rojo), Serie A (azul), Bundesliga (rojo), Ligue 1, Eredivisie, Primeira Liga, Libertadores, Sudamericana, Liga Nacional de Honduras, Liga MX, MLS y selecciones. Si la competición no está en la lista, usa los colores del país.
+- Detrás de cada equipo aparece un brillo con el color principal de su escudo (se calcula una vez y se guarda).
+- El logo de la competición aparece como marca de agua detrás del "VS" y la bandera del país en la esquina.
+- Código: site/js/18-cabecera-partido.js y site/css/12-cabecera-partido.css. Para añadir una competición, agrega una línea en COMPETITION_THEMES.
