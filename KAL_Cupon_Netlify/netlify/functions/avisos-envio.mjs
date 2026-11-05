@@ -18,8 +18,8 @@ export default async () => {
     for (const m of rec.matches || []) {
       if (gone) break;
       const due = [];
-      if (!m.preSent && leadMs > 0 && now >= m.kickoff - leadMs && now < m.kickoff) due.push(["preSent", { title: "⏰ " + m.title, body: "Empieza en " + Math.max(1, Math.round((m.kickoff - now) / 60000)) + " min" + (m.body ? " · " + m.body : ""), tag: "kal-" + m.id, url: "/?vista=calendar" }]);
-      if (rec.alStart && !m.startSent && now >= m.kickoff && now < m.kickoff + 20 * 60000) due.push(["startSent", { title: "🔴 Empezó: " + m.title, body: m.body || "Tu partido ya está en juego.", tag: "kal-" + m.id, url: "/?vista=calendar" }]);
+      if (!m.preSent && leadMs > 0 && now >= m.kickoff - leadMs && now < m.kickoff) due.push(["preSent", { title: "⏰ " + m.title, body: "Empieza en " + Math.max(1, Math.round((m.kickoff - now) / 60000)) + " min" + (m.body ? "\n" + m.body : ""), tag: "kal-" + m.id, url: "/?vista=calendar" }]);
+      if (rec.alStart && !m.startSent && now >= m.kickoff && now < m.kickoff + 20 * 60000) due.push(["startSent", { title: "🔴 Empezó: " + m.title, body: "Ya está en juego" + (m.body ? "\n" + m.body : ""), tag: "kal-" + m.id, url: "/?vista=calendar" }]);
       for (const [flag, payload] of due) {
         wp = wp || await pusher();
         const r = await sendPush(wp, rec.subscription, payload);

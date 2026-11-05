@@ -44,7 +44,7 @@ export default async request => {
         if (!m?.id || !Number.isFinite(kickoff) || kickoff < now - 3 * 3600000 || kickoff > now + 8 * 86400000) return null;
         const old = sent.get(String(m.id));
         const sameTime = old && old.kickoff === kickoff;
-        return { id: clean(m.id, 120), title: clean(m.title, 120), body: clean(m.body, 160), kickoff, preSent: !!(sameTime && old.preSent), startSent: !!(sameTime && old.startSent) };
+        return { id: clean(m.id, 120), title: clean(m.title, 120), body: clean(m.body, 240), kickoff, preSent: !!(sameTime && old.preSent), startSent: !!(sameTime && old.startSent) };
       }).filter(Boolean);
       await s.setJSON(key, { subscription: body.subscription, lead, alStart: body.alStart !== false, matches, updated: now });
       return reply(200, { ok: true, partidos: matches.length });

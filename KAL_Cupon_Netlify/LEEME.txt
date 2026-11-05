@@ -174,3 +174,4 @@ Avisos de partidos (notificaciones del teléfono)
 Presupuesto mensual y rachas
 - En Inicio, "Define tu presupuesto mensual": barra con lo apostado este mes, aviso al 80 % y al superar el 100 %. El presupuesto se sincroniza con la nube.
 - Aviso en Inicio cuando llevas 3 o más cupones perdidos seguidos.
+- Las notificaciones muestran la hora del partido, la competición y los mercados pendientes (hasta 3, y "y N más"). En iPhone siempre aparece el ícono de KAL: iOS no permite mostrar otras imágenes en notificaciones de apps web.
