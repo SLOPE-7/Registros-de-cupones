@@ -4,8 +4,12 @@ export default async (request) => {
   let target;
   try { target = new URL(new URL(request.url).searchParams.get("url") || ""); }
   catch { return new Response("Invalid image URL", { status: 400, headers }); }
-  const allowedHost = /^media(?:-\d+)?\.api-sports\.io$/i.test(target.hostname);
-  const allowedPath = /^\/football\/(?:teams|leagues|players)\/\d+\.png$/i.test(target.pathname) || /^\/flags\/[a-z]{2}\.svg$/i.test(target.pathname);
+  const apiSports = /^media(?:-\d+)?\.api-sports\.io$/i.test(target.hostname);
+  const theSportsDb = /^(?:r2|www)\.thesportsdb\.com$/i.test(target.hostname);
+  const allowedHost = apiSports || theSportsDb;
+  const allowedPath = apiSports
+    ? /^\/football\/(?:teams|leagues|players)\/\d+\.png$/i.test(target.pathname) || /^\/flags\/[a-z]{2}\.svg$/i.test(target.pathname)
+    : /^\/images\/media\/[a-z0-9/_-]+\.(?:png|jpe?g|webp)$/i.test(target.pathname);
   if (target.protocol !== "https:" || !allowedHost || !allowedPath) return new Response("Image source not allowed", { status: 400, headers });
   try {
     const upstream = await fetch(target, { signal: AbortSignal.timeout(10000) });

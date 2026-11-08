@@ -693,6 +693,10 @@ function renderPlayerLogoActions(item) {
       "</button>";
   }
   html += '<button type="button" class="btn sm" data-player-id="' + esc(item.id) + '">Por ID</button>';
+  html +=
+    '<button type="button" class="btn sm" data-player-upload="' +
+    esc(item.id) +
+    '" title="Subir foto del teléfono">📷</button>';
   if (item.photo && item.savedKey)
     html +=
       '<button type="button" class="btn sm" data-player-photo-remove="' +
@@ -744,7 +748,9 @@ function renderLogos() {
     (x.team.url ? "↻ Actualizar" : "＋ Buscar escudo") +
     '</button><button class="btn sm" data-logo-id="' +
     x.index +
-    '">Por ID</button>' +
+    '">Por ID</button><button class="btn sm" data-logo-upload="' +
+    x.index +
+    '" title="Subir imagen del teléfono">📷</button>' +
     (x.team.url
       ? '<button class="btn sm" data-team-logo-remove="' + esc(x.team.key) + '">Quitar</button>'
       : "") +
@@ -835,7 +841,9 @@ function renderLogos() {
         (x.url ? "Actualizar por nombre" : "Buscar por nombre") +
         '</button><button class="btn sm" data-league-id="' +
         esc(x.key) +
-        '">Por ID</button>' +
+        '">Por ID</button><button class="btn sm" data-league-upload="' +
+        esc(x.key) +
+        '" title="Subir imagen del teléfono">📷</button>' +
         (x.url ? '<button class="btn sm" data-league-remove="' + esc(x.key) + '">Quitar</button>' : "") +
         '<button class="btn danger sm" data-league-hide="' +
         esc(x.key) +
@@ -1093,75 +1101,75 @@ async function savePlayerPhotoById(keyId) {
   if (currentMatchRef) renderMatchDetail();
   toast("Foto guardada para " + x.name + ".");
 }
-async function lookupSavedTeamLogo(index) {
+// Busca el escudo en API-Football y TheSportsDB a la vez; se toca el correcto para guardarlo.
+async function lookupSavedTeamLogo(index, query = "") {
   const team = logoManagerTeams[index],
     box = $("logo-options-" + index),
     button = document.querySelector('[data-logo-lookup="' + index + '"]');
   if (!team || !box) return;
+  const tools =
+    '<div class="logo-tools"><input class="input" id="logo-q-' +
+    index +
+    '" placeholder="Buscar con otro nombre" value="' +
+    esc(query) +
+    '"><button type="button" class="btn sm" data-logo-requery="' +
+    index +
+    '">Buscar</button><button type="button" class="btn sm" data-logo-upload="' +
+    index +
+    '">📷 Subir imagen</button></div>';
   if (location.protocol === "file:") {
     box.innerHTML =
-      '<span class="marketmeta">La búsqueda automática está disponible al publicar la carpeta Netlify.</span>';
+      '<span class="marketmeta">La búsqueda automática está disponible al publicar la carpeta Netlify.</span>' +
+      tools;
     return;
   }
-  button.disabled = true;
-  button.textContent = "Buscando…";
-  box.innerHTML = '<span class="marketmeta">Consultando el catálogo de fútbol…</span>';
-  const params = new URLSearchParams({ home: team.name, away: "", league: "", country: team.country || "" }),
-    cache = crestCacheRead(),
-    cacheKey = crestNorm([team.name, "", "", team.country || ""].join("|"));
-  try {
+  const q = (query || team.name).trim();
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Buscando…";
+  }
+  box.innerHTML = '<span class="marketmeta">Buscando en API-Football y TheSportsDB…</span>';
+  const apiFootball = (async () => {
+    const params = new URLSearchParams({ home: q, away: "", league: "", country: team.country || "" }),
+      cache = crestCacheRead(),
+      cacheKey = crestNorm([q, "", "", team.country || ""].join("|"));
     let data = cache[cacheKey];
     if (!data) {
       const r = await fetch("/.netlify/functions/escudos?" + params.toString(), {
         headers: { Accept: "application/json" },
       });
       data = await r.json();
-      if (!r.ok) throw Error(data.error || "No se pudo consultar el catálogo.");
+      if (!r.ok) throw Error(data.error || "No se pudo consultar API-Football.");
       cache[cacheKey] = data;
       const keys = Object.keys(cache);
       if (keys.length > 200) delete cache[keys[0]];
-      localStorage.setItem(CREST_CACHE, JSON.stringify(cache));
+      try {
+        localStorage.setItem(CREST_CACHE, JSON.stringify(cache));
+      } catch {}
     }
-    const options = data.home?.options || [];
-    if (!options.length) {
-      box.innerHTML =
-        '<span class="marketmeta">No hubo coincidencias. Puedes guardar el enlace manualmente.</span><div class="logo-pick"><input class="input" type="url" id="logo-manual-' +
-        index +
-        '" placeholder="https://media.api-sports.io/football/teams/ID.png"><button class="btn good sm" data-logo-manual-save="' +
-        index +
-        '">Guardar URL</button></div>';
-      return;
-    }
+    return (data.home?.options || []).map((o) => ({ ...o, source: "API-Football" }));
+  })();
+  try {
+    const [a, b] = await Promise.allSettled([apiFootball, tsdbSearch("equipo", q)]);
+    const options = [
+      ...(a.status === "fulfilled" ? a.value : []),
+      ...(b.status === "fulfilled" ? b.value : []),
+    ];
+    const errors = [a, b]
+      .filter((x) => x.status === "rejected")
+      .map((x) => x.reason?.message)
+      .filter(Boolean);
     logoLookupState[team.key] = options;
     box.innerHTML =
-      '<div class="logo-pick"><label class="small muted" for="logo-choice-' +
-      index +
-      '">Elige el escudo correcto</label><select class="input" id="logo-choice-' +
-      index +
-      '">' +
-      options
-        .map(
-          (x, i) =>
-            '<option value="' +
-            i +
-            '">' +
-            esc(x.name) +
-            (x.country ? " · " + esc(x.country) : "") +
-            "</option>",
-        )
-        .join("") +
-      '</select><button class="btn good sm" data-logo-save="' +
-      index +
-      '">Guardar escudo</button></div>';
-  } catch (e) {
-    box.innerHTML =
-      '<span class="marketmeta">' +
-      esc(e.message || "Falló la búsqueda. Inténtalo otra vez.") +
-      '</span><div class="logo-pick"><input class="input" type="url" id="logo-manual-' +
-      index +
-      '" placeholder="https://media.api-sports.io/football/teams/ID.png"><button class="btn good sm" data-logo-manual-save="' +
-      index +
-      '">Guardar URL</button></div>';
+      (options.length
+        ? '<span class="marketmeta">Toca el escudo correcto para guardarlo:</span>' +
+          crestOptionsHTML(options, 'data-logo-opt="' + index + '" data-opt')
+        : '<span class="marketmeta">No encontré a “' +
+          esc(q) +
+          "”" +
+          (errors.length ? " (" + esc(errors[0]) + ")" : "") +
+          ". Prueba con otro nombre o sube una imagen.</span>") + tools;
+    showCrestImagesIn(box);
   } finally {
     if (button) {
       button.disabled = false;

@@ -217,6 +217,8 @@ async function loadCrestImage(url) {
       const cached = await readCrestImage(url);
       if (cached) return cached;
     } catch (e) {}
+    // Imagen subida desde el teléfono: ya está dentro de la app.
+    if (/^data:image\//i.test(url)) return await (await fetch(url)).blob();
     if (location.protocol === "file:") return null;
     const response = await fetch("/.netlify/functions/logo?url=" + encodeURIComponent(url));
     if (!response.ok) throw Error("No se pudo descargar este escudo.");
@@ -236,8 +238,15 @@ async function loadCrestImage(url) {
   }
 }
 function safeCrestSource(url) {
+  if (/^data:image\/(?:png|jpeg|webp);base64,/i.test(String(url || ""))) return true;
   try {
     const u = new URL(url);
+    if (
+      u.protocol === "https:" &&
+      /^(?:r2|www)\.thesportsdb\.com$/i.test(u.hostname) &&
+      /^\/images\/media\/[a-z0-9/_-]+\.(?:png|jpe?g|webp)$/i.test(u.pathname)
+    )
+      return true;
     return (
       u.protocol === "https:" &&
       /^media(?:-\d+)?\.api-sports\.io$/i.test(u.hostname) &&
@@ -356,12 +365,23 @@ async function lookupCrests(fi, force = false) {
         headers: { Accept: "application/json" },
       });
       data = await r.json();
-      if (!r.ok) throw Error(data.error || "No se pudo consultar el catálogo.");
-      cache[cacheKey] = data;
+      // Si API-Football falla (cuota, plan…), se sigue con TheSportsDB.
+      if (!r.ok)
+        data = { home: { options: [] }, away: { options: [] }, league: { options: [] }, error: data.error };
+      else cache[cacheKey] = data;
       const keys = Object.keys(cache);
       if (keys.length > 200) delete cache[keys[0]];
       localStorage.setItem(CREST_CACHE, JSON.stringify(cache));
     }
+    const [tsHome, tsAway] = await Promise.all([
+      needsHome ? tsdbSearch("equipo", f.home).catch(() => []) : [],
+      needsAway ? tsdbSearch("equipo", f.away).catch(() => []) : [],
+    ]);
+    data = {
+      ...data,
+      home: { options: [...(data.home?.options || []), ...tsHome] },
+      away: { options: [...(data.away?.options || []), ...tsAway] },
+    };
     crestChoices[fi] = data;
     const field = (key, label) => {
       const items = data[key]?.options || [];
@@ -382,6 +402,7 @@ async function lookupCrests(fi, force = false) {
               '">' +
               esc(x.name) +
               (x.country ? " · " + esc(x.country) : "") +
+              (x.source === "TheSportsDB" ? " (TheSportsDB)" : "") +
               "</option>",
           )
           .join("") +

@@ -723,34 +723,65 @@ async function lookupMatchPlayerPhoto(marketKeyValue, refOverride = null, player
       .replace(/[^A-Za-z0-9 ]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    const params = new URLSearchParams({
-      search: cleanName,
-      teamId: teamId || "",
-      season: scheduleISO(f).slice(0, 4),
-    });
-    const response = await fetch("/.netlify/functions/jugadores?" + params.toString(), {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(16000),
-    });
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw Error(
-        "La función de jugadores no devolvió JSON. Publica el paquete completo de Netlify, incluidas las funciones.",
+    // Busca en API-Football y TheSportsDB a la vez; si ninguna lo encuentra, deja probar con otro nombre.
+    const searchBoth = async (name) => {
+      const n = name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Za-z0-9 ]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const apiFootball = (async () => {
+        const params = new URLSearchParams({
+          search: n,
+          teamId: teamId || "",
+          season: scheduleISO(f).slice(0, 4),
+        });
+        const response = await fetch("/.netlify/functions/jugadores?" + params.toString(), {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(16000),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw Error(data.error || "No se pudo buscar al jugador.");
+        return (data.players || []).map((x) => ({ ...x, source: "API-Football" }));
+      })();
+      const [a, b] = await Promise.allSettled([apiFootball, tsdbSearch("jugador", n, club)]);
+      return [
+        ...(a.status === "fulfilled" ? a.value : []),
+        ...(b.status === "fulfilled" ? b.value.map((x) => ({ ...x, id: x.id ? "tsdb-" + x.id : "" })) : []),
+      ].filter((x) => x.photo);
+    };
+    let players = await searchBoth(cleanName);
+    for (let tries = 0; !players.length && tries < 2; tries++) {
+      const other = prompt(
+        "No encontré la foto de " + search + ". Escribe otro nombre o solo el apellido (o Cancelar):",
+        "",
       );
+      if (!other || other.trim().length < 3) break;
+      players = await searchBoth(other.trim());
     }
-    if (!response.ok) throw Error(data.error || "No se pudo buscar al jugador.");
-    if (!Array.isArray(data.players) || !data.players.length)
-      throw Error(
-        "API-Football no encontró una foto para " +
-          search +
-          ". Prueba con el apellido o revisa que el jugador aparezca en la lista Football Players IDs de API-Football.",
-      );
+    if (!players.length)
+      throw Error("No encontré la foto de " + search + ". Puedes subirla desde tu teléfono con 📷 en Logos.");
+    const data = { players };
     let chosen = data.players[0];
+    if (
+      data.players.length === 1 &&
+      !confirm("¿Es este jugador?\n" + chosen.name + (chosen.team ? " · " + chosen.team : "") + " (" + chosen.source + ")")
+    )
+      return;
     if (data.players.length > 1) {
       const options = data.players
-          .map((x, i) => i + 1 + ". " + x.name + (x.country ? " · " + x.country : ""))
+          .map(
+            (x, i) =>
+              i +
+              1 +
+              ". " +
+              x.name +
+              (x.team ? " · " + x.team : x.country ? " · " + x.country : "") +
+              " (" +
+              x.source +
+              ")",
+          )
           .join("\n"),
         answer = prompt("Elige el jugador correcto:\n" + options, "1");
       if (answer === null) return;
@@ -760,7 +791,7 @@ async function lookupMatchPlayerPhoto(marketKeyValue, refOverride = null, player
         return;
       }
     }
-    if (!chosen.photo) throw Error("API-Football encontró al jugador, pero no entregó su foto.");
+    if (!chosen.photo) throw Error("Se encontró al jugador, pero sin foto.");
     const code = playerBet?.code || parsed.code || "",
       savedClub = chosen.team || club || playerBet?.club || "",
       playerId = String(chosen.id || ""),

@@ -1,0 +1,88 @@
+/* Resultados de escudos con miniatura y fuente, herramientas de búsqueda y subida (V11). */
+.img-opts {
+  display: grid;
+  gap: 5px;
+  margin: 6px 0;
+}
+.img-opt {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+}
+.img-opt:hover,
+.img-opt:focus-visible {
+  border-color: var(--gold);
+}
+.img-opt .team-crest,
+.img-opt .team-fallback {
+  width: 34px;
+  height: 34px;
+}
+.img-opt b {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+.img-opt small {
+  display: block;
+  font-size: 11px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.img-opt .src {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.img-opt .src.af {
+  background: var(--won-bg);
+  color: var(--won);
+}
+.img-opt .src.tsdb {
+  background: #e7efff;
+  color: #2457c5;
+}
+:root[data-theme="dark"] .img-opt {
+  background: #0f1828;
+}
+:root[data-theme="dark"] .img-opt .src.tsdb {
+  background: #162a4d;
+  color: #8fb6ff;
+}
+.logo-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 5px;
+  margin-top: 6px;
+}
+.logo-tools .input {
+  padding: 6px 9px;
+  font-size: 13px;
+}
+.logo-tools .btn {
+  white-space: nowrap;
+}
+/* Fila del suplente: hay dos botones pequeños (📷 y 🗑). */
+.pg-player {
+  grid-template-columns: 30px minmax(0, 1fr) 38px 26px 38px auto auto;
+}
+@media (max-width: 420px) {
+  .logo-tools {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .logo-tools [data-logo-upload] {
+    grid-column: 1 / -1;
+  }
+}

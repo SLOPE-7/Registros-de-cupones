@@ -22,9 +22,24 @@ const section = (t) => console.log("\n" + t);
 
 // ---------- servidor local ----------
 const posts = [];
+const seen = [];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json" };
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
+  // API-Football (escudos y jugadores), TheSportsDB (imagenes) y el proxy de imágenes, simulados.
+  const sendJson = (obj, status = 200) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+  if (url.pathname === "/.netlify/functions/escudos") {
+    seen.push("escudos:" + url.searchParams.get("home"));
+    return sendJson({ home: { options: [{ name: url.searchParams.get("home"), country: "Turkey", logo: "https://media.api-sports.io/football/teams/611.png" }] }, away: { options: [] }, league: { options: [] } });
+  }
+  if (url.pathname === "/.netlify/functions/jugadores") return sendJson({ players: [] });
+  if (url.pathname === "/.netlify/functions/imagenes") {
+    seen.push("imagenes:" + url.searchParams.get("tipo") + ":" + url.searchParams.get("q"));
+    return sendJson({ options: url.searchParams.get("tipo") === "equipo"
+      ? [{ id: "1", name: url.searchParams.get("q") + " (TSDB)", country: "Turkey", logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png", source: "TheSportsDB" }]
+      : /nico|paz/i.test(url.searchParams.get("q")) ? [{ id: "9", name: "Nico Paz", team: "Como", photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png", source: "TheSportsDB" }] : [] });
+  }
+  if (url.pathname === "/.netlify/functions/logo") { res.writeHead(200, { "content-type": "image/png" }); return fs.createReadStream(path.join(ROOT, "pruebas/escudo-prueba.png")).pipe(res); }
   if (url.pathname === "/.netlify/functions/avisos") {
     if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ publicKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U" })); }
     let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { posts.push(JSON.parse(b)); res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); });
@@ -339,6 +354,41 @@ section("9. Barra de progreso de mercados");
   await ctx.close();
 }
 
+// ---------- 10. Escudos y fotos: TheSportsDB e imagen del teléfono ----------
+section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
+{
+  const { ctx, page } = await open(baseDb());
+  await view(page, "logos");
+  const idx = (name) => page.evaluate((n) => logoManagerTeams.findIndex((t) => t.name === n), name);
+  const fb = await idx("Fenerbahce");
+  await page.click(`[data-logo-lookup="${fb}"]`); await page.waitForTimeout(300);
+  const opts = await texts(page, `#logo-options-${fb} .img-opt`);
+  check("busca a la vez en API-Football y TheSportsDB", opts.length === 2 && /API-Football/.test(opts[0]) && /TheSportsDB/.test(opts[1]), opts.join(" / "));
+  await page.click(`#logo-options-${fb} .img-opt >> nth=1`); await page.waitForTimeout(200);
+  check("tocar un resultado de TheSportsDB guarda el escudo", (await page.evaluate(() => readCrestDirectory()["team:fenerbahce"]?.url || "")).includes("thesportsdb.com"));
+  check("el escudo se aplica a sus partidos", (await page.evaluate(() => db.coupons[0].fixtures[0].homeCrest)).includes("thesportsdb.com"));
+  const lv = await idx("Liverpool");
+  await page.click(`[data-logo-lookup="${lv}"]`); await page.waitForTimeout(300);
+  await page.fill(`#logo-q-${lv}`, "Liverpool FC"); await page.click(`[data-logo-requery="${lv}"]`); await page.waitForTimeout(300);
+  check("se puede buscar con otro nombre", seen.includes("imagenes:equipo:Liverpool FC") && seen.includes("escudos:Liverpool FC"), seen.slice(-4).join(" | "));
+  const aek = await idx("AEK");
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(`[data-logo-upload="${aek}"]`)]);
+  await chooser.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
+  const aekUrl = await page.evaluate(() => readCrestDirectory()["team:aek"]?.url || "");
+  check("subir imagen del teléfono guarda el escudo (recortado y pequeño)", /^data:image\/(webp|png);base64,/.test(aekUrl) && aekUrl.length < 60000, aekUrl.slice(0, 30) + " · " + aekUrl.length + " caracteres");
+  check("el escudo subido se ve en su tarjeta", await page.evaluate(() => [...document.querySelectorAll("#logoArchive .logo-card")].some((c) => c.innerText.includes("AEK") && /^(data:image|blob:)/.test(c.querySelector("img.team-crest:not([hidden])")?.src || ""))));
+  // Fotos de jugadores: búsqueda combinada y subida
+  await page.evaluate(() => { const el = document.querySelector('[data-fold="players"]'); if (!el.classList.contains("is-open")) el.querySelector(".fold-head").click(); });
+  await page.click('#playerPhotoArchive [data-player-photo]'); await page.waitForTimeout(400);
+  const nico = () => page.evaluate(() => Object.values(readCrestDirectory()).find((x) => x?.kind === "player" && /Nico Paz/.test(x.name))?.photo || "");
+  check("la foto del jugador se encuentra en TheSportsDB si API-Football no la tiene", (await nico()).includes("thesportsdb.com"), await nico());
+  const [ch2] = await Promise.all([page.waitForEvent("filechooser"), page.click('#playerPhotoArchive [data-player-upload]')]);
+  await ch2.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
+  check("subir la foto de un jugador desde el teléfono", (await nico()).startsWith("data:image"), (await nico()).slice(0, 30));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {
@@ -375,6 +425,24 @@ export async function sendPush(wp,sub,p){sent.push(p.title+' | '+p.body);return 
   check("avisos: 'empieza en' y 'empezó' en el momento justo", sent.length === 2 && /Empieza en 12 min/.test(sent[0]) && /Empezó/.test(sent[1]), sent.join(" / "));
   await envio();
   check("avisos: no repite notificaciones", sent.length === 2);
+  // TheSportsDB (con respuestas simuladas como las reales: un resultado por búsqueda)
+  const tsdbCalls = [];
+  globalThis.fetch = async (u) => {
+    const url = new URL(u), q = url.searchParams.get("t") || url.searchParams.get("p");
+    tsdbCalls.push(q);
+    const R = {
+      "Club Brugge KV": { teams: [{ idTeam: "2", strTeam: "Club NXT", strCountry: "Belgium", strSport: "Soccer", strBadge: "https://r2.thesportsdb.com/images/media/team/badge/nxt.png" }] },
+      "Club Brugge": { teams: [{ idTeam: "1", strTeam: "Club Brugge", strCountry: "Belgium", strSport: "Soccer", strBadge: "https://r2.thesportsdb.com/images/media/team/badge/cb.png" }] },
+      "Anastasios Douvikas": { player: [{ idPlayer: "5", strPlayer: "Anastasios Douvikas", strTeam: "_Retired Soccer", strSport: "Soccer" }] },
+      "Douvikas": { player: [{ idPlayer: "6", strPlayer: "Tasos Douvikas", strTeam: "Como", strSport: "Soccer", strCutout: "https://r2.thesportsdb.com/images/media/player/cutout/d.png" }] },
+    };
+    return { ok: true, status: 200, json: async () => R[q] || { teams: null, player: null } };
+  };
+  const { default: imagenes } = await import(path.join(ROOT, "netlify/functions/imagenes.mjs"));
+  let ri = await (await imagenes(new Request("https://x/i?tipo=equipo&q=Club%20Brugge%20KV"))).json();
+  check("TheSportsDB: prueba el nombre sin 'KV' y pone primero el equipo correcto", ri.options.map((o) => o.name).join() === "Club Brugge,Club NXT" && tsdbCalls.includes("Club Brugge"), JSON.stringify(ri.options.map((o) => o.name)));
+  ri = await (await imagenes(new Request("https://x/i?tipo=jugador&q=Anastasios%20Douvikas&club=Como"))).json();
+  check("TheSportsDB: prueba el apellido y descarta fichas sin foto", ri.options.length === 1 && ri.options[0].name === "Tasos Douvikas" && ri.options[0].photo.includes("cutout"), JSON.stringify(ri.options));
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 

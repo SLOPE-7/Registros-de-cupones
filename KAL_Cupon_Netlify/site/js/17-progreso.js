@@ -136,7 +136,9 @@ function counterRow(key, who, name, photo, count, editable) {
         '">＋</button>'
       : "") +
     (editable && who === "sub"
-      ? '<button type="button" class="pg-mini-btn" data-pg-sub-remove="' +
+      ? '<button type="button" class="pg-mini-btn" data-pg-sub-photo="' +
+        esc(key) +
+        '" aria-label="Subir foto del suplente">📷</button><button type="button" class="pg-mini-btn" data-pg-sub-remove="' +
         esc(key) +
         '" aria-label="Quitar suplente">🗑</button>'
       : "") +
@@ -299,21 +301,38 @@ async function addSubstitute(key) {
       teamId: (side && ids[side]) || "",
       season: scheduleISO(found.f).slice(0, 4),
     });
-    const r = await fetch("/.netlify/functions/jugadores?" + params, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(16000),
-    });
-    const d = await r.json().catch(() => ({}));
+    // API-Football y TheSportsDB a la vez.
+    const club = (side && found.f[side]) || "";
+    const [af, ts] = await Promise.allSettled([
+      fetch("/.netlify/functions/jugadores?" + params, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(16000),
+      }).then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw Error(d.error || "");
+        return (d.players || []).map((x) => ({ ...x, source: "API-Football" }));
+      }),
+      tsdbSearch("jugador", name, club),
+    ]);
+    const players = [
+      ...(af.status === "fulfilled" ? af.value : []),
+      ...(ts.status === "fulfilled" ? ts.value.map((x) => ({ ...x, id: x.id ? "tsdb-" + x.id : "" })) : []),
+    ].filter((x) => x.photo);
     let chosen = null;
-    if (r.ok && d.players?.length) {
-      chosen = d.players[0];
-      if (d.players.length > 1) {
+    if (players.length) {
+      chosen = players[0];
+      // Un solo resultado: se confirma (TheSportsDB a veces devuelve a otro jugador con nombre parecido).
+      if (players.length === 1 && !confirm("¿Es este jugador?\n" + chosen.name + (chosen.team ? " · " + chosen.team : "") + " (" + chosen.source + ")"))
+        chosen = null;
+      if (players.length > 1) {
         const a = prompt(
           "Elige el jugador:\n" +
-            d.players.map((x, i) => i + 1 + ". " + x.name + (x.team ? " · " + x.team : "")).join("\n"),
+            players
+              .map((x, i) => i + 1 + ". " + x.name + (x.team ? " · " + x.team : "") + " (" + x.source + ")")
+              .join("\n"),
           "1",
         );
-        chosen = a === null ? null : d.players[Number(a) - 1] || null;
+        chosen = a === null ? null : players[Number(a) - 1] || null;
       }
     } else if (confirm("No encontré la foto de " + name + ". ¿Quieres buscarla por su ID de API-Football?")) {
       const id = (prompt("ID numérico del jugador en API-Football:") || "").trim();

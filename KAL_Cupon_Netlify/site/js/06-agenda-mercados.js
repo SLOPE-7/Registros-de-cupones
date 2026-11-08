@@ -21,7 +21,7 @@ function fixtureMergedMarkets(g) {
 function crestHTML(url, name) {
   const u = String(url || "").trim(),
     fallback = '<span class="team-fallback">' + esc((name || "?").slice(0, 2).toUpperCase()) + "</span>";
-  if (!/^https?:\/\//i.test(u)) return fallback;
+  if (!/^https?:\/\//i.test(u) && !/^data:image\//i.test(u)) return fallback;
   const trusted = safeCrestSource(u);
   return (
     '<img class="team-crest"' +

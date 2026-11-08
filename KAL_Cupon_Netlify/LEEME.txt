@@ -233,3 +233,18 @@ VERSIÓN 10.2 — CORRECCIONES DESDE CAPTURAS REALES
 - V10.3: "Apuesta sin empate" ya no se confunde con la línea del importe apostado. Se agregó un cupón real de 16 partidos (pruebas/cupon-real-1.txt) a las pruebas automáticas (74 en total).
 - V10.4: "• pago anticipado" también se separa dentro de un BetBuilder. Copas con su nombre en español ("Copa de Alemania", "Copa de Italia", "Copa de Francia"…) usan el tema de su copa. Segundo cupón real (BetBuilder con jugador y copas) agregado a las pruebas: 79 en total.
 - V10.5: más códigos de club (BET, SCP, BEN, MNU, GAL, FEN, BRU, AJA, FEY, LEV, BVB, RBL, ROM, LAZ, ATA, OM, OL, LIL, MON, SEV, VIL, RSO…) y coincidencia más flexible (p. ej. "BEN" → "SL Benfica", "BET" → "Real Betis"). Tres cupones reales de Doradobet (42 partidos, 75 selecciones, 8 jugadores) agregados a las pruebas: 82 en total.
+
+
+VERSIÓN 11 — THESPORTSDB E IMÁGENES DESDE EL TELÉFONO
+TheSportsDB (segunda fuente, gratuita)
+- Los escudos (Logos, "🔎 Buscar logos" de la vista previa) y las fotos de jugadores (Logos, ficha del partido, suplentes) se buscan a la vez en API-Football y en TheSportsDB. Cada resultado muestra su miniatura y su fuente; se toca el correcto para guardarlo.
+- Si API-Football falla o no tiene al equipo (p. ej. Iberia 1999), sigue funcionando con TheSportsDB.
+- Se prueban varias formas del nombre (completo, sin "FC/KV/SC…", solo el apellido). Si el resultado no es el correcto, escribe otro nombre en "Buscar con otro nombre" (p. ej. "Luis Javier Suarez").
+- Cuando solo hay un resultado de un jugador, la app pregunta "¿Es este jugador?" antes de usarlo.
+- Función nueva: netlify/functions/imagenes.mjs. Usa la clave gratuita pública; si tienes una clave propia de TheSportsDB, agrégala en Netlify como THESPORTSDB_KEY.
+- El proxy de imágenes (logo.mjs) acepta también imágenes de thesportsdb.com.
+
+Imagen desde el teléfono
+- Botón 📷 en cada equipo, liga y jugador de Logos, en los resultados de búsqueda y en el suplente de la ficha del partido.
+- La imagen se recorta a un cuadrado pequeño (192 px, WebP o PNG) y se guarda dentro de la app; se sincroniza con la nube y entra en los respaldos.
+- Código: site/js/19-imagenes.js y site/css/13-imagenes.css. Pruebas: 93 en total.
