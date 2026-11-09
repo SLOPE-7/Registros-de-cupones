@@ -158,8 +158,20 @@ function rememberFixtureCrests(f) {
     toast("No se pudo guardar el catálogo local de escudos.");
   }
 }
+// Copia del catálogo válida solo durante la pasada de dibujo actual (se descarta al terminar el turno),
+// para no leer y descifrar localStorage una vez por cada partido.
+let crestDirTick = null;
+function crestDirectoryForRender() {
+  if (!crestDirTick) {
+    crestDirTick = readCrestDirectory();
+    queueMicrotask(() => {
+      crestDirTick = null;
+    });
+  }
+  return crestDirTick;
+}
 function applySavedCrests(f) {
-  const dir = readCrestDirectory();
+  const dir = crestDirectoryForRender();
   if (!f.countryFlag) f.countryFlag = dir[savedCrestKey("country", f.countryCode || f.country)]?.url || "";
   if (!f.homeCrest) f.homeCrest = dir[savedCrestKey("team", f.home)]?.url || "";
   if (!f.awayCrest) f.awayCrest = dir[savedCrestKey("team", f.away)]?.url || "";
@@ -210,6 +222,7 @@ async function writeCrestImage(url, blob) {
   });
 }
 async function loadCrestImage(url) {
+  url = resolveImage(url);
   if (!url) return null;
   if (crestImageJobs.has(url)) return crestImageJobs.get(url);
   const job = (async () => {

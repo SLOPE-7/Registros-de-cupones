@@ -78,3 +78,38 @@ function parseMoney(s) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+
+// Imágenes subidas desde el teléfono. Se guardan UNA vez aquí (id → imagen) y en escudos, fotos y partidos
+// solo se guarda la referencia corta "kalimg:<id>" (antes la imagen entera se copiaba en cada partido).
+const IMG_STORE = "kal_images_v1";
+let localImagesRaw = null,
+  localImagesMap = {};
+function localImages() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(IMG_STORE);
+  } catch {}
+  if (raw !== localImagesRaw) {
+    localImagesRaw = raw;
+    try {
+      localImagesMap = JSON.parse(raw || "{}") || {};
+    } catch {
+      localImagesMap = {};
+    }
+  }
+  return localImagesMap;
+}
+function storeLocalImage(dataUrl) {
+  const map = { ...localImages() };
+  const same = Object.entries(map).find(([, v]) => v === dataUrl);
+  if (same) return "kalimg:" + same[0];
+  const id = uid();
+  map[id] = dataUrl;
+  localStorage.setItem(IMG_STORE, JSON.stringify(map)); // si no hay espacio lanza un error que ve quien llama
+  return "kalimg:" + id;
+}
+// Convierte una referencia "kalimg:<id>" en la imagen; cualquier otra dirección se devuelve igual.
+function resolveImage(url) {
+  const u = String(url || "");
+  return u.startsWith("kalimg:") ? localImages()[u.slice(7)] || "" : u;
+}

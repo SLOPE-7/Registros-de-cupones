@@ -248,3 +248,25 @@ Imagen desde el teléfono
 - Botón 📷 en cada equipo, liga y jugador de Logos, en los resultados de búsqueda y en el suplente de la ficha del partido.
 - La imagen se recorta a un cuadrado pequeño (192 px, WebP o PNG) y se guarda dentro de la app; se sincroniza con la nube y entra en los respaldos.
 - Código: site/js/19-imagenes.js y site/css/13-imagenes.css. Pruebas: 93 en total.
+
+
+VERSIÓN 12 — REVISIÓN GENERAL: RENDIMIENTO, FLUIDEZ Y ACABADO
+Rendimiento (medido con 150 cupones y unos 2.100 partidos)
+- Antes cada toque redibujaba todas las pantallas (528 ms en computadora; segundos en un teléfono). Ahora solo se dibuja la pantalla visible: 32 ms. La página pasó de 86.000 a 9.500 elementos.
+- El catálogo de escudos se lee una vez por pasada (antes, una vez por partido).
+- Mercados construye solo lo que el filtro muestra, de 40 en 40 partidos ("Mostrar más"). Mis cupones, de 30 en 30.
+- Las tarjetas fuera de la pantalla no se dibujan hasta acercarse (content-visibility).
+- Corrección: cualquier clic ejecutaba "ir a la pantalla actual"; ahora solo navegan los botones de navegación.
+
+Espacio
+- Las imágenes subidas desde el teléfono se guardan una sola vez (kal_images_v1) y los partidos llevan solo una referencia corta "kalimg:<id>". Antes la imagen entera se copiaba en cada partido. Las ya guardadas se convierten solas. Viajan con la nube y los respaldos.
+
+Fluidez y acabado (site/css/14-pulido.css)
+- Transiciones suaves al cambiar de pantalla, abrir la ficha del partido, el buscador, el menú "Más" y los avisos.
+- Todo lo pulsable responde al toque; sin destello gris ni espera de doble toque.
+- Textura de grano fino y franjas de cancha en el encabezado y los paneles; brillo en los botones dorados.
+- El aviso inferior ya no tapa el menú en el teléfono.
+- Si el teléfono tiene activado "reducir movimiento", no hay animaciones.
+- Detalles: "—" en lugar de "Pendie…" en Mis cupones; estrellas de la Champions solo en la franja superior.
+
+Pruebas: 102 en total (nueva sección 11 de rendimiento con datos grandes).

@@ -19,7 +19,7 @@ function fixtureMergedMarkets(g) {
   return [...all.values()];
 }
 function crestHTML(url, name) {
-  const u = String(url || "").trim(),
+  const u = resolveImage(String(url || "").trim()),
     fallback = '<span class="team-fallback">' + esc((name || "?").slice(0, 2).toUpperCase()) + "</span>";
   if (!/^https?:\/\//i.test(u) && !/^data:image\//i.test(u)) return fallback;
   const trusted = safeCrestSource(u);
@@ -274,9 +274,22 @@ function marketPlayerPhotoHTML(x) {
         '" loading="lazy" referrerpolicy="no-referrer">'
     : "";
 }
+const MARKET_PAGE = 40;
+let marketLimit = MARKET_PAGE;
 function renderMarkets() {
   const matches = new Map(),
-    open = openCouponIds();
+    open = openCouponIds(),
+    couponById = new Map(db.coupons.map((c) => [c.id, c])),
+    lostIds = new Set(db.coupons.filter((c) => calcCoupon(c).status === "lost").map((c) => c.id)),
+    lostCount = (ids) => [...ids].filter((id) => lostIds.has(id)).length,
+    status = $("marketStatusFilter")?.value || "",
+    house = $("marketHouseFilter")?.value || "",
+    q = crestNorm($("marketSearch")?.value || ""),
+    dateQ = ($("marketDateFilter")?.value || "").trim().toLowerCase(),
+    rowVisible = (x) =>
+      (!status ||
+        (status === "pending" ? marketIsActive(x.m, x.coupons, open) : x.m.settlement === status)) &&
+      (!house || [...x.coupons].some((id) => couponById.get(id)?.houseId === house));
   db.coupons.forEach((c) =>
     c.fixtures.forEach((f) => {
       applySavedCrests(f);
@@ -293,10 +306,20 @@ function renderMarkets() {
       });
     }),
   );
-  const arr = [...matches.values()]
-    .map((group) => ({ ...group, markets: new Map([...group.markets]) }))
-    .filter((group) => group.markets.size)
-    .sort((a, b) => fixtureSortValue(a.f) - fixtureSortValue(b.f));
+  // Solo los partidos y mercados que pasan los filtros. Pendientes: primero el más próximo; historial: el más reciente.
+  const all = [...matches.values()]
+    .map((group) => ({ ...group, markets: new Map([...group.markets].filter(([, x]) => rowVisible(x))) }))
+    .filter(
+      (group) =>
+        group.markets.size &&
+        (!q || crestNorm(group.f.home + " " + group.f.away).includes(q)) &&
+        (!dateQ ||
+          (group.f.date + " " + group.f.time + " " + displayFixtureDate(group.f))
+            .toLowerCase()
+            .includes(dateQ)),
+    )
+    .sort((a, b) => (status === "pending" ? 1 : -1) * (fixtureSortValue(a.f) - fixtureSortValue(b.f)));
+  const arr = all.slice(0, marketLimit);
   marketMatchRefs = [];
   $("marketSummary").innerHTML = arr.length
     ? arr
@@ -304,13 +327,26 @@ function renderMarkets() {
           const firstMarket = [...match.markets.values()][0],
             firstCoupon = [...firstMarket.coupons][0],
             fixtureIndex =
-              db.coupons
-                .find((c) => c.id === firstCoupon)
-                ?.fixtures.findIndex((f) => fixtureKey(f) === fixtureKey(match.f)) ?? 0,
+              couponById.get(firstCoupon)?.fixtures.findIndex((f) => fixtureKey(f) === fixtureKey(match.f)) ??
+              0,
             ref = marketMatchRefs.push({ couponId: firstCoupon, fixtureIndex }) - 1;
-          return `<article class="coupon" data-market-card data-team="${esc(match.f.home + " " + match.f.away)}" data-date="${esc(match.f.date + " " + match.f.time)}"><div class="couponhead"><div class="market-match-open" role="button" tabindex="0" data-open-market-match="${ref}" title="Ver partido y mercados"><div class="agenda-teams">${crestHTML(match.f.homeCrest, match.f.home)}<strong>${esc(match.f.home)}</strong><span class="agenda-vs">vs</span><strong>${esc(match.f.away)}</strong>${crestHTML(match.f.awayCrest, match.f.away)}</div><div class="marketmeta">${match.f.leagueCrest ? crestHTML(match.f.leagueCrest, match.f.competition || match.f.league) : ""} ◷ ${esc(match.f.time || "Hora pendiente")}　·　${esc(displayFixtureDate(match.f))}　·　${esc([match.f.country, match.f.competition || match.f.league].filter(Boolean).join(" · ") || "Competencia sin identificar")}</div></div><div class="row market-head-actions"><button type="button" class="btn sm" data-market-edit-logos data-home="${esc(match.f.home)}" data-away="${esc(match.f.away)}">⚽ Editar escudos</button><button type="button" class="btn sm" data-expand="fixture-markets-${i}" aria-expanded="false"><span class="badge">${match.markets.size} mercado(s)　⌄</span></button></div></div><div class="couponbody hidden" id="fixture-markets-${i}"><div class="marketmeta">${esc(match.f.date)} · ${esc(match.f.time)} · ${esc(match.f.league || "Liga no identificada")} · ${match.markets.size} mercado(s)</div>${[...match.markets.values()].map((x) => `<div class="marketrow" data-market-row data-market-status="${esc(x.m.settlement)}" data-market-active="${marketIsActive(x.m, x.coupons, open) ? "1" : "0"}" data-market-houses="${esc([...x.coupons].map((id) => db.coupons.find((c) => c.id === id)?.houseId || "").join("|"))}"><div><div class="marketname">${marketPlayerPhotoHTML(x)}${esc(x.m.market)}${x.m.pick ? " · " + esc(x.m.pick) : ""}</div>${miniProgressText([x]) ? '<div class="pg-chips">' + miniProgressText([x]) + "</div>" : ""}<div class="marketmeta">Aparece en ${x.coupons.size} cupón(es) · Estado: <b>${statusLabel(x.m.settlement)}</b>${lostCouponCount(x.coupons) ? " · En " + lostCouponCount(x.coupons) + " combinada(s) perdida(s)" : ""}${x.m.odd || x.m.builderOdd || (x.f.markets.length === 1 ? x.f.totalOdds : "") ? " · Cuota: " + esc(x.m.odd || x.m.builderOdd || (x.f.markets.length === 1 ? x.f.totalOdds : "")) : ""}</div></div><div class="statusbtns"><button title="Ganado" aria-label="Ganado" class="${x.m.settlement === "won" ? "won" : ""}" data-status="${esc(x.key)}" data-value="won">✅</button><button title="Perdido" aria-label="Perdido" class="${x.m.settlement === "lost" ? "lost" : ""}" data-status="${esc(x.key)}" data-value="lost">❌</button><button title="Nulo" aria-label="Nulo" class="${x.m.settlement === "void" ? "void" : ""}" data-status="${esc(x.key)}" data-value="void">🟰</button><button title="Pendiente" aria-label="Pendiente" data-status="${esc(x.key)}" data-value="pending">↺</button></div></div>`).join("")}</div></article>`;
+          return `<article class="coupon" data-market-card data-team="${esc(match.f.home + " " + match.f.away)}" data-date="${esc(match.f.date + " " + match.f.time)}"><div class="couponhead"><div class="market-match-open" role="button" tabindex="0" data-open-market-match="${ref}" title="Ver partido y mercados"><div class="agenda-teams">${crestHTML(match.f.homeCrest, match.f.home)}<strong>${esc(match.f.home)}</strong><span class="agenda-vs">vs</span><strong>${esc(match.f.away)}</strong>${crestHTML(match.f.awayCrest, match.f.away)}</div><div class="marketmeta">${match.f.leagueCrest ? crestHTML(match.f.leagueCrest, match.f.competition || match.f.league) : ""} ◷ ${esc(match.f.time || "Hora pendiente")}　·　${esc(displayFixtureDate(match.f))}　·　${esc([match.f.country, match.f.competition || match.f.league].filter(Boolean).join(" · ") || "Competencia sin identificar")}</div></div><div class="row market-head-actions"><button type="button" class="btn sm" data-market-edit-logos data-home="${esc(match.f.home)}" data-away="${esc(match.f.away)}">⚽ Editar escudos</button><button type="button" class="btn sm" data-expand="fixture-markets-${i}" aria-expanded="false"><span class="badge">${match.markets.size} mercado(s)　⌄</span></button></div></div><div class="couponbody hidden" id="fixture-markets-${i}"><div class="marketmeta">${esc(match.f.date)} · ${esc(match.f.time)} · ${esc(match.f.league || "Liga no identificada")} · ${match.markets.size} mercado(s)</div>${[...match.markets.values()].map((x) => `<div class="marketrow" data-market-row data-market-status="${esc(x.m.settlement)}" data-market-active="${marketIsActive(x.m, x.coupons, open) ? "1" : "0"}" data-market-houses="${esc([...x.coupons].map((id) => couponById.get(id)?.houseId || "").join("|"))}"><div><div class="marketname">${marketPlayerPhotoHTML(x)}${esc(x.m.market)}${x.m.pick ? " · " + esc(x.m.pick) : ""}</div>${miniProgressText([x]) ? '<div class="pg-chips">' + miniProgressText([x]) + "</div>" : ""}<div class="marketmeta">Aparece en ${x.coupons.size} cupón(es) · Estado: <b>${statusLabel(x.m.settlement)}</b>${lostCount(x.coupons) ? " · En " + lostCount(x.coupons) + " combinada(s) perdida(s)" : ""}${x.m.odd || x.m.builderOdd || (x.f.markets.length === 1 ? x.f.totalOdds : "") ? " · Cuota: " + esc(x.m.odd || x.m.builderOdd || (x.f.markets.length === 1 ? x.f.totalOdds : "")) : ""}</div></div><div class="statusbtns"><button title="Ganado" aria-label="Ganado" class="${x.m.settlement === "won" ? "won" : ""}" data-status="${esc(x.key)}" data-value="won">✅</button><button title="Perdido" aria-label="Perdido" class="${x.m.settlement === "lost" ? "lost" : ""}" data-status="${esc(x.key)}" data-value="lost">❌</button><button title="Nulo" aria-label="Nulo" class="${x.m.settlement === "void" ? "void" : ""}" data-status="${esc(x.key)}" data-value="void">🟰</button><button title="Pendiente" aria-label="Pendiente" data-status="${esc(x.key)}" data-value="pending">↺</button></div></div>`).join("")}</div></article>`;
         })
-        .join("")
-    : '<div class="empty"><strong>No hay mercados registrados</strong>Guarda un cupón para ver aquí el resumen consolidado.</div>';
+        .join("") +
+      (all.length > arr.length
+        ? '<button type="button" class="btn show-more" data-market-more>Mostrar ' +
+          Math.min(MARKET_PAGE, all.length - arr.length) +
+          " más · quedan " +
+          (all.length - arr.length) +
+          "</button>"
+        : "")
+    : matches.size
+      ? '<div class="empty"><strong>Nada con estos filtros</strong>Cambia el estado, la casa o la búsqueda.</div>'
+      : '<div class="empty"><strong>No hay mercados registrados</strong>Guarda un cupón para ver aquí el resumen consolidado.</div>';
   showPlayerPhotoImagesIn($("marketSummary"));
 }
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-market-more]")) return;
+  marketLimit += MARKET_PAGE;
+  renderMarkets();
+});

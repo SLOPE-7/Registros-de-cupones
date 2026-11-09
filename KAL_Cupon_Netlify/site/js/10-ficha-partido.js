@@ -653,7 +653,7 @@ function renderMatchDataPanel(tab, f, merged) {
   return '<div class="empty">No hay información disponible para esta pestaña.</div>';
 }
 function playerImageUrl(url) {
-  return String(url || "");
+  return resolveImage(url);
 }
 function savedPlayerPhoto(key, fixture, market) {
   if (matchPlayerPhotos[key]) return matchPlayerPhotos[key];

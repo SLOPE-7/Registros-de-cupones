@@ -96,6 +96,7 @@ function progressStatusText(info, total) {
 }
 
 function counterRow(key, who, name, photo, count, editable) {
+  photo = resolveImage(photo);
   return (
     '<div class="pg-player">' +
     (photo
@@ -322,7 +323,17 @@ async function addSubstitute(key) {
     if (players.length) {
       chosen = players[0];
       // Un solo resultado: se confirma (TheSportsDB a veces devuelve a otro jugador con nombre parecido).
-      if (players.length === 1 && !confirm("¿Es este jugador?\n" + chosen.name + (chosen.team ? " · " + chosen.team : "") + " (" + chosen.source + ")"))
+      if (
+        players.length === 1 &&
+        !confirm(
+          "¿Es este jugador?\n" +
+            chosen.name +
+            (chosen.team ? " · " + chosen.team : "") +
+            " (" +
+            chosen.source +
+            ")",
+        )
+      )
         chosen = null;
       if (players.length > 1) {
         const a = prompt(

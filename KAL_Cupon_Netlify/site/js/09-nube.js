@@ -61,6 +61,11 @@ function mergeLogoStores(incoming) {
   });
   const hidden = new Set([...parse(localStorage.getItem(LOGO_HIDDEN), []), ...parse(incoming.hidden, [])]);
   const trash = { ...parse(incoming.trash, {}), ...readLogoTrash() };
+  // Imágenes subidas desde el teléfono: se juntan las de los dos lados.
+  const images = { ...parse(incoming.images, {}), ...localImages() };
+  try {
+    if (Object.keys(images).length) localStorage.setItem(IMG_STORE, JSON.stringify(images));
+  } catch (e) {}
   try {
     localStorage.setItem(CREST_DIR, JSON.stringify(dir));
     localStorage.setItem(LOGO_HIDDEN, JSON.stringify([...hidden]));
@@ -144,10 +149,16 @@ async function cloudPull() {
   const rows = await r.json();
   if (rows.length) {
     const remote = rows[0].payload || {};
-    mergeLogoStores({ dir: remote._kalLogos, hidden: remote._kalHiddenTeams, trash: remote._kalLogoTrash });
+    mergeLogoStores({
+      dir: remote._kalLogos,
+      hidden: remote._kalHiddenTeams,
+      trash: remote._kalLogoTrash,
+      images: remote._kalImages,
+    });
     delete remote._kalLogos;
     delete remote._kalHiddenTeams;
     delete remote._kalLogoTrash;
+    delete remote._kalImages;
     db = mergeDatabases(db, remote);
     localStorage.setItem(KEY, JSON.stringify(db));
     renderAll();
@@ -167,6 +178,7 @@ async function cloudPush() {
           _kalLogos: localStorage.getItem(CREST_DIR) || "{}",
           _kalHiddenTeams: localStorage.getItem(LOGO_HIDDEN) || "[]",
           _kalLogoTrash: localStorage.getItem(LOGO_TRASH) || "{}",
+          _kalImages: localStorage.getItem(IMG_STORE) || "{}",
         },
         updated_at: new Date().toISOString(),
       }),

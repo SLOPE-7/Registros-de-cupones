@@ -1,6 +1,8 @@
 // Mis cupones, casas y balances, informes, estadísticas de rendimiento y panel de Inicio.
 "use strict";
 let couponFilter = "pending";
+const COUPON_PAGE = 30;
+let couponLimit = COUPON_PAGE;
 const COUPON_FILTERS = [
   ["pending", "Pendientes"],
   ["won", "Ganados"],
@@ -44,6 +46,7 @@ function renderCoupons() {
   }
   el.innerHTML = db.coupons.length
     ? list
+        .slice(0, couponLimit)
         .map((c) => {
           const r = calcCoupon(c),
             house = db.houses.find((h) => h.id === c.houseId),
@@ -93,9 +96,9 @@ function renderCoupons() {
             "</b></span><span><small>Cuota</small><b>" +
             (c.odds || "—") +
             "</b></span><span><small>Retorno bruto</small><b>" +
-            (r.net === null ? "Pendiente" : money(r.gross)) +
+            (r.net === null ? "—" : money(r.gross)) +
             "</b></span><span><small>Resultado neto</small><b>" +
-            (r.net === null ? "Pendiente" : money(r.net)) +
+            (r.net === null ? "—" : money(r.net)) +
             '</b></span></div><div class="saved-fixtures">' +
             matches +
             '</div><div class="row"><button class="btn sm" data-detail="' +
@@ -109,7 +112,14 @@ function renderCoupons() {
             '">Eliminar</button></div></div></article>'
           );
         })
-        .join("")
+        .join("") +
+      (list.length > couponLimit
+        ? '<button type="button" class="btn show-more" data-coupon-more>Mostrar ' +
+          Math.min(COUPON_PAGE, list.length - couponLimit) +
+          " más · quedan " +
+          (list.length - couponLimit) +
+          "</button>"
+        : "")
     : '<div class="empty"><strong>Aún no hay cupones</strong>Los cupones guardados aparecerán aquí.</div>';
 }
 function renderHouses() {
@@ -669,3 +679,8 @@ function renderDashboard() {
         '"/></svg><small>Cada punto es un cupón liquidado.</small>'
       : '<div class="chart-placeholder">El gráfico mostrará tus resultados al liquidar cupones.</div>';
 }
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-coupon-more]")) return;
+  couponLimit += COUPON_PAGE;
+  renderCoupons();
+});

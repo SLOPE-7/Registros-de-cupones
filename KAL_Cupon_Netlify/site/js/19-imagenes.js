@@ -113,7 +113,7 @@ function setPlayerPhoto({
     toast("No hay espacio para guardar la foto en este teléfono.");
     return false;
   }
-  if (mk) matchPlayerPhotos[mk] = photo;
+  if (mk) matchPlayerPhotos[mk] = resolveImage(photo);
   if (cloudSession) queueCloudSync();
   renderLogos();
   if (currentMatchRef) renderMatchDetail();
@@ -138,7 +138,7 @@ uploadInput.addEventListener("change", async () => {
   uploadTarget = null;
   if (!file || !t) return;
   try {
-    const url = await imageFileToDataUrl(file);
+    const url = storeLocalImage(await imageFileToDataUrl(file));
     if (t.kind === "team") {
       if (setTeamCrest(t.name, url, t.country)) toast("Escudo de " + t.name + " guardado desde tu teléfono.");
     } else if (t.kind === "league") {
@@ -234,3 +234,37 @@ document.addEventListener("click", (e) => {
   const sp = e.target.closest("[data-pg-sub-photo]");
   if (sp) pickImage({ kind: "sub", key: sp.dataset.pgSubPhoto });
 });
+
+// Una sola vez: las imágenes subidas que quedaron copiadas enteras (versión anterior) pasan a referencia.
+function migrateInlineImages() {
+  let changed = false;
+  const ref = (v) => {
+    if (typeof v !== "string" || !v.startsWith("data:image/")) return v;
+    changed = true;
+    try {
+      return storeLocalImage(v);
+    } catch {
+      return v;
+    }
+  };
+  const dir = readCrestDirectory();
+  Object.values(dir).forEach((item) => {
+    if (!item) return;
+    if (item.url) item.url = ref(item.url);
+    if (item.photo) item.photo = ref(item.photo);
+  });
+  const dirChanged = changed;
+  db.coupons.forEach((c) =>
+    (c.fixtures || []).forEach((f) => {
+      for (const k of ["homeCrest", "awayCrest", "leagueCrest"]) if (f[k]) f[k] = ref(f[k]);
+    }),
+  );
+  Object.values(db.progress || {}).forEach((p) => {
+    if (p?.sub?.photo) p.sub.photo = ref(p.sub.photo);
+  });
+  if (dirChanged)
+    try {
+      localStorage.setItem(CREST_DIR, JSON.stringify(dir));
+    } catch {}
+  return changed;
+}

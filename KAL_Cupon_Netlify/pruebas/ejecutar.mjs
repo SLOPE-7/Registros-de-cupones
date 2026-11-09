@@ -76,8 +76,9 @@ async function open(db, { ctxOpts = {}, init } = {}) {
   await page.waitForTimeout(600);
   return { ctx, page };
 }
-const view = (page, v) => page.evaluate((v) => document.querySelector(`[data-view="${v}"]`).click(), v);
-const texts = (page, sel) => page.$$eval(sel, (x) => x.map((e) => e.innerText.replace(/\s+/g, " ").trim()));
+// Cambia de pantalla y espera un instante a que el navegador dibuje (las listas usan content-visibility).
+const view = async (page, v) => { await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`).click(), v); await page.waitForTimeout(120); };
+const texts = async (page, sel) => { await page.waitForTimeout(100); return page.$$eval(sel, (x) => x.map((e) => e.innerText.replace(/\s+/g, " ").trim())); };
 
 // ---------- 1. Lector y detección de jugadores (funciones puras) ----------
 section("1. Lector de cupones y detección de jugadores");
@@ -375,7 +376,10 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
   const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(`[data-logo-upload="${aek}"]`)]);
   await chooser.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
   const aekUrl = await page.evaluate(() => readCrestDirectory()["team:aek"]?.url || "");
-  check("subir imagen del teléfono guarda el escudo (recortado y pequeño)", /^data:image\/(webp|png);base64,/.test(aekUrl) && aekUrl.length < 60000, aekUrl.slice(0, 30) + " · " + aekUrl.length + " caracteres");
+  const aekImg = await page.evaluate((u) => resolveImage(u), aekUrl);
+  check("subir imagen del teléfono guarda el escudo (recortado y pequeño)", /^data:image\/(webp|png);base64,/.test(aekImg) && aekImg.length < 60000, aekImg.slice(0, 30) + " · " + aekImg.length + " caracteres");
+  const stored = await page.evaluate(() => ({ ref: readCrestDirectory()["team:aek"].url, enPartido: db.coupons.flatMap((c) => c.fixtures).find((f) => f.home === "AEK").homeCrest, copias: (JSON.stringify(db).match(/data:image/g) || []).length }));
+  check("la imagen se guarda una sola vez; los partidos llevan solo la referencia", stored.ref.startsWith("kalimg:") && stored.enPartido === stored.ref && stored.copias === 0, JSON.stringify(stored).slice(0, 120));
   check("el escudo subido se ve en su tarjeta", await page.evaluate(() => [...document.querySelectorAll("#logoArchive .logo-card")].some((c) => c.innerText.includes("AEK") && /^(data:image|blob:)/.test(c.querySelector("img.team-crest:not([hidden])")?.src || ""))));
   // Fotos de jugadores: búsqueda combinada y subida
   await page.evaluate(() => { const el = document.querySelector('[data-fold="players"]'); if (!el.classList.contains("is-open")) el.querySelector(".fold-head").click(); });
@@ -384,7 +388,43 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
   check("la foto del jugador se encuentra en TheSportsDB si API-Football no la tiene", (await nico()).includes("thesportsdb.com"), await nico());
   const [ch2] = await Promise.all([page.waitForEvent("filechooser"), page.click('#playerPhotoArchive [data-player-upload]')]);
   await ch2.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
-  check("subir la foto de un jugador desde el teléfono", (await nico()).startsWith("data:image"), (await nico()).slice(0, 30));
+  check("subir la foto de un jugador desde el teléfono", (await nico()).startsWith("kalimg:") && (await page.evaluate(() => !!document.querySelector('#playerPhotoArchive img.player-logo-thumb[src^="data:image"]'))), (await nico()).slice(0, 30));
+  // Una imagen guardada entera por la versión anterior pasa a referencia al abrir la app.
+  const mig = await page.evaluate(() => { const data = resolveImage(readCrestDirectory()["team:aek"].url); db.coupons[0].fixtures[0].awayCrest = data; const changed = migrateInlineImages(); return changed + ":" + db.coupons[0].fixtures[0].awayCrest.slice(0, 7); });
+  check("migra imágenes guardadas enteras a referencias", mig === "true:kalimg:", mig);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+// ---------- 11. Rendimiento con muchos datos ----------
+section("11. Rendimiento con muchos datos (150 cupones, ~2.100 partidos)");
+{
+  const { ctx, page } = await open(null);
+  const raws = [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/doradobet-${n}.txt`), "utf8"));
+  const r = await page.evaluate((raws) => {
+    const now = Date.now();
+    for (let i = 0; i < 150; i++) {
+      const x = parseCoupon(raws[i % 3]), d = new Date(now - ((i - 5) * 86400000) / 2);
+      x.fixtures.forEach((f, j) => { f.dateISO = d.toISOString().slice(0, 10); f.home += i > 10 ? " " + (i % 7) : ""; f.markets.forEach((m, k) => { m.settlement = i < 6 ? "pending" : (i * 7 + j * 3 + k) % 10 < 7 ? "won" : "lost"; }); });
+      db.coupons.push({ id: "c" + i, name: "Cupón " + i, created: d.toISOString(), type: "parlay", stake: 10, odds: 2, payout: 20, fixtures: x.fixtures });
+    }
+    const time = (fn) => { const a = performance.now(); fn(); return performance.now() - a; };
+    const out = { all: time(renderAll) };
+    for (const v of ["calendar", "markets", "saved", "stats", "logos"]) out[v] = time(() => go(v));
+    out.nodes = document.querySelectorAll("*").length;
+    out.marketCards = document.querySelectorAll("[data-market-card]").length;
+    return out;
+  }, raws);
+  const slowest = Math.max(r.all, r.calendar, r.markets, r.saved, r.stats, r.logos);
+  check("ninguna pantalla tarda más de 400 ms en dibujarse", slowest < 400, JSON.stringify(Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)]))));
+  check("la página se mantiene ligera (menos de 25.000 elementos)", r.nodes < 25000, String(r.nodes));
+  check("Mercados dibuja por páginas (40 partidos) con botón 'Mostrar más'", r.marketCards === 40 && (await page.$("[data-market-more]")) !== null, String(r.marketCards));
+  await view(page, "markets"); await page.click("[data-market-more]"); await page.waitForTimeout(100);
+  check("'Mostrar más' agrega otros 40", (await page.$$("[data-market-card]")).length === 80);
+  await page.selectOption("#marketStatusFilter", ""); await page.waitForTimeout(150);
+  check("el filtro 'Todos' también va por páginas", (await page.$$("[data-market-card]")).length === 40);
+  await view(page, "saved"); await page.click('[data-coupon-filter="all"]'); await page.waitForTimeout(100);
+  check("Mis cupones → Todos muestra 30 y ofrece 'Mostrar más'", (await page.$$("#couponList .saved-coupon")).length === 30 && (await page.$("[data-coupon-more]")) !== null);
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

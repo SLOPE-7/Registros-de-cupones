@@ -1,0 +1,246 @@
+/* Acabado y fluidez (V12): respuesta al tocar, transiciones, textura y listas largas más ligeras. */
+
+/* --- Tacto: sin destello gris al tocar ni espera de doble toque; texto más nítido --- */
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+button,
+select,
+input,
+textarea,
+[role="button"] {
+  touch-action: manipulation;
+}
+.stat strong,
+.mk-odd,
+.pv-odd,
+.pg-num,
+.budget-top b,
+.bank-main strong,
+.perf-val b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Respuesta al tocar: todo lo pulsable se hunde un poco --- */
+.btn,
+.chip,
+.tab,
+.mk-btn,
+.pg-btn,
+.img-opt,
+.agenda-match-link,
+.saved-fixture,
+.search-fixture,
+.fold-head,
+.mobile button,
+.more-menu button,
+.theme-toggle,
+.bookmaker-card {
+  transition:
+    transform 0.12s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+.btn:active,
+.chip:active,
+.mk-btn:active,
+.img-opt:active,
+.theme-toggle:active,
+.bookmaker-card:active {
+  transform: scale(0.96);
+}
+.agenda-match-link:active,
+.saved-fixture:active,
+.search-fixture:active,
+.fold-head:active {
+  transform: scale(0.985);
+}
+.mobile button:active span {
+  transform: scale(0.88);
+}
+.mobile button span {
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.mobile button.active span {
+  transform: translateY(-1px) scale(1.08);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* --- Transiciones entre pantallas, ventanas y avisos --- */
+@keyframes kal-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes kal-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+  }
+}
+@keyframes kal-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes kal-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+@keyframes kal-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+}
+.view.active {
+  animation: kal-view-in 0.22s ease both;
+}
+.match-modal.open .match-dialog {
+  animation: kal-sheet-in 0.3s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+.match-modal.open .match-modal-backdrop {
+  animation: kal-fade-in 0.25s ease both;
+}
+.search-sheet:not([hidden]) {
+  animation: kal-fade-in 0.18s ease both;
+}
+.more-menu:not([hidden]) {
+  animation: kal-pop-in 0.16s ease both;
+  transform-origin: bottom right;
+}
+.toast.show {
+  animation: kal-toast-in 0.22s ease both;
+}
+.save-bar:not([hidden]) {
+  animation: kal-pop-in 0.22s ease both;
+}
+.home-notice,
+.budget-card {
+  animation: kal-fade-in 0.25s ease both;
+}
+/* Sección plegable: el contenido aparece suavemente al abrir */
+.fold.is-open > .fold-body {
+  animation: kal-fade-in 0.2s ease both;
+}
+/* Barra de progreso: los segmentos se llenan con un pequeño rebote */
+.pg-seg i.on {
+  animation: kal-fade-in 0.25s ease both;
+}
+
+/* --- Aviso inferior: por encima del menú en el teléfono --- */
+.toast {
+  border-radius: 12px;
+  box-shadow: 0 10px 28px #0007;
+  text-align: center;
+}
+@media (max-width: 620px) {
+  .toast {
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100vw - 24px);
+  }
+  body[data-view="new"] .toast {
+    bottom: calc(134px + env(safe-area-inset-bottom));
+  }
+}
+
+/* --- Textura: grano muy fino sobre el encabezado y los paneles (imagen fija, no afecta al desplazamiento) --- */
+:root {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+}
+.top {
+  background-image: var(--grain), repeating-linear-gradient(105deg, #ffffff08 0 26px, transparent 26px 52px),
+    linear-gradient(115deg, #06412f, #13744d 68%, #0b543a);
+  background-blend-mode: soft-light, normal, normal;
+}
+:root[data-theme="dark"] .top {
+  background-image: var(--grain), repeating-linear-gradient(105deg, #ffffff06 0 26px, transparent 26px 52px),
+    linear-gradient(115deg, #0d1730, #14275a 60%, #0d1730);
+  background-blend-mode: soft-light, normal, normal;
+}
+:root[data-theme="dark"] .panel {
+  background-image: var(--grain), linear-gradient(160deg, #111a2c, #0c1322);
+  background-blend-mode: soft-light, normal;
+  box-shadow:
+    inset 0 1px 0 #ffffff0d,
+    0 6px 22px #0006;
+}
+:root[data-theme="dark"] .stat,
+:root[data-theme="dark"] .mk-card,
+:root[data-theme="dark"] .pv-card,
+:root[data-theme="dark"] .agenda-match,
+:root[data-theme="dark"] .saved-coupon,
+:root[data-theme="dark"] .logo-card {
+  box-shadow: inset 0 1px 0 #ffffff0a;
+}
+.btn.gold {
+  box-shadow:
+    inset 0 1px 0 #ffffff66,
+    0 4px 14px #f0b42933;
+}
+.bank-card,
+.match-stadium {
+  background-blend-mode: normal;
+}
+
+/* --- Listas largas: lo que queda fuera de la pantalla no se dibuja hasta que te acercas --- */
+.saved-coupon,
+[data-market-card],
+.logo-card,
+.search-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+.show-more {
+  width: 100%;
+  margin-top: 8px;
+}
+
+/* --- Barras de desplazamiento discretas --- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3a4a66 transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #3a4a66;
+  border-radius: 8px;
+}
+
+/* --- Quien prefiera menos movimiento (ajuste de accesibilidad del teléfono) no ve animaciones --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Estrellas de la Champions: solo en la franja superior, sin pasar por encima de los nombres. */
+[data-pattern="stars"] .hero-bg:before {
+  opacity: 0.7;
+  mask-image: linear-gradient(180deg, #000 0, #000 18%, transparent 46%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0, #000 18%, transparent 46%);
+}

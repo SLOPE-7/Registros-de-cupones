@@ -1,32 +1,48 @@
 // Navegación entre pantallas, respaldos, botones y carga inicial de los datos guardados.
 "use strict";
-function renderAll() {
-  if (typeof renderHomeNotices === "function") {
+// Qué se dibuja en cada pantalla. Solo se redibuja la pantalla visible; las demás se dibujan al entrar
+// (antes cada toque redibujaba todas las pantallas, también las ocultas).
+const VIEW_RENDER = {
+  home: () => {
     renderHomeNotices();
     renderBudget();
+    renderTodayPanel();
+    renderDashboard();
+  },
+  new: () => renderPreview(),
+  calendar: () => renderCalendar(),
+  markets: () => {
+    renderMarkets();
+    renderResultHistory();
+  },
+  logos: () => renderLogos(),
+  saved: () => {
+    renderCoupons();
+    renderCouponActionUndo();
+  },
+  houses: () => renderHouses(),
+  stats: () => renderStats(),
+  settings: () => {
     renderAlertsBox();
-    queueAlertsSync();
-  }
+    renderInstallHelp();
+  },
+};
+function renderView(name = activeView) {
+  VIEW_RENDER[name]?.();
+}
+function renderAll() {
+  db.coupons.forEach((c) => (c.fixtures || []).forEach(applySavedCrests));
   populateHouses();
   populateMarketHouseFilter();
   populateReportHouse();
-  renderPreview();
-  renderCalendar();
-  renderMarkets();
-  renderLogos();
-  applyMarketFilters();
-  renderResultHistory();
-  renderCouponActionUndo();
-  renderCoupons();
-  renderHouses();
-  renderStats();
-  renderDashboard();
+  renderView();
   if (currentMatchRef) renderMatchDetail(currentMatchRef);
   $("sideCount").textContent = db.coupons.length;
   $("sCoupons").textContent = db.coupons.length;
   $("sMatches").textContent = db.coupons.reduce((s, c) => s + c.fixtures.length, 0);
   $("sPending").textContent = pendingMarketCount();
   $("sStake").textContent = money(db.coupons.reduce((s, c) => s + (Number(c.stake) || 0), 0));
+  queueAlertsSync();
 }
 const VIEW_TITLES = {
     home: "Inicio",
@@ -59,6 +75,7 @@ function go(name) {
   if (title) title.textContent = VIEW_TITLES[name];
   document.body.dataset.view = name;
   closeMoreMenu();
+  if (changed) renderView(name);
   if (focusReader) {
     const raw = $("raw");
     raw?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -104,6 +121,7 @@ function backup() {
           dir: readCrestDirectory(),
           hidden: JSON.parse(localStorage.getItem(LOGO_HIDDEN) || "[]"),
           trash: readLogoTrash(),
+          images: localImages(),
         },
       },
       null,
@@ -200,10 +218,18 @@ $("logoClearFocus").addEventListener("click", () => {
   logoManagerFocus = [];
   renderLogos();
 });
-["marketSearch", "marketDateFilter"].forEach((id) => $(id).addEventListener("input", applyMarketFilters));
-["marketStatusFilter", "marketHouseFilter"].forEach((id) =>
-  $(id).addEventListener("change", applyMarketFilters),
+let marketFilterTimer = null;
+const refreshMarkets = () => {
+  marketLimit = MARKET_PAGE;
+  renderMarkets();
+};
+["marketSearch", "marketDateFilter"].forEach((id) =>
+  $(id).addEventListener("input", () => {
+    clearTimeout(marketFilterTimer);
+    marketFilterTimer = setTimeout(refreshMarkets, 160);
+  }),
 );
+["marketStatusFilter", "marketHouseFilter"].forEach((id) => $(id).addEventListener("change", refreshMarkets));
 $("undoResultBtn").addEventListener("click", undoLastResult);
 $("undoCouponActionBtn").addEventListener("click", undoCouponAction);
 $("exportCsvBtn").addEventListener("click", exportCsv);
@@ -290,7 +316,12 @@ document.addEventListener("click", (e) => {
   $("agendaDate").value = "";
   renderCalendar();
 });
-setInterval(renderCalendar, 30000);
+// Cada 30 s se refresca solo lo que está a la vista (estado "en vivo" de los partidos).
+setInterval(() => {
+  if (document.hidden) return;
+  if (activeView === "calendar") renderCalendar();
+  else if (activeView === "home") renderTodayPanel();
+}, 30000);
 document.body.addEventListener("input", (e) => {
   const field = e.target.closest("[data-draft-field]");
   if (!field) return;
@@ -526,6 +557,7 @@ document.body.addEventListener("click", (e) => {
   const cf = e.target.closest("[data-coupon-filter]");
   if (cf) {
     couponFilter = cf.dataset.couponFilter;
+    couponLimit = COUPON_PAGE;
     renderCoupons();
     return;
   }
@@ -564,7 +596,7 @@ document.body.addEventListener("click", (e) => {
         badge.textContent = badge.textContent.replace(/[⌄⌃]/g, "").trim() + (opening ? "　⌃" : "　⌄");
     }
   }
-  const v = e.target.closest("[data-view]");
+  const v = e.target.closest("button[data-view], a[data-view]");
   if (v) go(v.dataset.view);
   const g = e.target.closest("[data-go]");
   if (g) go(g.dataset.go);
