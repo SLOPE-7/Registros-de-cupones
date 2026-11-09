@@ -1,0 +1,205 @@
+/* Pantalla de entrada, confeti, tarjeta de resultado, sacudida y medidor de espacio (V13). */
+
+/* --- Pantalla de entrada: el balón cae, rebota y aparece el nombre --- */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  background: radial-gradient(ellipse at 50% 35%, #16264a 0, #070b14 62%);
+  color: #fff;
+  /* Si la app tardara o fallara al cargar, la pantalla de entrada se quita sola. */
+  animation: kal-splash-safety 0.4s ease 4s forwards;
+}
+.splash img {
+  width: 108px;
+  height: 108px;
+  border-radius: 26px;
+  box-shadow: 0 18px 44px #000a;
+  animation: kal-splash-drop 0.75s cubic-bezier(0.25, 1.4, 0.4, 1) both;
+}
+.splash b {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #f5c542;
+  animation: kal-view-in 0.4s ease 0.3s both;
+}
+.splash small {
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  color: #9fb0cc;
+  animation: kal-view-in 0.4s ease 0.42s both;
+}
+.splash.is-leaving {
+  animation: kal-splash-out 0.36s ease forwards;
+}
+@keyframes kal-splash-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-70px) scale(0.7) rotate(-18deg);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes kal-splash-out {
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+    visibility: hidden;
+  }
+}
+@keyframes kal-splash-safety {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+/* --- Confeti --- */
+.confetti {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 90;
+  pointer-events: none;
+}
+
+/* --- Tarjeta de resultado del cupón --- */
+.result-card-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #050a14aa;
+  animation: kal-fade-in 0.2s ease both;
+}
+.result-card-wrap.is-leaving {
+  animation: kal-splash-out 0.22s ease forwards;
+}
+.result-card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: min(300px, 82vw);
+  padding: 22px 26px 20px;
+  border-radius: 22px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(160deg, #142544, #0b1322);
+  border: 1px solid #f5c542;
+  box-shadow:
+    0 24px 60px #000c,
+    0 0 0 6px #f5c54222;
+  animation: kal-result-in 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.is-lost .result-card {
+  border-color: #ff6b6b;
+  box-shadow:
+    0 24px 60px #000c,
+    0 0 0 6px #ff6b6b1f;
+  background: linear-gradient(160deg, #2a1418, #120b10);
+}
+.result-emoji {
+  font-size: 58px;
+  line-height: 1.1;
+  animation: kal-emoji 0.9s ease 0.15s both;
+}
+.result-card b {
+  font-size: 22px;
+  font-weight: 900;
+}
+.result-card span {
+  font-size: 13px;
+  color: #b9c6dc;
+}
+.result-amount {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: 900;
+  color: #2fd27a;
+  font-variant-numeric: tabular-nums;
+}
+.is-lost .result-amount {
+  color: #ff8f8f;
+}
+@keyframes kal-result-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.8);
+  }
+}
+@keyframes kal-emoji {
+  0% {
+    transform: scale(0.3) rotate(-25deg);
+  }
+  55% {
+    transform: scale(1.25) rotate(8deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* --- Sacudida al perder --- */
+@keyframes kal-shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-7px);
+  }
+  40%,
+  60% {
+    transform: translateX(7px);
+  }
+}
+.shake {
+  animation: kal-shake 0.42s ease both;
+}
+
+/* --- Medidor de espacio en Ajustes --- */
+.storage-box {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.storage-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--ink);
+}
+.storage-bar {
+  margin: 0;
+}
+.storage-bar.is-warn i {
+  background: #e0a21b;
+}
+.storage-bar.is-over i {
+  background: var(--lost);
+}
+.storage-box p {
+  margin: 0;
+}
+.storage-box .btn {
+  justify-self: start;
+}

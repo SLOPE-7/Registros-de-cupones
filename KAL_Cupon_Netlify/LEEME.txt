@@ -270,3 +270,19 @@ Fluidez y acabado (site/css/14-pulido.css)
 - Detalles: "—" en lugar de "Pendie…" en Mis cupones; estrellas de la Champions solo en la franja superior.
 
 Pruebas: 102 en total (nueva sección 11 de rendimiento con datos grandes).
+
+
+VERSIÓN 13 — ANIMACIONES Y LIMPIEZA DE ESPACIO
+Animaciones (site/js/20-animaciones.js, site/css/15-animaciones.css)
+- Pantalla de entrada al abrir la app: el ícono cae y aparece "KAL" (menos de un segundo; se quita sola aunque algo falle).
+- Mercado ganado: ráfaga corta de confeti. Mercado perdido: sacudida breve.
+- Cupón ganado (todo acertado): tarjeta "¡Cupón ganado!" con el nombre y la ganancia, confeti grande y vibración. Cupón perdido: tarjeta con lo apostado y sacudida.
+- "Terminó el partido" y otras marcas seguidas se juntan en un solo aviso (el más importante).
+- La tarjeta se cierra sola o al tocarla. Con "reducir movimiento" activado no hay confeti ni sacudidas.
+
+Espacio (site/js/21-espacio.js)
+- Más → Ajustes → "Espacio en este teléfono": medidor de lo usado (de ~5 MB) y botón "Liberar espacio ahora".
+- Limpieza automática al abrir cuando hay más de 50 cupones o el espacio pasa del 60 %, y también si al guardar no cabe (limpia y reintenta).
+- Se quita solo lo que no se usa: el texto original de cupones ya liquidados (se conserva en los 40 más recientes y en los pendientes), el historial largo de "deshacer", progreso de mercados que ya no existen, imágenes subidas sin uso y la caché de búsquedas. Nunca borra cupones, resultados, escudos ni fotos en uso.
+
+Pruebas: 114 en total (secciones 12 y 13).

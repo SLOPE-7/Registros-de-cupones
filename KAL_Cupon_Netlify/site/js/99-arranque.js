@@ -16,7 +16,9 @@ cleanSavedPlayerNames();
 if (migrateEarlyPayout()) save();
 if (migrateInlineImages()) save();
 indexSavedCrests();
+autoCompact();
 renderAll();
+hideSplash();
 initCrestImageCache();
 if (cloudSession) {
   cloudPull()

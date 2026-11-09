@@ -53,8 +53,14 @@ function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
   } catch (e) {
-    toast("El navegador no permitió guardar. Libera espacio o usa otro navegador; tus datos no se borraron.");
-    return false;
+    // Sin espacio: se limpia lo que no se usa y se intenta de nuevo.
+    try {
+      compactData(true);
+      localStorage.setItem(KEY, JSON.stringify(db));
+    } catch (e2) {
+      toast("No queda espacio para guardar. Descarga un respaldo y libera espacio en Ajustes; tus datos no se borraron.");
+      return false;
+    }
   }
   try {
     localStorage.setItem(DRAFT, $("raw").value);

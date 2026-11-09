@@ -429,6 +429,72 @@ section("11. Rendimiento con muchos datos (150 cupones, ~2.100 partidos)");
   await ctx.close();
 }
 
+// ---------- 12. Animaciones de resultado y pantalla de entrada ----------
+section("12. Animaciones y pantalla de entrada");
+{
+  const { ctx, page } = await open(baseDb());
+  await page.waitForTimeout(700);
+  check("la pantalla de entrada se quita sola al cargar", (await page.$("#splash")) === null);
+  const key = (ci, fi, mi) => page.evaluate(([ci, fi, mi]) => marketKey(db.coupons[ci].fixtures[fi], db.coupons[ci].fixtures[fi].markets[mi]), [ci, fi, mi]);
+  // Combinada B: AEK (1 mercado) + Como (2 mercados). Ganar uno → confeti corto, sin tarjeta.
+  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 0, 0)); await page.waitForTimeout(300);
+  check("mercado ganado: confeti, sin tarjeta de cupón", (await page.$("canvas.confetti")) !== null && (await page.$(".result-card")) === null);
+  // Ganar el resto → cupón B ganado: tarjeta con la ganancia (210 − 70 = 140).
+  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 1, 0));
+  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 1, 1)); await page.waitForTimeout(350);
+  const card = await page.$eval(".result-card-wrap", (e) => e.className + " | " + e.innerText.replace(/\s+/g, " "));
+  check("cupón ganado: tarjeta con el nombre y la ganancia", /is-won/.test(card) && /¡Cupón ganado!/.test(card) && /Combinada B/.test(card) && /\+L 140\.00/.test(card), card);
+  await page.click(".result-card-wrap"); await page.waitForTimeout(350);
+  check("la tarjeta se cierra al tocarla", (await page.$(".result-card-wrap")) === null);
+  // Perder un mercado de la Combinada A → tarjeta de cupón perdido con lo apostado.
+  await page.evaluate((k) => setMarketStatus(k, "lost"), await key(0, 0, 0)); await page.waitForTimeout(350);
+  const lostCard = await page.$eval(".result-card-wrap", (e) => e.className + " | " + e.innerText.replace(/\s+/g, " "));
+  check("cupón perdido: tarjeta con lo apostado", /is-lost/.test(lostCard) && /Cupón perdido/.test(lostCard) && /−L 50\.00/.test(lostCard), lostCard);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+  // Con "reducir movimiento" no hay confeti, pero la tarjeta sí aparece.
+  const calm = await open(baseDb(), { ctxOpts: { reducedMotion: "reduce" } });
+  await calm.page.evaluate(() => { const f = db.coupons[1].fixtures; f.forEach((x) => x.markets.forEach((m) => setMarketStatus(marketKey(x, m), "won"))); });
+  await calm.page.waitForTimeout(350);
+  check("con 'reducir movimiento': tarjeta sí, confeti no", (await calm.page.$(".result-card")) !== null && (await calm.page.$("canvas.confetti")) === null);
+  await calm.ctx.close();
+}
+
+// ---------- 13. Limpieza de espacio ----------
+section("13. Limpieza automática de espacio");
+{
+  const { ctx, page } = await open(null);
+  const raws = [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/doradobet-${n}.txt`), "utf8"));
+  const r = await page.evaluate((raws) => {
+    for (let i = 0; i < 100; i++) {
+      const x = parseCoupon(raws[i % 3]);
+      x.fixtures.forEach((f) => f.markets.forEach((m) => { m.settlement = i % 10 === 9 ? "pending" : "won"; }));
+      db.coupons.push({ id: "c" + i, name: "Cupón " + i, created: new Date(Date.now() - i * 3600e3).toISOString(), stake: 10, odds: 2, payout: 20, raw: raws[i % 3], fixtures: x.fixtures });
+    }
+    db.actionHistory = Array.from({ length: 60 }, (_, i) => ({ type: "create", couponId: "c" + i, at: "x" }));
+    db.progress = { "clave-que-ya-no-existe": { count: 3 } };
+    localStorage.setItem("kal_images_v1", JSON.stringify({ huerfana: "data:image/png;base64," + "A".repeat(20000) }));
+    save();
+    const before = storageUsage(), markets = db.coupons.reduce((s, c) => s + c.fixtures.reduce((n, f) => n + f.markets.length, 0), 0);
+    const freed = compactData(true);
+    const saved = JSON.parse(localStorage.getItem("kal_coupon_organizer_v2"));
+    return {
+      freed, before: before.bytes, after: storageUsage().bytes, coupons: saved.coupons.length,
+      marketsSame: saved.coupons.reduce((s, c) => s + c.fixtures.reduce((n, f) => n + f.markets.length, 0), 0) === markets,
+      rawNewest: saved.coupons.slice(0, 40).every((c) => c.raw), rawOldSettled: saved.coupons.slice(40).filter((c) => c.raw).map((c) => c.id),
+      pendingOldKeepRaw: saved.coupons.slice(40).filter((c) => c.fixtures[0].markets[0].settlement === "pending").every((c) => c.raw),
+      history: saved.actionHistory.length, progress: Object.keys(saved.progress).length, images: Object.keys(JSON.parse(localStorage.getItem("kal_images_v1"))).length,
+    };
+  }, raws);
+  check("libera espacio sin borrar cupones ni mercados", r.freed > 100000 && r.coupons === 100 && r.marketsSame, `liberó ${Math.round(r.freed / 1024)} KB de ${Math.round(r.before / 1024)} KB`);
+  check("conserva el texto original en los 40 más recientes y en los pendientes", r.rawNewest && r.pendingOldKeepRaw && r.rawOldSettled.every((id) => Number(id.slice(1)) % 10 === 9), JSON.stringify(r.rawOldSettled.slice(0, 5)));
+  check("recorta el historial de deshacer y quita progreso e imágenes sin uso", r.history === 20 && r.progress === 0 && r.images === 0, `${r.history}/${r.progress}/${r.images}`);
+  await view(page, "settings");
+  check("Ajustes muestra el espacio usado y el botón de liberar", /de ~5 MB · 100 cupones/.test(await page.$eval("#storageBox", (e) => e.innerText)) && (await page.$("[data-compact]")) !== null, await page.$eval("#storageBox", (e) => e.innerText.replace(/\s+/g, " ").slice(0, 80)));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {

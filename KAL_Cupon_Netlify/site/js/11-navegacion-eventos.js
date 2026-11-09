@@ -25,6 +25,7 @@ const VIEW_RENDER = {
   settings: () => {
     renderAlertsBox();
     renderInstallHelp();
+    renderStorageBox();
   },
 };
 function renderView(name = activeView) {

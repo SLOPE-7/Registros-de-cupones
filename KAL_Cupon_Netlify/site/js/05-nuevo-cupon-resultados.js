@@ -234,6 +234,7 @@ function saveCoupon() {
   go("saved");
 }
 function setMarketStatus(key, status) {
+  const statusBefore = couponStatusSnapshot();
   let count = 0,
     oldStatus = null,
     label = "Mercado";
@@ -296,6 +297,7 @@ function setMarketStatus(key, status) {
   save();
   renderAll();
   toast(`Resultado actualizado en ${count} coincidencia(s).`);
+  announceResult(status, statusBefore);
 }
 function renderResultHistory() {
   const el = $("resultHistory");
