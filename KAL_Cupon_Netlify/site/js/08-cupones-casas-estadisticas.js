@@ -306,6 +306,7 @@ const COMPETITION_ALIASES = [
   [/champions league|liga (de )?campeones/, "UEFA Champions League"],
   [/europa league|liga (de la )?europa\b/, "UEFA Europa League"],
   [/conference league|liga (de la )?conferencia/, "UEFA Conference League"],
+  [/nations league|liga de (las )?naciones/, "UEFA Nations League"],
 ];
 function canonicalCompetition(name) {
   const raw = String(name || "").trim();
