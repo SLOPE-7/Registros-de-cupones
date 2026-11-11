@@ -22,6 +22,8 @@ const VIEW_RENDER = {
   },
   houses: () => renderHouses(),
   stats: () => renderStats(),
+  // Mientras escribe un análisis no se redibuja (se perdería el texto que va llegando).
+  analyst: () => analystBusy || renderAnalyst(),
   settings: () => {
     renderAlertsBox();
     renderInstallHelp();
@@ -54,9 +56,10 @@ const VIEW_TITLES = {
     saved: "Mis cupones",
     houses: "Balances",
     stats: "Estadísticas",
+    analyst: "Analista",
     settings: "Ajustes",
   },
-  MORE_VIEWS = ["logos", "houses", "stats", "settings"];
+  MORE_VIEWS = ["logos", "houses", "stats", "analyst", "settings"];
 function closeMoreMenu() {
   const m = $("moreMenu");
   if (m) m.hidden = true;

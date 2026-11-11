@@ -22,6 +22,7 @@ const section = (t) => console.log("\n" + t);
 
 // ---------- servidor local ----------
 const posts = [];
+const analystPosts = [];
 const seen = [];
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json" };
 const server = http.createServer((req, res) => {
@@ -43,6 +44,25 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/.netlify/functions/avisos") {
     if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ publicKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U" })); }
     let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { posts.push(JSON.parse(b)); res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); });
+    return;
+  }
+  // Analista (función de borde simulada): responde en streaming, una línea JSON por evento.
+  if (url.pathname === "/api/analista") {
+    let b = ""; req.on("data", (c) => (b += c)); req.on("end", async () => {
+      if (req.headers["x-kal-clave"] !== "secreto") return sendJson({ error: "El código de acceso del Analista no es correcto.", codigo: "codigo" }, 401);
+      const body = JSON.parse(b); analystPosts.push(body);
+      res.writeHead(200, { "content-type": "application/x-ndjson" });
+      const send = (o) => res.write(JSON.stringify(o) + "\n");
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      send({ t: "estado", v: "Pensando…" });
+      if (body.modo === "cupon") { await wait(150); send({ t: "estado", v: "Buscando: Fenerbahce Liverpool lesiones" }); }
+      const slow = /LENTO/.test(body.datos?.cupon || "");
+      const chunks = ["## 📌 En resumen\n", "Te va **bien** en goles de *1.5*.\n", "- Punto uno\n- Punto <img src=x onerror=alert(1)>\n", "## 🎯 Recomendaciones\n1. Combinadas cortas\n"];
+      for (const c of chunks) { await wait(slow ? 400 : 60); if (res.destroyed) return; send({ t: "texto", v: c }); }
+      if (/FALLA/.test(body.datos?.cupon || "")) send({ t: "error", v: "Se alcanzó el límite de uso de la API." });
+      else send({ t: "fin", uso: { entrada: 100, salida: 50, busquedas: 1 } });
+      res.end();
+    });
     return;
   }
   let f = path.join(SITE, decodeURIComponent(url.pathname));
@@ -264,6 +284,8 @@ section("5. Buscador global");
 section("6. Avisos de partidos, presupuesto y rachas");
 {
   const db = baseDb();
+  // "Ganado viejo" (hace 9 días) entraría en el mes actual a partir del día 10: se pasa al mes anterior para que el gasto del mes sea siempre 120.
+  db.coupons.find((c) => c.id === "C").created = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString();
   for (let i = 0; i < 3; i++) db.coupons.push({ id: "L" + i, name: "Perdido " + i, created: new Date(Date.now() - (5 - i) * 86400e3).toISOString(), stake: 0, odds: 2, payout: 20, fixtures: [{ id: "x" + i, home: "X" + i, away: "Y" + i, dateISO: isoDay(Date.now() - (5 - i) * 86400e3), time: "10:00", markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "lost" }] }] });
   const { ctx, page } = await open(db, { init: "push" });
   check("aviso dentro de la app antes del partido", /Fenerbahce vs Liverpool<\/b> empieza en \d+ min/.test(await page.$eval("#liveAlert", (e) => e.innerHTML)));
@@ -495,6 +517,74 @@ section("13. Limpieza automática de espacio");
   await ctx.close();
 }
 
+section("14. Analista con IA (pantalla y datos que se envían)");
+{
+  const { ctx, page } = await open(baseDb());
+  // Historial con suficientes resultados: 6 cupones liquidados (3 simples ganados, 3 combinadas perdidas)
+  await page.evaluate(() => {
+    for (let i = 0; i < 6; i++) {
+      const won = i < 3;
+      db.coupons.push({ id: "H" + i, name: "Hist " + i, created: new Date(Date.now() - (i + 2) * 86400e3).toISOString(), houseId: "h2", stake: 10, odds: won ? 1.8 : 5, payout: won ? 18 : 50,
+        fixtures: (won ? [0] : [0, 1, 2]).map((k) => ({ id: "h" + i + k, home: "Equipo " + i + k, away: "Rival " + k, competition: "LaLiga", date: "01/11/2026", time: "12:00",
+          markets: [{ market: "Total de goles", pick: "Más de 1.5", odd: "1.80", settlement: won ? "won" : k === 2 ? "lost" : "won" }] })) });
+    }
+    save(); renderAll();
+  });
+  await view(page, "analyst");
+  let info = await page.evaluate(() => ({ title: $("viewTitle").textContent, open: document.querySelector(".analyst-config").classList.contains("is-open"), disabled: document.querySelector('[data-analyst-run="historial"]').disabled, inMore: !!document.querySelector('#moreMenu [data-view="analyst"]') }));
+  check("pantalla Analista en el menú Más, con la configuración abierta si falta el código", info.title === "Analista" && info.open && info.inMore && !info.disabled, JSON.stringify(info));
+  await page.click('[data-analyst-run="historial"]');
+  await page.waitForTimeout(150);
+  check("sin código avisa en vez de llamar al servidor", /código de acceso/i.test(await page.$eval("#analystOut-historial", (e) => e.innerText)) && analystPosts.length === 0);
+  await page.fill("#analystKey", "malo"); await page.click("[data-analyst-key]");
+  await page.click('[data-analyst-run="historial"]'); await page.waitForTimeout(250);
+  check("código incorrecto muestra el error del servidor", /no es correcto/.test(await page.$eval("#analystOut-historial", (e) => e.innerText)));
+  await page.click(".analyst-config [data-fold-toggle]"); await page.fill("#analystKey", "secreto"); await page.click("[data-analyst-key]");
+  await page.click('[data-analyst-run="historial"]');
+  await page.waitForTimeout(140);
+  const live = await page.$eval("#analystOut-historial", (e) => ({ busy: !!e.querySelector(".analyst-live"), btn: document.querySelector('[data-analyst-run="historial"]').disabled }));
+  await page.waitForTimeout(600);
+  const e2 = (o) => o.i === "1.5";
+  const out = await page.$eval("#analystOut-historial", (e) => ({ i: e.querySelector("i")?.textContent, h: [...e.querySelectorAll("h4")].map((x) => x.textContent), li: e.querySelectorAll("li").length, b: e.querySelector("b")?.textContent, img: e.querySelectorAll("img").length, text: e.innerText }));
+  check("muestra el análisis mientras llega y bloquea el botón", live.busy && live.btn, JSON.stringify(live));
+  check("da formato (títulos, listas, negritas) sin ejecutar HTML", out.h.length === 2 && out.li === 3 && out.b === "bien" && e2(out) && out.img === 0 && out.text.includes("<img"), JSON.stringify(out).slice(0, 200));
+  const hp = analystPosts.at(-1);
+  const h = hp?.datos?.historial;
+  check("envía un resumen: por mercado, cuota, tamaño de combinada y últimos cupones", hp?.modo === "historial" && h.porMercado.some((r) => r.tipo === "Goles (más / menos)" && r.ganados === 9 && r.perdidos === 3) && h.porTamano.some((r) => r.selecciones === "3" && r.cupones === 3 && r.ganados === 0) && h.ultimosCupones.length >= 6 && /^\d{4}-\d{2}-\d{2}$/.test(hp.datos.hoy), JSON.stringify(h?.porTamano));
+  check("no envía datos de la cuenta ni el código", !/cloud|password|supabase|secreto|kal_/i.test(JSON.stringify(hp)));
+  await view(page, "home"); await view(page, "analyst");
+  check("el último análisis se guarda y se ve al volver", /Último análisis/.test(await page.$eval("#analystOut-historial", (e) => e.innerText)));
+  // Revisar un cupón pendiente
+  await page.selectOption("#analystCouponPick", "A");
+  check("elegir un cupón pendiente carga su texto", /Fenerbahce/.test(await page.$eval("#analystCouponText", (e) => e.value)));
+  await page.click('[data-analyst-run="cupon"]');
+  await page.waitForTimeout(100);
+  const st = await page.$eval("#analystOut-cupon [data-status]", (e) => e.textContent).catch(() => "");
+  await page.waitForTimeout(800);
+  const cp = analystPosts.at(-1);
+  check("revisión de cupón: envía el cupón, el historial por mercado y el presupuesto", cp.modo === "cupon" && /Fenerbahce/.test(cp.datos.cupon) && Array.isArray(cp.datos.historial) && cp.datos.historial.length > 0, JSON.stringify(cp).slice(0, 160));
+  check("muestra lo que está haciendo (búsquedas)", /Pensando|Buscando|Conectando/.test(st), st);
+  check("revisión de cupón terminada", /Recomendaciones/.test(await page.$eval("#analystOut-cupon", (e) => e.innerText)));
+  // Error a mitad del análisis y cancelar
+  await page.fill("#analystCouponText", "Cupón que FALLA en el servidor");
+  await page.click('[data-analyst-run="cupon"]'); await page.waitForTimeout(700);
+  check("un error a mitad conserva lo recibido y explica el problema", await page.$eval("#analystOut-cupon", (e) => /límite de uso/.test(e.innerText) && e.querySelectorAll("li").length > 0));
+  await page.fill("#analystCouponText", "Cupón LENTO de prueba para cancelar");
+  await page.click('[data-analyst-run="cupon"]'); await page.waitForTimeout(250);
+  await page.click("[data-analyst-cancel]"); await page.waitForTimeout(200);
+  check("se puede cancelar un análisis", /cancelado/.test(await page.$eval("#analystOut-cupon", (e) => e.innerText)) && !(await page.$eval('[data-analyst-run="cupon"]', (b) => b.disabled)));
+  // Desde Nuevo cupón
+  await view(page, "new");
+  check("el botón del Analista no aparece sin cupón leído", !(await page.isVisible("[data-analyst-preview]")));
+  await page.fill("#raw", "España, La Liga\nBarcelona\nvs.\nReal Madrid\n25/10/2026 • 08:00\nMás de 2.5 goles\nCuotas: 1.85\nVALOR APOSTADO L 120.00");
+  await page.click("#readBtn"); await page.waitForTimeout(200);
+  await page.click("[data-analyst-preview]"); await page.waitForTimeout(300);
+  check("'Revisar con el Analista' lleva el cupón leído a la pantalla del Analista", (await page.evaluate(() => activeView)) === "analyst" && /Barcelona vs Real Madrid/.test(await page.$eval("#analystCouponText", (e) => e.value)));
+  check("el código queda solo en este teléfono (no entra en los datos sincronizados)", await page.evaluate(() => !JSON.stringify(db).includes("secreto") && JSON.parse(localStorage.getItem("kal_analista_v1")).clave === "secreto"));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {
@@ -550,6 +640,50 @@ export async function sendPush(wp,sub,p){sent.push(p.title+' | '+p.body);return 
   ri = await (await imagenes(new Request("https://x/i?tipo=jugador&q=Anastasios%20Douvikas&club=Como"))).json();
   check("TheSportsDB: prueba el apellido y descarta fichas sin foto", ri.options.length === 1 && ri.options[0].name === "Tasos Douvikas" && ri.options[0].photo.includes("cutout"), JSON.stringify(ri.options));
   fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+section("15. Función del Analista (Claude simulado)");
+{
+  const A = await import(path.join(ROOT, "netlify/lib/analista-comun.mjs"));
+  const env = { ANTHROPIC_API_KEY: "sk-prueba", ANALISTA_CLAVE: "secreto" };
+  const req = (body, clave = "secreto", method = "POST") => new Request("https://x/api/analista", { method, headers: { "x-kal-clave": clave }, body: method === "POST" ? JSON.stringify(body) : undefined });
+  const status = async (r, e = env) => (await A.leerPeticion(r, e)).error?.status;
+  check("rechaza sin ANTHROPIC_API_KEY, sin ANALISTA_CLAVE, con código malo o modo raro",
+    (await status(req({ modo: "historial", datos: {} }), { ANALISTA_CLAVE: "x" })) === 503 && (await status(req({ modo: "historial", datos: {} }), { ANTHROPIC_API_KEY: "x" })) === 503 &&
+    (await status(req({ modo: "historial", datos: {} }, "otro"))) === 401 && (await status(req({ modo: "x", datos: {} }))) === 400 && (await status(req({ modo: "cupon", datos: { cupon: "" } }))) === 400 &&
+    (await status(new Request("https://x", { method: "GET" }))) === 405 && (await status(req({ modo: "historial", datos: { x: "a".repeat(130000) } }))) === 413);
+  const pc = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2", historial: [{ tipo: "1X2" }], hoy: "2026-11-11" });
+  const ph = A.construirPeticion("historial", { historial: { resumen: {} } });
+  check("petición: modelo, respaldo ante rechazos, esfuerzo y búsqueda web solo al revisar cupones",
+    pc.model === "claude-opus-5-5" && pc.fallbacks === "default" && pc.betas.includes("server-side-fallback-2026-07-01") && pc.output_config.effort === "medium" &&
+    pc.tools[0].type === "web_search_20260209" && !ph.tools && /2026-11-11/.test(pc.messages[0].content) && /<cupon>/.test(pc.messages[0].content) && !("thinking" in pc) && !("temperature" in pc));
+  // Cliente simulado: cada llamada sigue un guion de eventos y devuelve un mensaje final.
+  const fakeClient = (scripts) => { const calls = []; return { calls, beta: { messages: { stream(params) {
+    const sc = scripts[calls.length]; calls.push(JSON.parse(JSON.stringify(params))); const h = {};
+    return { on(ev, fn) { (h[ev] = h[ev] || []).push(fn); return this; }, async finalMessage() {
+      if (sc.throw) throw sc.throw;
+      for (const [ev, ...args] of sc.events || []) (h[ev] || []).forEach((fn) => fn(...args));
+      return { stop_reason: sc.stop, content: sc.content || [{ type: "text", text: "x" }], usage: { input_tokens: 10, output_tokens: 5, server_tool_use: { web_search_requests: sc.searches || 0 } } };
+    } };
+  } } } }; };
+  const run = async (scripts) => { const client = fakeClient(scripts), out = []; await A.analizar(client, pc, (e) => out.push(e)); return { client, out }; };
+  let r = await run([
+    { stop: "pause_turn", searches: 2, content: [{ type: "server_tool_use", id: "s1", name: "web_search", input: { query: "Barcelona lesiones" } }],
+      events: [["streamEvent", { type: "content_block_start", content_block: { type: "server_tool_use" } }], ["contentBlock", { type: "server_tool_use", input: { query: "Barcelona lesiones" } }], ["text", "Hola "]] },
+    { stop: "end_turn", searches: 1, events: [["text", "mundo"]] },
+  ]);
+  check("búsqueda larga (pause_turn): continúa con lo hecho y suma el uso", r.client.calls.length === 2 && r.client.calls[1].messages.at(-1).role === "assistant" && r.client.calls[1].messages.length === 2 &&
+    r.out.filter((e) => e.t === "texto").map((e) => e.v).join("") === "Hola mundo" && r.out.some((e) => e.v === "Buscando: Barcelona lesiones") && r.out.at(-1).t === "fin" && r.out.at(-1).uso.busquedas === 3, JSON.stringify(r.out));
+  r = await run([{ stop: "end_turn", events: [["text", "parcial"], ["streamEvent", { type: "content_block_start", content_block: { type: "fallback" } }], ["text", "nuevo"]] }]);
+  check("si otro modelo retoma la respuesta, la app descarta lo parcial", r.out.map((e) => e.t).join() === "texto,reinicio,texto,fin");
+  r = await run([{ stop: "refusal" }]);
+  check("un rechazo se informa como error legible", r.out.at(-1).t === "error" && !r.out.some((e) => e.t === "fin"));
+  const resp = await A.manejar(req({ modo: "historial", datos: { historial: {} } }), { env, crearCliente: () => fakeClient([{ throw: Object.assign(new Error("rate"), { status: 429 }) }]) });
+  const lines = (await resp.text()).trim().split("\n").map((l) => JSON.parse(l));
+  check("respuesta en streaming: empieza con 'Pensando…' y traduce los errores de la API", resp.headers.get("content-type").includes("ndjson") && lines[0].t === "estado" && lines.at(-1).t === "error" && /límite de uso/.test(lines.at(-1).v), JSON.stringify(lines));
+  check("mensajes de error claros (sin saldo, clave mala)", /saldo/.test(A.mensajeDeError({ status: 400, message: "Your credit balance is too low" })) && /ANTHROPIC_API_KEY/.test(A.mensajeDeError({ status: 401 })));
+  const edge = fs.readFileSync(path.join(ROOT, "netlify/edge-functions/analista.js"), "utf8");
+  check("función de borde en /api/analista con el SDK oficial y la clave desde variables", /path: "\/api\/analista"/.test(edge) && /from "@anthropic-ai\/sdk"/.test(edge) && /Netlify\.env\.get\("ANTHROPIC_API_KEY"\)/.test(edge));
 }
 
 await browser.close();

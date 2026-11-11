@@ -1,0 +1,109 @@
+/* Analista con IA (V14): tarjetas, texto del análisis, estado mientras escribe. */
+.analyst-view {
+  display: grid;
+  gap: 12px;
+}
+.analyst-warn {
+  margin: 0;
+}
+.analyst-card .pb > .btn.gold {
+  width: 100%;
+}
+.analyst-text {
+  min-height: 110px;
+  font-size: 13px;
+}
+.analyst-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
+}
+.analyst-out:empty {
+  display: none;
+}
+.analyst-out {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.analyst-meta {
+  margin-bottom: 6px;
+}
+.analyst-md {
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.analyst-md h4 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+  color: var(--gold);
+}
+.analyst-md h4:first-child {
+  margin-top: 0;
+}
+.analyst-md p {
+  margin: 0 0 8px;
+}
+.analyst-md ul,
+.analyst-md ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.analyst-md li {
+  margin: 3px 0;
+}
+.analyst-md b {
+  color: var(--text);
+}
+.analyst-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.analyst-status [data-status] {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.analyst-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--gold);
+  animation: kal-analyst-pulse 1s ease-in-out infinite;
+}
+@keyframes kal-analyst-pulse {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+}
+.analyst-error {
+  border-color: var(--red);
+  color: var(--red);
+  margin-bottom: 8px;
+}
+.analyst-config .fold-body {
+  padding: 4px 12px 12px;
+}
+.analyst-preview-btn {
+  width: 100%;
+  margin: 10px 0 0;
+}
+/* El botón de la vista previa solo tiene sentido cuando ya hay un cupón leído. */
+#preview:has(.empty) ~ .analyst-preview-btn {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .analyst-dot {
+    animation: none;
+  }
+}

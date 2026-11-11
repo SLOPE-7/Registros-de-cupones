@@ -286,3 +286,37 @@ Espacio (site/js/21-espacio.js)
 - Se quita solo lo que no se usa: el texto original de cupones ya liquidados (se conserva en los 40 más recientes y en los pendientes), el historial largo de "deshacer", progreso de mercados que ya no existen, imágenes subidas sin uso y la caché de búsquedas. Nunca borra cupones, resultados, escudos ni fotos en uso.
 
 Pruebas: 114 en total (secciones 12 y 13).
+
+
+VERSIÓN 14 — ANALISTA CON IA (CLAUDE)
+Qué hace (Más → 🤖 Analista)
+- "Analizar mi historial": la app resume tus cupones liquidados (por tipo de mercado, rango de cuota, competición, casa, mes y número de selecciones, más tus últimos 25 cupones) y la IA explica dónde ganas, dónde pierdes, qué tamaño de combinada te conviene y qué cambiar. Necesita al menos 5 mercados liquidados.
+- "Revisar un cupón antes de apostar": pega el cupón o elige uno pendiente. La IA busca en internet la forma, las lesiones y las rotaciones de cada partido, da una confianza Alta/Media/Baja por selección, señala el eslabón más débil y propone una versión ajustada según tu presupuesto. También tiene en cuenta tu historial por tipo de mercado (casilla opcional).
+- En "Nuevo cupón", después de leer un cupón aparece "🤖 Revisar con el Analista antes de apostar".
+- El análisis aparece mientras se escribe, se puede cancelar y el último queda guardado en el teléfono.
+- Importante: es un análisis orientativo. Ninguna IA puede asegurar resultados.
+
+Configuración (una sola vez)
+1. Crea una cuenta en console.anthropic.com, añade saldo (Billing) y pon un límite de gasto mensual (Limits), por ejemplo 5 USD.
+2. En la consola crea una clave (API keys) y cópiala.
+3. En Netlify: Site configuration → Environment variables → añade:
+     ANTHROPIC_API_KEY = la clave del paso 2
+     ANALISTA_CLAVE    = un código que tú inventes (por ejemplo una frase larga). Protege tu saldo: sin él nadie puede usar tu Analista.
+4. Vuelve a desplegar el sitio (Deploys → Trigger deploy).
+5. En la app: Más → Analista → ⚙ Configurar el Analista → escribe el mismo código de ANALISTA_CLAVE → Guardar código.
+Nunca pegues la clave de Anthropic en un chat ni dentro de la app: solo en Netlify.
+
+Costo aproximado (se cobra en tu cuenta de Anthropic)
+- Analizar el historial: unos US$0.05.
+- Revisar un cupón con búsquedas en internet: entre US$0.15 y US$0.40, según cuántos partidos tenga.
+
+Cómo funciona por dentro
+- netlify/edge-functions/analista.js (ruta /api/analista): función "de borde" de Netlify. Se usa en vez de una función normal porque en el plan gratis las funciones normales se cortan a los 10 segundos; la de borde envía la respuesta a trozos mientras la IA escribe.
+- netlify/lib/analista-comun.mjs: instrucciones para la IA, validación (código de acceso, tamaño máximo), búsqueda web (máx. 6 por cupón), continuación de búsquedas largas y mensajes de error en español (sin saldo, clave mala, límite de uso).
+- Modelo: Claude Opus 5.5 con la librería oficial @anthropic-ai/sdk (versión fija 1.3.0). Si un filtro de seguridad rechaza una respuesta por error, el servidor la reintenta solo con otro modelo.
+- site/js/22-analista.js y site/css/16-analista.css: pantalla, datos que se envían y formato del texto (todo se escapa: el texto de la IA no puede ejecutar código en la app).
+- Privacidad: solo se envía el resumen de apuestas y el cupón. Nunca se envían tu correo, tus datos de la nube ni el código de acceso dentro de los datos. El código queda solo en este teléfono (kal_analista_v1) y no se sincroniza.
+
+Corrección: la prueba del presupuesto fallaba a partir del día 10 de cada mes (un cupón de prueba entraba en el mes actual). Era un error de la prueba, no de la app.
+
+Pruebas: 140 en total (sección 14: pantalla del Analista; sección 15: la función con Claude simulado).
