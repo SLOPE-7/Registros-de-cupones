@@ -84,19 +84,45 @@ async function cloudRequest(url, options = {}) {
         body: JSON.stringify({ refresh_token: cloudSession.refresh_token }),
       });
     if (refresh.ok) {
-      cloudSession = await refresh.json();
+      cloudSession = await cloudJson(refresh);
       localStorage.setItem(CLOUD_SESSION, JSON.stringify(cloudSession));
       r = await fetch(url, { ...options, headers: cloudHeaders(options.headers || {}) });
     }
   }
   return r;
 }
+// Acepta la dirección de Supabase como venga: con o sin "https://", con rutas pegadas (/rest/v1…) o solo el
+// identificador del proyecto (20 letras). Devuelve "" si no es una dirección válida.
+function normalizeCloudUrl(v) {
+  let s = String(v || "").replace(/\s+/g, "");
+  if (!s) return "";
+  if (/^[a-z0-9]{20}$/i.test(s)) s = s.toLowerCase() + ".supabase.co";
+  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
+  try {
+    const u = new URL(s);
+    return u.hostname.includes(".") ? "https://" + u.host : "";
+  } catch {
+    return "";
+  }
+}
 function cloudCfg() {
   const c = JSON.parse(localStorage.getItem(CLOUD_CFG) || "{}");
   return {
-    url: ($("cloudUrl").value || c.url || "").trim().replace(/\/$/, ""),
-    key: ($("cloudAnon").value || c.key || "").trim(),
+    url: normalizeCloudUrl($("cloudUrl").value || c.url),
+    // La clave no lleva espacios ni saltos de línea (a veces se cuelan al copiar y pegar).
+    key: String($("cloudAnon").value || c.key || "").replace(/\s+/g, ""),
   };
+}
+// Lee la respuesta como JSON; si no lo es, explica el problema en vez del mensaje técnico del navegador.
+async function cloudJson(r) {
+  const text = await r.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw Error(
+      "La dirección de Supabase no respondió como Supabase. Revisa que sea https://TU-PROYECTO.supabase.co",
+    );
+  }
 }
 function cloudMsg(x) {
   $("cloudStatus").textContent = x;
@@ -114,17 +140,32 @@ async function cloudAuth(mode) {
   const c = cloudCfg(),
     email = $("cloudEmail").value.trim(),
     password = $("cloudPassword").value;
+  if (!c.url && $("cloudUrl").value.trim()) {
+    cloudMsg("La dirección de Supabase no es válida. Debe ser como https://TU-PROYECTO.supabase.co");
+    return;
+  }
   if (!c.url || !c.key || !email || password.length < 8) {
     cloudMsg("Completa URL, clave pública, correo y contraseña de al menos 8 caracteres.");
     return;
   }
   localStorage.setItem(CLOUD_CFG, JSON.stringify(c));
+  $("cloudUrl").value = c.url;
+  $("cloudAnon").value = c.key;
   const r = await fetch(
       c.url + (mode === "signup" ? "/auth/v1/signup" : "/auth/v1/token?grant_type=password"),
       { method: "POST", headers: cloudHeaders(), body: JSON.stringify({ email, password }) },
     ),
-    d = await r.json();
-  if (!r.ok) throw Error(d.msg || d.message || d.error_description || "No se pudo autenticar.");
+    d = await cloudJson(r);
+  if (!r.ok) {
+    const raw = String(d.msg || d.message || d.error_description || d.error || "");
+    const known = [
+      [/invalid login credentials/i, "Correo o contraseña incorrectos."],
+      [/email not confirmed/i, "Confirma tu correo (revisa tu bandeja) y luego inicia sesión."],
+      [/user already registered/i, "Ese correo ya tiene cuenta: usa «Iniciar sesión»."],
+      [/invalid api key|no api key/i, "La clave pública (anon) de Supabase no es correcta."],
+    ].find(([re]) => re.test(raw));
+    throw Error(known ? known[1] : raw || "No se pudo autenticar (error " + r.status + ").");
+  }
   if (!d.access_token) {
     cloudMsg("Cuenta creada. Confirma tu correo y luego inicia sesión.");
     return;
@@ -146,7 +187,7 @@ async function cloudPull() {
       { headers: cloudHeaders() },
     );
   if (!r.ok) throw Error("Falta crear la tabla o habilitar sus permisos.");
-  const rows = await r.json();
+  const rows = await cloudJson(r);
   if (rows.length) {
     const remote = rows[0].payload || {};
     mergeLogoStores({

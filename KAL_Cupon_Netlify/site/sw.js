@@ -3,7 +3,7 @@
 //   conexión, se usa la copia guardada.
 // - Iconos y manifiesto se sirven desde la caché.
 // - Las funciones de Netlify (API-Football) nunca se guardan: siempre van a la red.
-const CACHE = 'kal-v16';
+const CACHE = 'kal-v17';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-32.png',
   '/css/01-base.css',
   '/css/02-tema-claro.css',

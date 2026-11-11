@@ -581,6 +581,8 @@ section("14. Analista con IA (pantalla y datos que se envían)");
   await page.click("#readBtn"); await page.waitForTimeout(200);
   await page.click("[data-analyst-preview]"); await page.waitForTimeout(300);
   check("'Revisar con el Analista' lleva el cupón leído a la pantalla del Analista", (await page.evaluate(() => activeView)) === "analyst" && /Barcelona vs Real Madrid/.test(await page.$eval("#analystCouponText", (e) => e.value)));
+  const nube = await page.evaluate(() => ["tutujwepbvlxfmizehkf.supabase.co", " https://tutujwepbvlxfmizehkf.supabase.co/rest/v1/ ", "tutujwepbvlxfmizehkf", "http://x.supabase.co", "no es url", ""].map(normalizeCloudUrl));
+  check("nube: acepta la dirección de Supabase sin https://, con rutas o solo el proyecto", nube.join("|") === "https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://x.supabase.co||", nube.join("|"));
   check("el código queda solo en este teléfono (no entra en los datos sincronizados)", await page.evaluate(() => !JSON.stringify(db).includes("secreto") && JSON.parse(localStorage.getItem("kal_analista_v1")).clave === "secreto"));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
