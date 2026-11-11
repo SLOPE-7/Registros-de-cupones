@@ -1119,7 +1119,7 @@ async function lookupSavedTeamLogo(index, query = "") {
     '">📷 Subir imagen</button></div>';
   if (location.protocol === "file:") {
     box.innerHTML =
-      '<span class="marketmeta">La búsqueda automática está disponible al publicar la carpeta Netlify.</span>' +
+      '<span class="marketmeta">La búsqueda automática está disponible al publicar la app en Cloudflare.</span>' +
       tools;
     return;
   }

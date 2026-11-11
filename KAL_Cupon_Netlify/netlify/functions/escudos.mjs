@@ -9,7 +9,7 @@ export default async (request) => {
   const ip = request.headers.get("x-nf-client-connection-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   if (ip) { const now = Date.now(), window = lookupWindows.get(ip); if (window && now - window.started < 60000 && window.count >= 3) return reply(429, { error: "Límite de seguridad: máximo tres búsquedas nuevas por minuto para cuidar la cuota de API-Football. Espera un minuto." }); if (!window || now - window.started >= 60000) lookupWindows.set(ip, { started: now, count: 1 }); else window.count++; }
   const key = process.env.API_FOOTBALL_KEY;
-  if (!key) return reply(503, { error: "Falta configurar API_FOOTBALL_KEY en las variables de Netlify." });
+  if (!key) return reply(503, { error: "Falta configurar API_FOOTBALL_KEY en las variables de Cloudflare (Workers → kal-cupones → Settings → Variables and Secrets)." });
   const url = new URL(request.url);
   const home = (url.searchParams.get("home") || "").trim().slice(0, 100);
   const away = (url.searchParams.get("away") || "").trim().slice(0, 100);

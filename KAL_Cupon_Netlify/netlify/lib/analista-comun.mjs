@@ -76,14 +76,16 @@ export async function leerPeticion(req, env) {
   if (!env.ANTHROPIC_API_KEY)
     return {
       error: respuestaJson(503, {
-        error: "Falta configurar ANTHROPIC_API_KEY en Netlify (Site configuration → Environment variables).",
+        error:
+          "Falta configurar ANTHROPIC_API_KEY en las variables de Cloudflare (Workers → kal-cupones → Settings → Variables and Secrets).",
         codigo: "sin_clave_api",
       }),
     };
   if (!env.ANALISTA_CLAVE)
     return {
       error: respuestaJson(503, {
-        error: "Falta configurar ANALISTA_CLAVE en Netlify: es el código que protege al Analista.",
+        error:
+          "Falta configurar ANALISTA_CLAVE en las variables de Cloudflare (Workers → kal-cupones → Settings → Variables and Secrets): es el código que protege al Analista.",
         codigo: "sin_codigo",
       }),
     };
@@ -156,7 +158,7 @@ export function construirPeticion(modo, datos) {
 }
 
 const MENSAJE_ERROR = {
-  401: "Anthropic rechazó la clave ANTHROPIC_API_KEY. Revisa que esté bien copiada en Netlify.",
+  401: "Anthropic rechazó la clave ANTHROPIC_API_KEY. Revisa que esté bien copiada en Cloudflare.",
   403: "La clave de Anthropic no tiene permiso para este modelo.",
   429: "Se alcanzó el límite de uso de la API (o el límite de gasto que pusiste). Prueba en unos minutos.",
   529: "Los servidores de Claude están saturados. Prueba en unos minutos.",

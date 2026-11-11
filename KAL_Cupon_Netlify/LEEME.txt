@@ -320,3 +320,36 @@ Cómo funciona por dentro
 Corrección: la prueba del presupuesto fallaba a partir del día 10 de cada mes (un cupón de prueba entraba en el mes actual). Era un error de la prueba, no de la app.
 
 Pruebas: 140 en total (sección 14: pantalla del Analista; sección 15: la función con Claude simulado).
+
+
+VERSIÓN 15 — MUDANZA A CLOUDFLARE (GRATIS, SIN CRÉDITOS)
+Por qué: el plan gratis de Netlify cobra 15 créditos por cada publicación (300 al mes) y pausó las publicaciones; las versiones 12, 13 y 14 nunca llegaron al teléfono. Cloudflare Workers no cobra por publicación.
+
+Cómo quedó
+- wrangler.toml: configuración del Worker "kal-cupones" (archivos de site/, tarea cada 5 minutos, almacenamiento).
+- cloudflare/worker.mjs: un solo Worker. Sirve la app y atiende las mismas rutas que en Netlify (/.netlify/functions/escudos, logo, partido, jugadores, catalogo, imagenes, avisos y /api/analista), así la app no cambió.
+- cloudflare/avisos.mjs: avisos de partidos. Las suscripciones se guardan en un Durable Object (incluido gratis, sin configurar nada).
+- cloudflare/webpush.mjs: envío de notificaciones con WebCrypto (la librería web-push de Node no funciona en Cloudflare). Probado contra la librería de referencia del estándar.
+- site/_headers: la página y el service worker sin caché, igual que en Netlify.
+- La carpeta netlify/ se conserva: las funciones de escudos, partidos, etc. se reutilizan tal cual desde ahí.
+- Pruebas: 155 (sección 16, incluye arrancar el Worker con el motor real de Cloudflare).
+
+PASO A PASO (una sola vez)
+A. Antes de nada, en la app vieja (la de Netlify): Cupones guardados → Exportar respaldo. Guarda el archivo en tu iPhone (Archivos).
+B. Crear el Worker conectado a GitHub (dash.cloudflare.com):
+   1. Compute (Workers) → Workers & Pages → Create → Import a repository (o "Connect to Git").
+   2. Conecta tu cuenta de GitHub y elige el repositorio Registros-de-cupones.
+   3. Nombre del proyecto: kal-cupones (tiene que ser exactamente ese).
+   4. En las opciones avanzadas: Root directory / Path = KAL_Cupon_Netlify. Build command: vacío. Deploy command: npx wrangler deploy (el que viene).
+   5. Create and deploy. Espera a que termine (1–2 minutos).
+C. Variables: Workers & Pages → kal-cupones → Settings → Variables and Secrets → Add. Tipo "Secret", una por una:
+     API_FOOTBALL_KEY, ANTHROPIC_API_KEY, ANALISTA_CLAVE (los mismos valores que en Netlify).
+   Guarda (Deploy).
+D. La dirección nueva aparece en kal-cupones → Settings → Domains & Routes (algo como kal-cupones.TU-NOMBRE.workers.dev).
+E. En el iPhone: abre esa dirección en Safari → Compartir → "Agregar a inicio". Abre la app desde el ícono nuevo.
+F. Tus datos: Ajustes → Importar respaldo (el archivo del paso A). Si usas la cuenta en la nube (Supabase), basta con poner la dirección, la clave y tu correo, e iniciar sesión.
+G. Ajustes → Avisos de partidos → actívalos otra vez (la dirección nueva necesita su propio permiso).
+H. Analista → ⚙ Configurar → escribe tu código de ANALISTA_CLAVE.
+I. Cuando todo funcione: borra el ícono viejo y, en Netlify, elimina el sitio (Project configuration → Delete project) para que no gaste créditos ni envíe avisos duplicados.
+
+Desde ahora, cada cambio que se sube a la rama main se publica solo en Cloudflare.

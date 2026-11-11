@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { baseDb, isoDay } from "./datos.mjs";
 
 const require = createRequire(import.meta.url);
+const nativeFetch = globalThis.fetch; // algunas secciones simulan fetch; la 16 necesita la red local de verdad
 const { chromium } = require("playwright");
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = path.join(ROOT, "site");
@@ -684,6 +685,87 @@ section("15. Función del Analista (Claude simulado)");
   check("mensajes de error claros (sin saldo, clave mala)", /saldo/.test(A.mensajeDeError({ status: 400, message: "Your credit balance is too low" })) && /ANTHROPIC_API_KEY/.test(A.mensajeDeError({ status: 401 })));
   const edge = fs.readFileSync(path.join(ROOT, "netlify/edge-functions/analista.js"), "utf8");
   check("función de borde en /api/analista con el SDK oficial y la clave desde variables", /path: "\/api\/analista"/.test(edge) && /from "@anthropic-ai\/sdk"/.test(edge) && /Netlify\.env\.get\("ANTHROPIC_API_KEY"\)/.test(edge));
+}
+
+section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
+{
+  const W = await import(path.join(ROOT, "cloudflare/webpush.mjs"));
+  const { avisosHandler, enviarAvisos } = await import(path.join(ROOT, "cloudflare/avisos.mjs"));
+  const nodeCrypto = await import("node:crypto");
+  const ece = require(path.join(ROOT, "node_modules/http_ece"));
+  // Teléfono simulado: sus claves y una captura del envío
+  const ua = nodeCrypto.createECDH("prime256v1"); ua.generateKeys();
+  const auth = nodeCrypto.randomBytes(16);
+  const sub = { endpoint: "https://web.push.apple.com/QAbc", keys: { p256dh: W.b64u(ua.getPublicKey()), auth: W.b64u(auth) } };
+  const keys = await W.generateVapidKeys();
+  const realFetch = nativeFetch;
+  let sent = null, status = 201;
+  globalThis.fetch = async (url, init) => { sent = { url, init }; return new Response(null, { status }); };
+  const r1 = await W.sendWebPush(sub, { title: "⏰ Barça", body: "Empieza en 15 min" }, { keys, subject: "https://kal.example.workers.dev" });
+  const plain = ece.decrypt(Buffer.from(sent.init.body), { version: "aes128gcm", privateKey: ua, authSecret: W.b64u(auth) }).toString();
+  check("Web Push: el mensaje cifrado (aes128gcm) se descifra con la librería de referencia", r1 === "ok" && plain === '{"title":"⏰ Barça","body":"Empieza en 15 min"}' && sent.init.headers["Content-Encoding"] === "aes128gcm", plain);
+  const [, t, k] = sent.init.headers.Authorization.match(/^vapid t=([^,]+), k=(.+)$/);
+  const [h, c, sg] = t.split(".");
+  const pk = nodeCrypto.createPublicKey({ key: { kty: "EC", crv: "P-256", x: W.b64u(W.unb64u(k).slice(1, 33)), y: W.b64u(W.unb64u(k).slice(33)) }, format: "jwk" });
+  const claims = JSON.parse(Buffer.from(W.unb64u(c)).toString());
+  check("Web Push: firma VAPID (ES256) válida, para el servicio correcto y con contacto", nodeCrypto.verify("sha256", Buffer.from(h + "." + c), { key: pk, dsaEncoding: "ieee-p1363" }, Buffer.from(W.unb64u(sg))) && claims.aud === "https://web.push.apple.com" && claims.sub === "https://kal.example.workers.dev" && claims.exp > Date.now() / 1000);
+  status = 410;
+  check("Web Push: un teléfono que ya no acepta avisos se detecta", (await W.sendWebPush(sub, {}, { keys, subject: "x" })) === "gone");
+  globalThis.fetch = realFetch;
+
+  // Lógica de avisos con un almacenamiento en memoria (igual al Durable Object)
+  const mem = new Map();
+  const store = { get: async (k2) => (mem.has(k2) ? structuredClone(mem.get(k2)) : null), put: async (k2, v) => void mem.set(k2, structuredClone(v)), delete: async (k2) => void mem.delete(k2), list: async (p) => [...mem.keys()].filter((x) => x.startsWith(p)) };
+  const pushes = [];
+  const fakeSend = async (s2, payload, opts) => { pushes.push({ payload, opts }); return s2.endpoint.includes("muerto") ? "gone" : "ok"; };
+  const call = (body, method = "POST") => avisosHandler(new Request("https://kal-cupones.ejemplo.workers.dev/.netlify/functions/avisos" + (method === "GET" ? "?accion=clave" : ""), { method, body: method === "POST" ? JSON.stringify(body) : undefined }), store, fakeSend);
+  const pub1 = (await (await call(null, "GET")).json()).publicKey, pub2 = (await (await call(null, "GET")).json()).publicKey;
+  check("avisos: clave pública estable y dirección de la app guardada", pub1 && pub1 === pub2 && W.unb64u(pub1).length === 65 && mem.get("config/origin") === "https://kal-cupones.ejemplo.workers.dev");
+  const now = Date.now();
+  const saveRes = await (await call({ accion: "guardar", subscription: sub, lead: 15, matches: [{ id: "m1", title: "Barcelona vs Real Madrid", kickoff: new Date(now + 10 * 60000).toISOString() }, { id: "viejo", title: "X", kickoff: new Date(now - 5 * 3600000).toISOString() }] })).json();
+  check("avisos: guarda solo partidos válidos", saveRes.partidos === 1);
+  await call({ accion: "guardar", subscription: { endpoint: "https://push.example/muerto", keys: { p256dh: "a", auth: "b" } }, matches: [{ id: "z", title: "Y", kickoff: new Date(now + 5 * 60000).toISOString() }] });
+  let r = await enviarAvisos(store, fakeSend, now);
+  const pre = pushes.filter((p) => /Empieza en 10 min/.test(p.payload.body));
+  check("avisos: 'Empieza en 10 min' con la clave y el contacto de la app; borra teléfonos que ya no existen", r.telefonos === 2 && pre.length === 1 && pre[0].opts.subject === "https://kal-cupones.ejemplo.workers.dev" && pre[0].opts.keys.publicKey === pub1 && (await store.list("sub/")).length === 1, JSON.stringify(r));
+  pushes.length = 0;
+  await enviarAvisos(store, fakeSend, now + 60000);
+  check("avisos: no repite el mismo aviso", pushes.length === 0);
+  await enviarAvisos(store, fakeSend, now + 11 * 60000);
+  check("avisos: 'Empezó' a la hora del partido", pushes.length === 1 && /Empezó/.test(pushes[0].payload.title));
+  await enviarAvisos(store, fakeSend, now + 4 * 3600000);
+  check("avisos: limpia partidos de hace más de 3 horas", (await store.get((await store.list("sub/"))[0])).matches.length === 0);
+  const pr = await call({ accion: "prueba", subscription: sub });
+  check("avisos: notificación de prueba", pr.status === 200 && pushes.at(-1).payload.tag === "kal-prueba");
+
+  // Servidor real de Cloudflare (workerd) con wrangler dev: archivos, rutas, Analista y tarea programada
+  const { spawn } = await import("node:child_process");
+  const net = await import("node:net");
+  const port = await new Promise((res) => { const s2 = net.createServer(); s2.listen(0, () => { const p = s2.address().port; s2.close(() => res(p)); }); });
+  let log = "";
+  const dev = spawn(path.join(ROOT, "node_modules/.bin/wrangler"), ["dev", "--port", String(port), "--test-scheduled", "--persist-to", path.join(os.tmpdir(), "kal-wrangler-" + port), "--var", "ANALISTA_CLAVE:secreto", "--var", "ANTHROPIC_API_KEY:sk-prueba", "--var", "API_FOOTBALL_KEY:prueba"], { cwd: ROOT, detached: true, env: { ...process.env, WRANGLER_SEND_METRICS: "false", CI: "1" } });
+  dev.stdout.on("data", (d) => (log += d)); dev.stderr.on("data", (d) => (log += d));
+  const B2 = `http://127.0.0.1:${port}`;
+  let up = false;
+  for (let i = 0; i < 120 && !up; i++) { await new Promise((res) => setTimeout(res, 500)); up = await realFetch(B2 + "/").then((x) => x.ok, () => false); }
+  check("workerd: el Worker arranca", up, log.slice(-400));
+  if (up) {
+    const home = await realFetch(B2 + "/"), swr = await realFetch(B2 + "/sw.js"), css = await realFetch(B2 + "/css/16-analista.css");
+    check("workerd: sirve la app sin caché en la página y con el permiso del service worker", home.headers.get("cache-control") === "no-cache" && /<title>/.test(await home.text()) && swr.headers.get("service-worker-allowed") === "/" && css.ok);
+    const clave = await (await realFetch(B2 + "/.netlify/functions/avisos?accion=clave")).json();
+    check("workerd: avisos con almacenamiento (Durable Object) y claves generadas", W.unb64u(clave.publicKey).length === 65);
+    const guard = await (await realFetch(B2 + "/.netlify/functions/avisos", { method: "POST", body: JSON.stringify({ accion: "guardar", lead: 15, subscription: sub, matches: [{ id: "w1", title: "A vs B", kickoff: new Date(Date.now() + 10 * 60000).toISOString() }] }) })).json();
+    const an = await realFetch(B2 + "/api/analista", { method: "POST", headers: { "x-kal-clave": "malo" }, body: "{}" });
+    const nf = await realFetch(B2 + "/.netlify/functions/nada");
+    const fb = await (await realFetch(B2 + "/.netlify/functions/escudos")).json().catch(() => ({}));
+    check("workerd: rutas de funciones y Analista protegidas", guard.partidos === 1 && an.status === 401 && nf.status === 404 && typeof fb === "object", JSON.stringify(guard));
+    await realFetch(B2 + "/__scheduled?cron=*/5+*+*+*+*");
+    for (let i = 0; i < 20 && !/avisos: \d+ teléfono/.test(log); i++) await new Promise((res) => setTimeout(res, 300));
+    check("workerd: la tarea programada de avisos corre", /avisos: 1 teléfono\(s\)/.test(log), log.split("\n").filter((l) => /avisos|rror/.test(l)).slice(-3).join(" | "));
+  }
+  try { process.kill(-dev.pid, "SIGTERM"); } catch {} // termina wrangler y su workerd (mismo grupo de procesos)
+  await new Promise((res) => setTimeout(res, 500));
+  fs.rmSync(path.join(os.tmpdir(), "kal-wrangler-" + port), { recursive: true, force: true });
 }
 
 await browser.close();

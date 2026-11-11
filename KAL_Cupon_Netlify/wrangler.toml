@@ -1,0 +1,29 @@
+# KAL en Cloudflare Workers (plan gratis). Cloudflare publica solo con cada cambio en GitHub (rama main).
+# El nombre debe coincidir con el del Worker creado en el panel de Cloudflare.
+name = "kal-cupones"
+main = "cloudflare/worker.mjs"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+# Conserva las variables puestas en el panel de Cloudflare al publicar desde GitHub.
+keep_vars = true
+
+# La app (HTML, CSS, JS, íconos). Lo que no es un archivo pasa al Worker (funciones y Analista).
+[assets]
+directory = "./site"
+binding = "ASSETS"
+
+# Avisos de partidos: revisa cada 5 minutos si hay que enviar "Empieza en…" o "Empezó".
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Almacenamiento de los avisos (incluido en el plan gratis, sin configuración).
+[[durable_objects.bindings]]
+name = "ALMACEN"
+class_name = "Almacen"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Almacen"]
+
+[observability]
+enabled = true

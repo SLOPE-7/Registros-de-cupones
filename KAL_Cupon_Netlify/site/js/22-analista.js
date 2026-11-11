@@ -219,7 +219,7 @@ async function analystRequest(modo, datos, { onStatus, onText, onReset }) {
       const j = await r.json();
       if (j?.error) msg = j.error;
     } catch {}
-    if (r.status === 404) msg = "El Analista aún no está publicado en Netlify. Vuelve a desplegar el sitio.";
+    if (r.status === 404) msg = "El Analista aún no está publicado en el servidor. Vuelve a publicar la app.";
     throw new Error(msg);
   }
   const reader = r.body.getReader(),
@@ -352,7 +352,7 @@ function renderAnalyst() {
     '"><span class="fold-title">⚙ Configurar el Analista</span><span class="fold-count">' +
     (st.clave ? "✓" : "!") +
     '</span><span class="fold-icon" aria-hidden="true">▾</span></button><div class="fold-body">' +
-    '<p class="small muted">El Analista usa la IA de Claude (Anthropic). Necesita dos variables en Netlify: <b>ANTHROPIC_API_KEY</b> (tu clave de console.anthropic.com) y <b>ANALISTA_CLAVE</b> (un código que inventas). Escribe ese mismo código aquí; se guarda solo en este teléfono.</p>' +
+    '<p class="small muted">El Analista usa la IA de Claude (Anthropic). Necesita dos variables en Cloudflare (Workers → kal-cupones → Settings → Variables and Secrets): <b>ANTHROPIC_API_KEY</b> (tu clave de console.anthropic.com) y <b>ANALISTA_CLAVE</b> (un código que inventas). Escribe ese mismo código aquí; se guarda solo en este teléfono.</p>' +
     '<div class="row"><div class="field"><label for="analystKey">Código de acceso</label><input class="input" id="analystKey" type="password" autocomplete="off" placeholder="El mismo de ANALISTA_CLAVE" value="' +
     esc(st.clave || "") +
     '"></div><div class="field" style="align-self:end"><button type="button" class="btn" data-analyst-key>Guardar código</button></div></div>' +

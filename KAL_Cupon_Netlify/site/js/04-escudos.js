@@ -355,7 +355,7 @@ async function lookupCrests(fi, force = false) {
     return;
   }
   if (location.protocol === "file:") {
-    toast("La búsqueda automática se activa al publicar el paquete Netlify.");
+    toast("La búsqueda automática se activa al publicar la app en Cloudflare.");
     return;
   }
   const box = $("crest-result-" + fi),

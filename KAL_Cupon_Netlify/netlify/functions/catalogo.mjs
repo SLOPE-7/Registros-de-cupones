@@ -5,7 +5,7 @@ export default async (request) => {
   const reply = (status, body) => new Response(JSON.stringify(body), { status, headers });
   if (request.method !== "GET") return reply(405, { error: "Usa una solicitud GET." });
   const key = process.env.API_FOOTBALL_KEY;
-  if (!key) return reply(503, { error: "Falta configurar API_FOOTBALL_KEY en Netlify." });
+  if (!key) return reply(503, { error: "Falta configurar API_FOOTBALL_KEY en las variables de Cloudflare (Workers → kal-cupones → Settings → Variables and Secrets)." });
   const p = new URL(request.url).searchParams, countryCode = (p.get("countryCode") || "").trim().toUpperCase(), leagueId = (p.get("leagueId") || "").trim();
   if (countryCode && !/^[A-Z]{2}$/.test(countryCode)) return reply(400, { error: "Escribe el código ISO de dos letras, por ejemplo ES o GB." });
   if (leagueId && !/^\d{1,10}$/.test(leagueId)) return reply(400, { error: "El ID de liga debe contener solo números." });
@@ -15,7 +15,7 @@ export default async (request) => {
     for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v);
     const cacheKey = u.toString(), cached = cache.get(cacheKey); if (cached && cached.until > Date.now()) return cached.data;
     const r = await fetch(u, { headers: { "x-apisports-key": key }, signal: AbortSignal.timeout(9000) });
-    if (r.status === 401 || r.status === 403) throw Error("API-Football rechazó la clave configurada en Netlify.");
+    if (r.status === 401 || r.status === 403) throw Error("API-Football rechazó la clave API_FOOTBALL_KEY configurada en el servidor.");
     if (r.status === 429) throw Error("Se alcanzó el límite de API-Football. Espera a que se renueve la cuota.");
     if (!r.ok) throw Error("API-Football respondió con error HTTP " + r.status + ".");
     const body = await r.json();
