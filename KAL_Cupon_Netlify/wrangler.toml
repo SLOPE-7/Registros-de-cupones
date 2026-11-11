@@ -6,6 +6,9 @@ compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 # Conserva las variables puestas en el panel de Cloudflare al publicar desde GitHub.
 keep_vars = true
+# Dirección pública kal-cupones.<cuenta>.workers.dev (y las de prueba de otras ramas) siempre activas.
+workers_dev = true
+preview_urls = true
 
 # La app (HTML, CSS, JS, íconos). Lo que no es un archivo pasa al Worker (funciones y Analista).
 [assets]
