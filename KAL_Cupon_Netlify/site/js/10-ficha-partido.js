@@ -198,7 +198,8 @@ function matchMarketCard(x) {
   const odd = Number(
       String(x.m.odd || x.m.builderOdd || (x.f.markets.length === 1 ? x.f.totalOdds : "")).replace(",", "."),
     ),
-    prob = odd > 1 ? Math.round(100 / odd) : null,
+    // En un BetBuilder la cuota es la del paquete: no indica la probabilidad de esta selección sola.
+    prob = odd > 1 && !x.m.builder ? Math.round(100 / odd) : null,
     bet = parsePlayerBet(x.m, x.f),
     photo = bet ? savedPlayerPhoto(x.key, x.f, x.m) : "",
     icon = photo
@@ -263,7 +264,9 @@ function matchMarketCard(x) {
         " cupón" +
         (x.coupons.size === 1 ? "" : "es") +
         "</small>"
-      : "<small>Sin cuota registrada · " +
+      : "<small>" +
+        (x.m.builder && odd > 1 ? "Cuota del BetBuilder completo" : "Sin cuota registrada") +
+        " · " +
         x.coupons.size +
         " cupón" +
         (x.coupons.size === 1 ? "" : "es") +
@@ -766,7 +769,14 @@ async function lookupMatchPlayerPhoto(marketKeyValue, refOverride = null, player
     let chosen = data.players[0];
     if (
       data.players.length === 1 &&
-      !confirm("¿Es este jugador?\n" + chosen.name + (chosen.team ? " · " + chosen.team : "") + " (" + chosen.source + ")")
+      !confirm(
+        "¿Es este jugador?\n" +
+          chosen.name +
+          (chosen.team ? " · " + chosen.team : "") +
+          " (" +
+          chosen.source +
+          ")",
+      )
     )
       return;
     if (data.players.length > 1) {

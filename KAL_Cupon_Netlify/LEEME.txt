@@ -353,3 +353,9 @@ H. Analista → ⚙ Configurar → escribe tu código de ANALISTA_CLAVE.
 I. Cuando todo funcione: borra el ícono viejo y, en Netlify, elimina el sitio (Project configuration → Delete project) para que no gaste créditos ni envíe avisos duplicados.
 
 Desde ahora, cada cambio que se sube a la rama main se publica solo en Cloudflare.
+
+V15.1 — Correcciones detectadas por el propio Analista
+- Nube: la dirección de Supabase se acepta sin "https://" (antes Safari decía "The string did not match the expected pattern"); errores de inicio de sesión en español.
+- Estadísticas: "UEFA Liga Campeones" y "UEFA Champions League" (y lo mismo con Europa y Conference League) cuentan como una sola competición.
+- BetBuilder: su cuota es la del paquete completo, así que ya no se usa como cuota de cada selección (inflaba la rentabilidad y los rangos de cuota). En la ficha del partido dice "Cuota del BetBuilder completo" en lugar de una probabilidad engañosa.
+Pruebas: 158.

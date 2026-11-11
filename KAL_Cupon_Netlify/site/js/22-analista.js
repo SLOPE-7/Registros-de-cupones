@@ -46,15 +46,19 @@ function couponLegs(c) {
   return c.fixtures.reduce((s, f) => s + f.markets.length, 0);
 }
 function legLine(f, m, withResult) {
-  const odd = m.odd || m.builderOdd;
+  const odd = m.builder ? "" : m.odd;
   const when = [f.date, f.time].filter(Boolean).join(" ");
   return (
-    [f.competition || f.league, (f.home || "?") + " vs " + (f.away || "?"), when]
+    [canonicalCompetition(f.competition || f.league), (f.home || "?") + " vs " + (f.away || "?"), when]
       .filter(Boolean)
       .join(" · ") +
     " · " +
     [m.market, m.pick].filter(Boolean).join(": ") +
-    (odd ? " @ " + odd : "") +
+    (odd
+      ? " @ " + odd
+      : m.builder && m.builderOdd
+        ? " (BetBuilder; cuota del paquete " + m.builderOdd + ")"
+        : "") +
     (withResult && m.settlement && m.settlement !== "pending" ? " → " + m.settlement : "")
   );
 }

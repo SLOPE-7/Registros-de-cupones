@@ -581,6 +581,19 @@ section("14. Analista con IA (pantalla y datos que se envían)");
   await page.click("#readBtn"); await page.waitForTimeout(200);
   await page.click("[data-analyst-preview]"); await page.waitForTimeout(300);
   check("'Revisar con el Analista' lleva el cupón leído a la pantalla del Analista", (await page.evaluate(() => activeView)) === "analyst" && /Barcelona vs Real Madrid/.test(await page.$eval("#analystCouponText", (e) => e.value)));
+  const comp = await page.evaluate(() => ({
+    names: ["UEFA Liga Campeones", "UEFA Champions League", "Liga de Campeones de la UEFA", "UEFA Liga Europa", "UEFA Europa League", "UEFA Conference League", "AFC Champions League", "CONCACAF Liga de Campeones", "Championship", "LaLiga"].map(canonicalCompetition),
+    builder: (() => {
+      db.coupons.push({ id: "BB", name: "BB", created: new Date().toISOString(), stake: 10, odds: 3.25, payout: 32.5, fixtures: [{ id: "bb1", home: "PSG", away: "Lyon", competition: "Ligue 1", date: "02/11/2026", time: "12:00",
+        markets: [{ market: "Remates Kang-in Lee", pick: "Más de 0.5", odd: "", builder: true, builderOdd: "3.25", settlement: "won" }, { market: "Total de goles", pick: "Más de 1.5", odd: "", builder: true, builderOdd: "3.25", settlement: "won" }] }] });
+      const p = analystMarketHistory(), row = p.byOdds.find((r) => r.name.startsWith("3.00"));
+      const line = legLine(db.coupons.at(-1).fixtures[0], db.coupons.at(-1).fixtures[0].markets[0], true);
+      db.coupons.pop();
+      return { inflated: !!row && row.won >= 2, line };
+    })(),
+  }));
+  check("estadísticas: una sola Champions/Europa/Conference, sin tocar otras confederaciones ni la Championship", comp.names.join("|") === "UEFA Champions League|UEFA Champions League|UEFA Champions League|UEFA Europa League|UEFA Europa League|UEFA Conference League|AFC Champions League|CONCACAF Liga de Campeones|Championship|LaLiga", comp.names.join("|"));
+  check("estadísticas: la cuota de un BetBuilder no se cuenta como cuota de cada selección", !comp.builder.inflated && /cuota del paquete 3.25/.test(comp.builder.line) && !/@ 3.25/.test(comp.builder.line), JSON.stringify(comp.builder));
   const nube = await page.evaluate(() => ["tutujwepbvlxfmizehkf.supabase.co", " https://tutujwepbvlxfmizehkf.supabase.co/rest/v1/ ", "tutujwepbvlxfmizehkf", "http://x.supabase.co", "no es url", ""].map(normalizeCloudUrl));
   check("nube: acepta la dirección de Supabase sin https://, con rutas o solo el proyecto", nube.join("|") === "https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://x.supabase.co||", nube.join("|"));
   check("el código queda solo en este teléfono (no entra en los datos sincronizados)", await page.evaluate(() => !JSON.stringify(db).includes("secreto") && JSON.parse(localStorage.getItem("kal_analista_v1")).clave === "secreto"));

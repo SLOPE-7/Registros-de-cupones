@@ -300,6 +300,21 @@ function marketCategory(m, f) {
   if (/gol|mas de|menos de|over|under|total/.test(x)) return "Goles (más / menos)";
   return "Otros";
 }
+// Las casas escriben la misma competición de formas distintas ("UEFA Liga Campeones", "UEFA Champions League"…).
+// Para las estadísticas se agrupan con un solo nombre. Las Champions de otros continentes no se tocan.
+const COMPETITION_ALIASES = [
+  [/champions league|liga (de )?campeones/, "UEFA Champions League"],
+  [/europa league|liga (de la )?europa\b/, "UEFA Europa League"],
+  [/conference league|liga (de la )?conferencia/, "UEFA Conference League"],
+];
+function canonicalCompetition(name) {
+  const raw = String(name || "").trim();
+  if (!raw) return "";
+  const x = crestNorm(raw);
+  if (/\b(concacaf|afc|caf|conmebol|ofc|asia|africa|asiatica|africana)\b/.test(x)) return raw;
+  const hit = COMPETITION_ALIASES.find(([re]) => re.test(x));
+  return hit ? hit[1] : raw;
+}
 function oddsBand(o) {
   if (!(o > 1)) return null;
   if (o < 1.3) return "1.01 – 1.29";
@@ -320,9 +335,10 @@ function perfData() {
         if (!inPeriod(iso)) return;
         const k = marketKey(f, m);
         if (seen.has(k)) return;
-        const odd = Number(
-          String(m.odd || m.builderOdd || (f.markets.length === 1 ? f.totalOdds : "")).replace(",", "."),
-        );
+        // En un BetBuilder la cuota es la del paquete completo: no sirve como cuota de cada selección.
+        const odd = m.builder
+          ? NaN
+          : Number(String(m.odd || (f.markets.length === 1 ? f.totalOdds : "")).replace(",", "."));
         seen.set(k, { m, f, odd: odd > 1 ? odd : null, house: c.houseId });
       }),
     ),
@@ -392,7 +408,7 @@ function perfData() {
     markets,
     byType: group((x) => marketCategory(x.m, x.f)).sort((a, b) => b.n - a.n),
     byOdds: group((x) => oddsBand(x.odd)).sort((a, b) => a.name.localeCompare(b.name)),
-    byComp: group((x) => x.f.competition || x.f.league || null)
+    byComp: group((x) => canonicalCompetition(x.f.competition || x.f.league) || null)
       .sort((a, b) => b.n - a.n)
       .slice(0, 8),
     coupons,
