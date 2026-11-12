@@ -552,3 +552,13 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-bankroll-save]")) saveBankroll();
 });
 ["stake", "totalOdds"].forEach((id) => $(id)?.addEventListener("input", renderRiskBox));
+
+// Cupón antes de apostar: los campos que faltan se resaltan hasta que se completan.
+document.addEventListener("input", (e) => {
+  if (e.target.classList?.contains("need-input") && String(e.target.value).trim())
+    e.target.classList.remove("need-input");
+});
+function clearSlipHint() {
+  if ($("slipHint")) $("slipHint").innerHTML = "";
+  ["stake", "totalOdds", "bonus", "payout"].forEach((id) => $(id)?.classList.remove("need-input"));
+}

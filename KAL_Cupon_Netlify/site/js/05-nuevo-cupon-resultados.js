@@ -79,6 +79,20 @@ function readText() {
   $("totalOdds").value = parsed.meta.odds ?? "";
   $("bonus").value = parsed.meta.bonus ?? 0;
   $("payout").value = parsed.meta.payout ?? "";
+  const slip = parsed.meta.betslip;
+  if (slip && !parsed.meta.odds && parsed.meta.oddsProduct) $("totalOdds").value = parsed.meta.oddsProduct;
+  ["stake", "totalOdds", "bonus", "payout"].forEach((id) =>
+    $(id).classList.toggle("need-input", !!slip && !String($(id).value).trim()),
+  );
+  if ($("slipHint"))
+    $("slipHint").innerHTML = slip
+      ? "🧾 <b>Cupón antes de apostar.</b> El boleto no trae los totales: completa <b>valor apostado</b>, <b>bono</b> y <b>ganancia total</b>" +
+        (parsed.meta.oddsProduct && !parsed.meta.odds
+          ? ". La <b>cuota total</b> (" +
+            parsed.meta.oddsProduct +
+            ") la calculé multiplicando las cuotas; corrígela si tu casa muestra otra."
+          : ".")
+      : "";
   $("couponName").value = $("couponName").value || `Cupón ${new Date().toLocaleDateString("es-HN")}`;
   $("couponType").value = draftSelections.reduce((n, f) => n + f.markets.length, 0) > 1 ? "parlay" : "simple";
   applyQuickDefaults();
@@ -88,7 +102,11 @@ function readText() {
   try {
     localStorage.removeItem(DRAFT);
   } catch (e) {}
-  toast(`Detecté ${draftSelections.length} partidos. Revisa los mercados y datos financieros.`);
+  toast(
+    parsed.meta.betslip
+      ? `Detecté ${draftSelections.length} partidos (antes de apostar). Completa valor apostado, bono y ganancia total.`
+      : `Detecté ${draftSelections.length} partidos. Revisa los mercados y datos financieros.`,
+  );
 }
 function calcCoupon(c) {
   const all = c.fixtures.flatMap((f) => f.markets),
@@ -232,6 +250,7 @@ function saveCoupon() {
   $("notes").value = "";
   $("couponReason").value = "";
   setConfidence(0);
+  clearSlipHint();
   $("autoStakeTx").checked = false;
   draftSelections = [];
   renderPreview();

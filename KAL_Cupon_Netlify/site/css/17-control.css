@@ -333,3 +333,14 @@
   width: 100%;
   margin-top: 14px;
 }
+/* Cupón antes de apostar: aviso y campos por completar */
+.slip-hint:empty {
+  display: none;
+}
+.slip-hint {
+  margin: 0 0 10px;
+}
+.input.need-input {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent);
+}

@@ -116,12 +116,174 @@ function splitEarlyPayout(pick) {
 // Línea del importe apostado. "Apuesta" solo cuenta si va sola o seguida del importe
 // (así "Apuesta sin empate: 1" se lee como mercado y no como importe).
 const STAKE_LINE_RE = /^(?:VALOR APOSTADO|IMPORTE APOSTADO|STAKE)\b|^APUESTA\s*(?::|L\b|\$|\d|$)/i;
+// ---- Cupón ANTES de apostar (boleto de la casa, sin "Cuotas:" ni totales) ----
+// Formato (Doradobet):
+//   Selección simple:  "Equipo A vs. Equipo B" · fecha "12/11/2026 • 13:00" · mercado · selección · cuota
+//   BetBuilder:        "BB" · "2/10" · fecha · "Equipo A vs. Equipo B" · cuota del paquete · (mercado · selección)…
+// El boleto no trae cuota total, importe, bono ni ganancia: se piden al guardar (se pueden pegar al final como
+// "Cuota total 12.5", "Valor total 50", "Bono 5", "Ganancia total 625").
+const BETSLIP_VS_RE = /^(.+?)\s+vs\.?\s+(.+)$/i,
+  BETSLIP_ODD_RE = /^\d{1,3}[.,]\d{1,3}$/,
+  BETSLIP_DATE_RE = /^(\d{1,2})[/.\-](\d{1,2})(?:[/.\-](\d{2,4}))?\s*[•·,\-]?\s*(\d{1,2}):(\d{2})$/;
+function looksLikeBetslip(lines) {
+  if (lines.some((l) => /^Cuotas\s*:?$/i.test(l) || /^(?:BetBuilder|Constructor de apuestas)\s*:/i.test(l)))
+    return false;
+  const vs = lines.filter((l) => BETSLIP_VS_RE.test(l)).length;
+  if (!vs) return false;
+  if (lines.some((l) => /^BB$/i.test(l))) return true;
+  // Simples: "A vs. B", fecha sola y una cuota suelta por partido; sin "mercado: selección" en una línea.
+  return (
+    lines.filter((l) => BETSLIP_DATE_RE.test(l)).length >= vs &&
+    lines.filter((l) => BETSLIP_ODD_RE.test(l)).length >= vs &&
+    !lines.some((l) => /^[^:]{2,70}:\s*\S+/.test(l) && !/^\d{1,2}:\d{2}$/.test(l))
+  );
+}
+function parseBetslip(lines) {
+  const meta = { stake: null, odds: null, bonus: 0, payout: null, duplicateFixtures: 0, betslip: true };
+  const fixtures = [];
+  const amount = (line) => {
+    const m = line.match(/([\d]+(?:[.,][\d]+)*)\s*$/);
+    return m ? parseMoney(m[1]) : null;
+  };
+  let current = null,
+    pendingDate = null,
+    pendingBuilder = false,
+    lastMarket = null;
+  const dateOf = (m) => {
+    const y = m[3] ? (m[3].length === 2 ? "20" + m[3] : m[3]) : String(new Date().getFullYear());
+    const d = String(m[1]).padStart(2, "0"),
+      mo = String(m[2]).padStart(2, "0");
+    return {
+      text: d + "/" + mo + "/" + y,
+      iso: y + "-" + mo + "-" + d,
+      time: String(m[4]).padStart(2, "0") + ":" + m[5],
+    };
+  };
+  const setDate = (f, d) => {
+    f.date = d.text;
+    f.dateISO = d.iso;
+    f.time = d.time;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Totales que la persona pegue al final (opcional)
+    if (/^cuota total\b/i.test(line) || /^CUOTAS\b/.test(line)) {
+      meta.odds = amount(line) ?? meta.odds;
+      continue;
+    }
+    if (/^(?:valor total|valor apostado|importe|apuesta total)\b/i.test(line)) {
+      meta.stake = amount(line) ?? meta.stake;
+      continue;
+    }
+    if (/^bono\b/i.test(line)) {
+      meta.bonus = amount(line) ?? meta.bonus;
+      continue;
+    }
+    if (/^(?:ganancia total|retorno total|pago potencial)\b/i.test(line)) {
+      meta.payout = amount(line) ?? meta.payout;
+      continue;
+    }
+    if (/^BB$/i.test(line)) {
+      pendingBuilder = true;
+      continue;
+    }
+    if (/^\d{1,2}\/\d{1,2}$/.test(line)) continue; // "2/10": selecciones del BetBuilder
+    const dm = line.match(BETSLIP_DATE_RE);
+    if (dm) {
+      const d = dateOf(dm);
+      // En las simples la fecha va después de los equipos; en los BetBuilder, antes.
+      if (current && !current.dateISO && !current.markets.length && !pendingBuilder) setDate(current, d);
+      else pendingDate = d;
+      continue;
+    }
+    const vs = line.match(BETSLIP_VS_RE);
+    if (vs) {
+      current = {
+        id: uid(),
+        home: vs[1].trim(),
+        away: vs[2].trim(),
+        league: "",
+        country: "",
+        competition: "",
+        leagueCrest: "",
+        homeCrest: "",
+        awayCrest: "",
+        date: "",
+        dateISO: "",
+        time: "",
+        markets: [],
+        builderOdd: "",
+        builder: pendingBuilder,
+      };
+      if (pendingDate) setDate(current, pendingDate);
+      pendingDate = null;
+      pendingBuilder = false;
+      lastMarket = null;
+      fixtures.push(current);
+      continue;
+    }
+    if (!current) continue;
+    if (BETSLIP_ODD_RE.test(line)) {
+      const odd = line.replace(",", ".");
+      if (current.builder && !current.builderOdd) {
+        current.builderOdd = odd;
+        current.totalOdds = odd;
+      } else if (lastMarket && !lastMarket.odd && !current.builder) {
+        lastMarket.odd = odd;
+        if (current.markets.length === 1) current.totalOdds = odd;
+      }
+      continue;
+    }
+    // Mercado y selección van en líneas seguidas.
+    if (lastMarket && !lastMarket.pickDone) {
+      const ep = splitEarlyPayout(line);
+      lastMarket.pick = ep.pick;
+      if (ep.early) lastMarket.earlyPayout = true;
+      lastMarket.pickDone = true;
+      continue;
+    }
+    lastMarket = {
+      market: line,
+      pick: "",
+      odd: "",
+      builder: !!current.builder,
+      builderOdd: current.builder ? current.builderOdd : "",
+      settlement: "pending",
+    };
+    current.markets.push(lastMarket);
+  }
+  fixtures.forEach((f) => {
+    f.markets.forEach((m) => {
+      delete m.pickDone;
+      if (m.builder) m.builderOdd = f.builderOdd;
+    });
+    delete f.builder;
+  });
+  // Cuota total calculada (cada BetBuilder cuenta una vez).
+  let prod = 1,
+    complete = fixtures.length > 0;
+  fixtures.forEach((f) => {
+    if (f.markets.some((m) => m.builder)) {
+      const b = Number(f.builderOdd);
+      if (b > 1) prod *= b;
+      else complete = false;
+    } else
+      f.markets.forEach((m) => {
+        const o = Number(m.odd);
+        if (o > 1) prod *= o;
+        else complete = false;
+      });
+  });
+  meta.oddsProduct = complete ? Math.round(prod * 100) / 100 : null;
+  return { fixtures: fixtures.filter((f) => f.markets.length), meta };
+}
 function parseCoupon(raw) {
   const lines = String(raw || "")
     .replace(/\r/g, "")
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
+  if (looksLikeBetslip(lines)) return parseBetslip(lines);
   const fixtures = [],
     meta = { stake: null, odds: null, bonus: 0, payout: null };
   const dateRe = /\b(\d{1,2})[/.\-](\d{1,2})(?:[/.\-](\d{2,4}))?\s*(?:[•·,\-]\s*)?(\d{1,2}):(\d{2})\b/;

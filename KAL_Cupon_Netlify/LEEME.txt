@@ -386,3 +386,9 @@ SI CLOUDFLARE DEJA DE PUBLICAR
 - Arreglo: Settings → Builds → Git repository → Manage → vuelve a conectar GitHub (repositorio SLOPE-7/Registros-de-cupones, rama main, Root directory KAL_Cupon_Netlify, Deploy command npx wrangler deploy).
 - Cloudflare publica solo cuando llega un cambio nuevo a la rama main; tras reconectar, el siguiente cambio dispara la publicación.
 - Variables (todas como "Secret"): API_FOOTBALL_KEY, ANTHROPIC_API_KEY, ANALISTA_CLAVE, FOOTBALL_DATA_KEY.
+
+V16.1 — CUPONES ANTES DE APOSTAR
+- El lector entiende el boleto de la casa antes de apostar (ejemplos en pruebas/previa-1.txt a previa-3.txt): "Equipo A vs. Equipo B" en una línea, fecha "12/11/2026 • 13:00" antes (BetBuilder "BB", "2/10") o después (simples), mercado y selección en líneas separadas, y la cuota del partido o del paquete.
+- Como el boleto no trae totales, la app calcula la cuota total (multiplicando cada partido; un BetBuilder cuenta una vez), avisa y resalta lo que falta: valor apostado, bono y ganancia total. Si los pegas al final ("Cuota total 245.10", "Valor total 50", "Bono 5", "Ganancia total 12,255"), los lee.
+- Funciona en Nuevo cupón (con el freno al guardar) y en Analista → Revisar cupón.
+Pruebas: 210.

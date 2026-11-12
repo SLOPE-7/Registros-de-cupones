@@ -801,6 +801,38 @@ section("21. Copias automáticas, espejo, novedades y rutas /api");
   await ctx.close();
 }
 
+section("22. Cupones antes de apostar (boleto sin totales)");
+{
+  const { ctx, page } = await open(null);
+  const slips = [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/previa-${n}.txt`), "utf8"));
+  const r = await page.evaluate((slips) => slips.map((t) => {
+    const p = parseCoupon(t);
+    return { meta: p.meta, n: p.fixtures.length, legs: p.fixtures.reduce((s, f) => s + f.markets.length, 0),
+      f: p.fixtures.map((f) => ({ h: f.home, a: f.away, iso: f.dateISO, t: f.time, b: f.builderOdd, m: f.markets.map((m) => [m.market, m.pick, m.odd, m.builder ? 1 : 0, m.builderOdd || ""]) })) };
+  }), slips);
+  const [a, b, c] = r;
+  check("previa 1: 11 BetBuilder de selecciones con sus 25 selecciones, fecha, hora y cuota del paquete", a.meta.betslip && a.n === 11 && a.legs === 25 && a.f[0].h === "Senegal" && a.f[0].a === "Sudan" && a.f[0].iso === "2026-11-12" && a.f[0].t === "13:00" && a.f[0].b === "1.16" && JSON.stringify(a.f[0].m[1]) === JSON.stringify(["Doble oportunidad", "1 o empate", "", 1, "1.16"]) && a.f[7].m[1][0] === "Remates - Arda Guler (TUR)" && a.f[7].m[1][1] === "Más de 1.5", JSON.stringify(a.f[0]));
+  const prod1 = [1.16, 1.26, 1.42, 1.3, 1.2, 1.35, 1.13, 1.52, 1.47, 1.33, 1.8].reduce((x, y) => x * y, 1);
+  check("previa 1: cuota total calculada multiplicando cada BetBuilder una vez", Math.abs(a.meta.oddsProduct - Math.round(prod1 * 100) / 100) < 0.011 && a.meta.stake === null && a.meta.payout === null, a.meta.oddsProduct + " vs " + prod1.toFixed(2));
+  check("previa 2: 4 BetBuilder con 12 selecciones (incluye hándicap y remates)", b.n === 4 && b.legs === 12 && b.f[1].m[1][0] === "Hándicap" && b.f[1].m[1][1] === "2 (+0.5)" && b.f[2].b === "2.20" && b.f[2].m.length === 4, JSON.stringify(b.f[1]));
+  const simple = c.f.filter((f) => !f.b), bb = c.f.filter((f) => f.b);
+  check("previa 3: 18 partidos mezclando simples (con fecha después) y BetBuilder (con fecha antes)", c.n === 18 && c.legs === 22 && simple.length === 14 && bb.length === 4 && c.f[0].h === "FK Bodo Glimt" && c.f[0].iso === "2026-11-24" && c.f[0].t === "11:45" && JSON.stringify(c.f[0].m[0]) === JSON.stringify(["Ambos equipos marcan", "Sí", "1.38", 0, ""]) && c.f[11].m[0][0] === "2 marcará" && c.f[11].m[0][2] === "1.25" && c.f[10].h === "Sabah FC" && c.f[10].iso === "2026-11-25" && c.f[10].b === "1.17", JSON.stringify(c.f.slice(10, 12)));
+  const totals = await page.evaluate((t) => parseCoupon(t + "\nCuota total 245.10\nValor total L 50\nBono 5\nGanancia total 12,255.00").meta, slips[2]);
+  check("previa: lee los totales si se pegan al final", totals.odds === 245.1 && totals.stake === 50 && totals.bonus === 5 && totals.payout === 12255, JSON.stringify(totals));
+  const old = await page.evaluate((t) => { const p = parseCoupon(t); return { slip: !!p.meta.betslip, n: p.fixtures.length }; }, fs.readFileSync(path.join(ROOT, "pruebas/doradobet-1.txt"), "utf8"));
+  check("los cupones ya apostados siguen usando su lector", !old.slip && old.n > 10, JSON.stringify(old));
+  const players = await page.evaluate(() => ["Remates - Arda Guler (TUR)", "Remates a Puerta - Harry Kane (ENG)", "Remates (Lopez Fermin (ESP)) y suplente"].map((mk) => parsePlayerBet({ market: mk, pick: "Más de 1.5" }, { home: "Turquía", away: "Bélgica" })?.name || null));
+  check("jugadores en el formato del boleto: Arda Guler, Harry Kane, Lopez Fermin", players.join("|") === "Arda Guler|Harry Kane|Lopez Fermin", players.join("|"));
+  await view(page, "new");
+  await page.fill("#raw", slips[2]); await tap(page, "#readBtn"); await page.waitForTimeout(300);
+  const ui = await page.evaluate(() => ({ odds: $("totalOdds").value, hint: $("slipHint").innerText, need: ["stake", "bonus", "payout"].filter((id) => $(id).classList.contains("need-input")), risk: !!document.querySelector("#riskBox .risk-card") }));
+  check("Nuevo cupón: pone la cuota calculada, avisa qué falta y resalta valor apostado y ganancia", Number(ui.odds) > 100 && /antes de apostar/i.test(ui.hint) && /valor apostado/.test(ui.hint) && ui.need.includes("stake") && ui.need.includes("payout") && ui.risk, JSON.stringify(ui));
+  await page.fill("#stake", "20");
+  check("al escribir el valor apostado deja de estar resaltado", !(await page.$eval("#stake", (e) => e.classList.contains("need-input"))));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones del servidor (con API simulada) ----------
 section("8. Funciones del servidor (API-Football y TheSportsDB)");
 {

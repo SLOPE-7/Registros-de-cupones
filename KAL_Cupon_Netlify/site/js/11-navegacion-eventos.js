@@ -252,6 +252,7 @@ $("clearBtn").addEventListener("click", () => {
     (id) => ($(id).value = ""),
   );
   setConfidence(0);
+  clearSlipHint();
   $("couponType").value = "auto";
   $("couponHouse").value = "";
   $("autoStakeTx").checked = false;
