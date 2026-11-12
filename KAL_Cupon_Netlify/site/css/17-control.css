@@ -152,3 +152,115 @@
 .vc-verdict small {
   color: var(--muted);
 }
+/* Pestaña "Datos" de la ficha del partido */
+.dp-block {
+  margin: 0 0 14px;
+}
+.dp-block h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.dp-prob {
+  display: grid;
+  grid-template-columns: minmax(110px, 38%) 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 4px 0;
+}
+.dp-prob b {
+  text-align: right;
+}
+.dp-markets {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.dp-markets li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel2);
+  font-size: 13px;
+}
+.dp-markets li > div {
+  flex: 1 1 100%;
+}
+.dp-markets li > span:not(.clv-chip) {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.dp-table th,
+.dp-table td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+.dp-table td:first-child,
+.dp-table th:first-child {
+  text-align: left;
+}
+.dp-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.form-row {
+  display: flex;
+  gap: 3px;
+  margin: 4px 0;
+}
+.form-chip {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--muted);
+  margin-right: 4px;
+}
+.form-chip.is-G {
+  background: var(--green);
+}
+.form-chip.is-P {
+  background: var(--red);
+}
+.form-chip.is-E {
+  background: #8a8f9c;
+}
+.dp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  display: grid;
+  gap: 3px;
+}
+.dp-source .linkish,
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--gold);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (max-width: 420px) {
+  .dp-form {
+    grid-template-columns: 1fr;
+  }
+}

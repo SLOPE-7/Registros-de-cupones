@@ -3,7 +3,7 @@
 //   - atiende las mismas rutas que usaba en Netlify (/.netlify/functions/… y /api/analista), así la app no cambia;
 //   - envía los avisos de partidos cada 5 minutos (tarea programada).
 // Variables y secretos (Cloudflare → Workers → kal-cupones → Settings → Variables and Secrets):
-//   API_FOOTBALL_KEY, ANTHROPIC_API_KEY, ANALISTA_CLAVE y, opcional, THESPORTSDB_KEY.
+//   API_FOOTBALL_KEY, ANTHROPIC_API_KEY, ANALISTA_CLAVE, FOOTBALL_DATA_KEY y, opcional, THESPORTSDB_KEY.
 import { DurableObject } from "cloudflare:workers";
 import Anthropic from "@anthropic-ai/sdk";
 import escudos from "../netlify/functions/escudos.mjs";
@@ -14,6 +14,7 @@ import catalogo from "../netlify/functions/catalogo.mjs";
 import imagenes from "../netlify/functions/imagenes.mjs";
 import { manejar as analista } from "../netlify/lib/analista-comun.mjs";
 import { avisosHandler, enviarAvisos } from "./avisos.mjs";
+import { datosPartido } from "./datos-partido.mjs";
 
 // Almacenamiento de los avisos (suscripciones, partidos y claves VAPID). Un único Durable Object con SQLite,
 // incluido en el plan gratis y sin nada que configurar.
@@ -54,6 +55,8 @@ const FUNCIONES = { escudos, logo, partido, jugadores, catalogo, imagenes };
 async function api(nombre, request, env) {
   if (FUNCIONES[nombre]) return FUNCIONES[nombre](request);
   if (nombre === "avisos") return avisosHandler(request, almacen(env));
+  if (nombre === "datos-partido")
+    return datosPartido(request, { token: env.FOOTBALL_DATA_KEY, store: almacen(env) });
   if (nombre === "analista")
     return analista(request, {
       env: { ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY, ANALISTA_CLAVE: env.ANALISTA_CLAVE },

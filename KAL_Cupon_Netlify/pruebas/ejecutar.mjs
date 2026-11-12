@@ -47,6 +47,15 @@ const server = http.createServer((req, res) => {
     let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { posts.push(JSON.parse(b)); res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); });
     return;
   }
+  if (url.pathname === "/api/datos-partido") {
+    seen.push("datos:" + url.searchParams.get("home") + "|" + url.searchParams.get("date"));
+    return sendJson({ encontrado: true, alReves: false, fuente: "football-data.org",
+      partido: { competicion: "UEFA Champions League", local: { nombre: "Fenerbahçe" }, visitante: { nombre: "Liverpool" } },
+      modelo: { lambdaLocal: 1.2, lambdaVisitante: 1.6, p1: 0.3, px: 0.25, p2: 0.45, over05: 0.94, over15: 0.77, over25: 0.53, over35: 0.31, btts: 0.52, base: "tabla de local y visitante" },
+      tabla: { local: { posicion: 12, puntos: 7, golesFavor: 6, golesContra: 7 }, visitante: { posicion: 3, puntos: 10, golesFavor: 9, golesContra: 3 }, localEnCasa: { ganados: 1, empates: 1, perdidos: 0 }, visitanteFuera: { ganados: 2, empates: 0, perdidos: 0 }, equipos: 36 },
+      forma: { local: [{ fecha: "2026-11-01", rival: "Galatasaray", enCasa: true, marcador: "2-1", resultado: "G" }], visitante: [{ fecha: "2026-11-02", rival: "Arsenal", enCasa: false, marcador: "0-0", resultado: "E" }] },
+      h2h: { partidos: 2, goles: 5, local: { ganados: 0, empates: 1, perdidos: 1 }, visitante: { ganados: 1, empates: 1, perdidos: 0 }, ultimos: [{ fecha: "2020-02-01", local: "Liverpool", visitante: "Fenerbahçe", marcador: "2-1" }] } });
+  }
   // Analista (función de borde simulada): responde en streaming, una línea JSON por evento.
   if (url.pathname === "/api/analista") {
     let b = ""; req.on("data", (c) => (b += c)); req.on("end", async () => {
@@ -675,6 +684,57 @@ section("18. Valor de la cuota: cierre (CLV), calculadora y comparador");
   await ctx.close();
 }
 
+section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles");
+{
+  const D = await import(path.join(ROOT, "cloudflare/datos-partido.mjs"));
+  const m = D.poissonModel(1.5, 1.5);
+  check("modelo Poisson: probabilidades coherentes (λ 1.5 + 1.5 → más de 2.5 = 57.7 %)", Math.abs(m.p1 - m.p2) < 0.001 && Math.abs(m.p1 + m.px + m.p2 - 1) < 0.002 && Math.abs(m.over25 - 0.577) < 0.002 && m.over15 > m.over25 && m.over25 > m.over35, JSON.stringify(m));
+  const T = (id, name, shortName, tla) => ({ id, name, shortName, tla });
+  const fdMatches = [
+    { id: 11, utcDate: "2026-11-22T20:00:00Z", status: "TIMED", competition: { id: 2002, code: "BL1", name: "Bundesliga" }, homeTeam: T(5, "FC Bayern München", "Bayern", "FCB"), awayTeam: T(4, "Borussia Dortmund", "Dortmund", "BVB"), score: { fullTime: {} } },
+    { id: 12, utcDate: "2026-11-22T18:00:00Z", status: "TIMED", competition: { id: 2014, code: "PD", name: "Primera Division" }, homeTeam: T(78, "Club Atlético de Madrid", "Atleti", "ATM"), awayTeam: T(81, "FC Barcelona", "Barça", "FCB"), score: { fullTime: {} } },
+  ];
+  check("nombres: español, alias y equipos al revés", D.nameScore("España", T(1, "Spain", "Spain", "ESP")) === 1 && D.findMatch(fdMatches, "Bayern Múnich", "Dortmund")?.m.id === 11 && D.findMatch(fdMatches, "Barcelona", "Atlético de Madrid")?.swapped === true && !D.findMatch(fdMatches, "Inter", "Napoli"));
+  const fin = (id, h, a, gh, ga, d) => ({ id, utcDate: d + "T15:00:00Z", status: "FINISHED", competition: { name: "Bundesliga" }, homeTeam: T(h, "H" + h, "H" + h), awayTeam: T(a, "A" + a, "A" + a), score: { fullTime: { home: gh, away: ga } } });
+  const row = (id, pos, pj, gf, ga) => ({ position: pos, team: { id }, playedGames: pj, won: 3, draw: 1, lost: 1, points: 10, goalsFor: gf, goalsAgainst: ga, form: "W,W,D,L,W" });
+  const standings = { standings: ["TOTAL", "HOME", "AWAY"].map((type) => ({ type, table: [row(5, 1, 6, 15, 4), row(4, 2, 6, 12, 6), row(9, 3, 6, 6, 8), row(10, 4, 6, 4, 12)] })) };
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url.replace("https://api.football-data.org/v4", ""));
+    const ok = (d) => ({ ok: true, status: 200, json: async () => d });
+    if (/\/matches\?dateFrom=2026-11-21&dateTo=2026-11-23/.test(url)) return ok({ matches: fdMatches });
+    if (/competitions\/BL1\/standings/.test(url)) return ok(standings);
+    if (/matches\/11\/head2head/.test(url)) return ok({ aggregates: { numberOfMatches: 4, totalGoals: 13, homeTeam: { wins: 3, draws: 0, losses: 1 }, awayTeam: { wins: 1, draws: 0, losses: 3 } }, matches: [fin(1, 5, 4, 4, 2, "2026-03-01")] });
+    if (/teams\/5\/matches/.test(url)) return ok({ matches: [fin(2, 5, 9, 3, 0, "2026-11-15"), fin(3, 10, 5, 1, 1, "2026-11-08")] });
+    if (/teams\/4\/matches/.test(url)) return ok({ matches: [fin(4, 4, 10, 2, 1, "2026-11-15")] });
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const mem = new Map(), store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
+  const req = (q) => new Request("https://x/api/datos-partido?" + new URLSearchParams(q));
+  const r1 = await (await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch })).json();
+  check("datos: encuentra el partido y arma tabla, forma, enfrentamientos y modelo", r1.encontrado && r1.tabla.local.posicion === 1 && r1.tabla.local.forma === "GGEPG" && r1.forma.local[0].resultado === "G" && r1.forma.local[0].marcador === "3-0" && r1.h2h.partidos === 4 && r1.modelo.p1 > r1.modelo.p2 && r1.modelo.base === "tabla de local y visitante", JSON.stringify(r1).slice(0, 300));
+  const n1 = calls.length;
+  await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch });
+  check("datos: la segunda consulta sale de la caché (cuida el límite de 10 por minuto)", n1 === 5 && calls.length === 5, n1 + "/" + calls.length);
+  const noKey = await D.datosPartido(req({ home: "A", away: "B", date: "2026-11-22" }), { token: "", store, fetchImpl: fakeFetch });
+  const nf = await (await D.datosPartido(req({ home: "Inter", away: "Napoli", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch })).json();
+  const limited = await D.datosPartido(req({ home: "X", away: "Y", date: "2026-12-01" }), { token: "t", store: null, fetchImpl: async () => ({ ok: false, status: 429 }) });
+  check("datos: sin clave, partido no cubierto y límite de consultas con mensajes claros", noKey.status === 503 && nf.encontrado === false && /Nations League/.test(nf.motivo) && limited.status === 429 && /10 consultas/.test((await limited.json()).error));
+
+  const { ctx, page } = await open(baseDb());
+  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Fenerbahce")).click());
+  await page.waitForTimeout(150);
+  await tap(page, '[data-match-tab="datos"]');
+  await page.waitForTimeout(500);
+  const panel = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
+  check("ficha → 📈 Datos: modelo, tabla, forma y enfrentamientos", /Modelo de goles/.test(panel) && /Más de 2.5 goles 53 %/.test(panel) && /12º/.test(panel) && /Forma reciente/.test(panel) && /Enfrentamientos directos/.test(panel), panel.slice(0, 300));
+  check("ficha → 📈 Datos: compara tus mercados con el modelo (más de 1.5 a 1.50: 77 % → +16 % de valor)", /Total de goles · Más de 1.5 Modelo 77 % · cuota 1.50 \(67 %\) \+16 % valor/.test(panel) && /Ambos equipos marcan · Sí Modelo 52 %/.test(panel), panel.match(/Tus mercados[^📊]*/)?.[0]);
+  check("ficha → 📈 Datos: pide los datos con la fecha del partido", seen.some((x) => x.startsWith("datos:Fenerbahce|20")));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {
@@ -848,6 +908,8 @@ section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
     const nf = await realFetch(B2 + "/.netlify/functions/nada");
     const fb = await (await realFetch(B2 + "/.netlify/functions/escudos")).json().catch(() => ({}));
     check("workerd: rutas de funciones y Analista protegidas", guard.partidos === 1 && an.status === 401 && nf.status === 404 && typeof fb === "object", JSON.stringify(guard));
+    const dp = await realFetch(B2 + "/api/datos-partido?home=Barcelona&away=Madrid&date=2026-11-22");
+    check("workerd: datos del partido sin clave explica cómo configurarla", dp.status === 503 && (await dp.json()).codigo === "sin_clave");
     await realFetch(B2 + "/__scheduled?cron=*/5+*+*+*+*");
     for (let i = 0; i < 20 && !/avisos: \d+ teléfono/.test(log); i++) await new Promise((res) => setTimeout(res, 300));
     check("workerd: la tarea programada de avisos corre", /avisos: 1 teléfono\(s\)/.test(log), log.split("\n").filter((l) => /avisos|rror/.test(l)).slice(-3).join(" | "));
