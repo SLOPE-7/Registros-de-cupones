@@ -52,7 +52,40 @@ Para cada selección: "- **Equipo A vs Equipo B** · mercado · cuota → confia
 Cuál quitarías o cambiarías y por qué. Propón un mercado alternativo más seguro solo si tiene sentido.
 ## 💡 Cómo lo armaría yo
 Versión ajustada del cupón (qué quitar o cambiar) y cuánto arriesgar según su presupuesto, si te lo pasan.
+Si la app te pasa "riesgo" (calculado con el historial de la persona: probabilidad estimada, selecciones de relleno, partidos repetidos en otros cupones, cómo le fue con cupones de ese tamaño), úsalo y menciónalo cuando sea relevante.
 Cierra con una línea recordando que es un análisis orientativo, no una garantía.`;
+
+const SISTEMA_SEMANA = `${BASE}
+
+Tarea: hacer el resumen de los últimos 7 días de apuestas que te pasa la app (JSON), comparándolo con el historial general.
+Estructura (corta, cabe en una pantalla de teléfono):
+## 📅 Tu semana
+Cifras clave: cupones, ganados/perdidos, resultado neto y si va mejor o peor que su media.
+## ✅ Lo mejor
+## ⚠️ A corregir
+Incluye si rompió sus propias reglas (más selecciones que su límite, el mismo partido en varios cupones, montos por encima de su unidad, apuestas seguidas tras perder).
+## 🎯 Para la próxima semana
+Tres acciones concretas.`;
+
+const SISTEMA_ARMAR = `${BASE}
+
+Tarea: ayudar a armar cupones con los partidos o picks que la persona está considerando. Usa la búsqueda web para revisar forma, bajas, rotaciones y contexto de cada partido. Si la persona solo da partidos, propón tú los mercados.
+Reglas para armar:
+- Propón entre 1 y 3 cupones cortos (de 1 a la cantidad máxima de selecciones que indique la app; si no la indica, máximo 4).
+- Un partido no se repite en dos cupones.
+- Evita selecciones de "relleno" con cuota menor que 1.15.
+- Prioriza los tipos de mercado donde su historial es bueno y evita los que le salen mal (si la app te pasa el historial).
+- Si un partido no tiene un pick con sentido, descártalo y dilo.
+- Montos en unidades (½, 1, 1½ o 2) según tu confianza; si la app te da el valor de la unidad, conviértelo a lempiras.
+Estructura:
+## 🧩 Cupón 1 · nombre corto
+Lista: "- **Equipo A vs Equipo B** · mercado · cuota aproximada si la conoces → confianza Alta/Media/Baja" y una frase con el motivo. Al final: probabilidad estimada del cupón y monto sugerido.
+(Repite para cada cupón.)
+## 🗑️ Lo que descarté
+Partidos que no usaste y por qué.
+Cierra con una línea recordando que es un análisis orientativo, no una garantía.`;
+
+export const MODOS = ["historial", "cupon", "semana", "armar"];
 
 export function respuestaJson(status, cuerpo) {
   return new Response(JSON.stringify(cuerpo), {
@@ -106,12 +139,13 @@ export async function leerPeticion(req, env) {
     return { error: respuestaJson(400, { error: "La petición no es JSON válido." }) };
   }
   const modo = cuerpo?.modo;
-  if (modo !== "historial" && modo !== "cupon")
-    return { error: respuestaJson(400, { error: "Modo desconocido." }) };
+  if (!MODOS.includes(modo)) return { error: respuestaJson(400, { error: "Modo desconocido." }) };
   const datos = cuerpo.datos && typeof cuerpo.datos === "object" ? cuerpo.datos : null;
   if (!datos) return { error: respuestaJson(400, { error: "Faltan los datos." }) };
   if (modo === "cupon" && !(typeof datos.cupon === "string" && datos.cupon.trim().length >= 10))
     return { error: respuestaJson(400, { error: "Pega el texto del cupón que quieres revisar." }) };
+  if (modo === "armar" && !(typeof datos.partidos === "string" && datos.partidos.trim().length >= 10))
+    return { error: respuestaJson(400, { error: "Escribe los partidos o picks que estás considerando." }) };
   return { modo, datos };
 }
 
@@ -138,9 +172,40 @@ export function construirPeticion(modo, datos) {
       ],
     };
   }
+  if (modo === "semana") {
+    return {
+      ...base,
+      output_config: { effort: "medium" },
+      system: SISTEMA_SEMANA,
+      messages: [
+        {
+          role: "user",
+          content: `Fecha de hoy: ${hoy}.\nMis últimos 7 días y mi historial general:\n\n${JSON.stringify(datos.semana ?? {})}`,
+        },
+      ],
+    };
+  }
   const extras = [];
   if (datos.historial) extras.push("Mi historial por tipo de mercado:\n" + JSON.stringify(datos.historial));
   if (datos.presupuesto) extras.push("Mi presupuesto:\n" + JSON.stringify(datos.presupuesto));
+  if (datos.banca) extras.push("Mi gestión de banca:\n" + JSON.stringify(datos.banca));
+  if (datos.riesgo) extras.push("Riesgo calculado por la app:\n" + JSON.stringify(datos.riesgo));
+  if (modo === "armar") {
+    return {
+      ...base,
+      output_config: { effort: "medium" },
+      system: SISTEMA_ARMAR,
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 8 }],
+      messages: [
+        {
+          role: "user",
+          content:
+            `Fecha de hoy: ${hoy}.\nAyúdame a armar cupones con esto:\n\n<partidos>\n${datos.partidos.trim()}\n</partidos>` +
+            (extras.length ? "\n\n" + extras.join("\n\n") : ""),
+        },
+      ],
+    };
+  }
   return {
     ...base,
     output_config: { effort: "medium" },

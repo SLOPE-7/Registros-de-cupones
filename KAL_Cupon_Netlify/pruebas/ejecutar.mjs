@@ -735,6 +735,39 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
   await ctx.close();
 }
 
+section("20. Analista: mi semana, armar cupones y riesgo en la revisión");
+{
+  const A = await import(path.join(ROOT, "netlify/lib/analista-comun.mjs"));
+  const pa = A.construirPeticion("armar", { partidos: "España vs Suiza\nAlemania vs Italia", banca: { unidad: 20, maxSelecciones: 4 } });
+  const ps = A.construirPeticion("semana", { semana: { ultimos7dias: { cupones: 3 } } });
+  const bad = await A.leerPeticion(new Request("https://x", { method: "POST", headers: { "x-kal-clave": "s" }, body: JSON.stringify({ modo: "armar", datos: { partidos: "" } }) }), { ANTHROPIC_API_KEY: "k", ANALISTA_CLAVE: "s" });
+  check("servidor: 'armar' busca en internet y recibe tu banca; 'semana' no busca; valida los datos", pa.tools[0].max_uses === 8 && /Ayúdame a armar cupones/.test(pa.messages[0].content) && /"maxSelecciones":4/.test(pa.messages[0].content) && /Un partido no se repite/.test(pa.system) && !ps.tools && /últimos 7 días/.test(ps.messages[0].content) && bad.error.status === 400);
+  const db0 = baseDb();
+  db0.settings = { banca: { monto: 1000, unidadPct: 2, maxSel: 4, pausaTras: 3 } };
+  db0.coupons.push({ id: "W1", name: "Semana 1", created: new Date(Date.now() - 2 * 86400e3).toISOString(), updated: new Date(Date.now() - 86400e3).toISOString(), stake: 50, odds: 3, payout: 150, fixtures: [{ id: "w1", home: "Ajax", away: "PSV", date: "09/11/2026", time: "12:00", markets: [{ market: "1x2", pick: "1", odd: "1.5", settlement: "won" }, { market: "Ambos equipos marcan", pick: "Sí", odd: "2", settlement: "won" }] }] });
+  db0.coupons.push({ id: "W2", name: "Semana 2", created: new Date(Date.now() - 3 * 86400e3).toISOString(), updated: new Date(Date.now() - 2 * 86400e3).toISOString(), stake: 20, odds: 30, payout: 600, fixtures: ["a", "b", "c", "d", "e"].map((k, i) => ({ id: "w2" + k, home: "Ajax", away: "PSV" + (i ? i : ""), date: "09/11/2026", time: "12:00", markets: [{ market: "1x2", pick: "1", odd: "1.8", settlement: i === 4 ? "lost" : "won" }] })) });
+  const { ctx, page } = await open(db0);
+  const week = await page.$eval("#weekCard", (e) => e.innerText.replace(/\s+/g, " "));
+  check("Inicio: tarjeta de los últimos 7 días con resultado y avisos de tus reglas", /Tus últimos 7 días/.test(week) && /2 Cupones/.test(week) && /1 \/ 1/.test(week) && /\+L 80.00/.test(week) && /por encima de tu límite/.test(week) && /monto\(s\) de más de 2 unidades/.test(week), week);
+  await tap(page, "[data-week-analyst]"); await page.waitForTimeout(200);
+  check("Inicio → 🤖 Analizar lleva a 'Mi semana'", (await page.evaluate(() => activeView)) === "analyst" && !!(await page.$("[data-analyst-run=semana]")));
+  await page.evaluate(() => { analystSave({ clave: "secreto" }); renderAnalyst(); });
+  const before = analystPosts.length;
+  await tap(page, '[data-analyst-run="semana"]'); await page.waitForTimeout(700);
+  const sp = analystPosts.at(-1);
+  check("Mi semana: envía los últimos 7 días y el historial general", analystPosts.length === before + 1 && sp.modo === "semana" && sp.datos.semana.ultimos7dias.cupones === 2 && sp.datos.semana.general.porMercado.length > 0 && /Recomendaciones/.test(await page.$eval("#analystOut-semana", (e) => e.innerText)));
+  await page.fill("#analystBuildText", "España vs Suiza\nAlemania vs Italia — me gusta más de 2.5");
+  await tap(page, '[data-analyst-run="armar"]'); await page.waitForTimeout(800);
+  const ap = analystPosts.at(-1);
+  check("Armar cupones: envía tus partidos, tu límite, tu unidad y tu historial", ap.modo === "armar" && /Alemania vs Italia/.test(ap.datos.partidos) && ap.datos.banca.maxSelecciones === 4 && ap.datos.banca.unidad === 20 && Array.isArray(ap.datos.historial));
+  await page.selectOption("#analystCouponPick", "A");
+  await tap(page, '[data-analyst-run="cupon"]'); await page.waitForTimeout(800);
+  const cp = analystPosts.at(-1);
+  check("Revisar cupón: envía el riesgo calculado (sin contar el mismo cupón como repetido)", cp.modo === "cupon" && cp.datos.riesgo?.selecciones >= 1 && cp.datos.riesgo.limiteSelecciones === 4 && Array.isArray(cp.datos.riesgo.repetidosEnOtrosCupones) && !cp.datos.riesgo.repetidosEnOtrosCupones.some((x) => x.cupones > 1) && cp.datos.banca.unidad === 20, JSON.stringify(cp.datos.riesgo));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {

@@ -264,3 +264,12 @@
     grid-template-columns: 1fr;
   }
 }
+.week-card .mini-stats .stat strong.gain {
+  color: var(--green);
+}
+.week-card .mini-stats .stat strong.loss {
+  color: var(--red);
+}
+.week-warn {
+  color: var(--gold);
+}

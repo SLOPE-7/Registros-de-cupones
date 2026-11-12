@@ -417,6 +417,125 @@ function saveBankroll() {
   toast("Gestión de banca guardada.");
 }
 
+// ---------- Resumen de la semana (últimos 7 días) ----------
+function weekSummary(now = Date.now()) {
+  const since = now - 7 * 86400000;
+  const when = (c) => Date.parse(c.updated || c.created) || 0;
+  const items = db.coupons
+    .map((c) => ({ c, r: calcCoupon(c) }))
+    .filter((x) => x.r.status !== "pending" && when(x.c) >= since);
+  const cfg = bankrollCfg(),
+    unit = unitStake();
+  const won = items.filter((x) => x.r.status === "won").length,
+    lost = items.filter((x) => x.r.status === "lost").length,
+    stake = items.reduce((s, x) => s + (Number(x.c.stake) || 0), 0),
+    net = items.reduce((s, x) => s + (Number(x.r.net) || 0), 0);
+  const cats = new Map();
+  items.forEach(({ c }) =>
+    c.fixtures.forEach((f) =>
+      f.markets.forEach((m) => {
+        if (m.settlement !== "won" && m.settlement !== "lost") return;
+        const k = marketCategory(m, f);
+        if (!cats.has(k)) cats.set(k, { tipo: k, ganados: 0, perdidos: 0 });
+        cats.get(k)[m.settlement === "won" ? "ganados" : "perdidos"]++;
+      }),
+    ),
+  );
+  // Partidos repetidos en varios cupones de la semana
+  const seenMatch = new Map();
+  items.forEach(({ c }) =>
+    c.fixtures.forEach((f) => {
+      const k = matchPairKey(f);
+      seenMatch.set(k, (seenMatch.get(k) || 0) + 1);
+    }),
+  );
+  const legs = items.map(({ c }) => couponLegs(c));
+  return {
+    cupones: items.length,
+    ganados: won,
+    perdidos: lost,
+    apostado: r2(stake),
+    neto: r2(net),
+    roi: stake ? r2(net / stake) : null,
+    seleccionesMedias: legs.length ? r2(legs.reduce((a, b) => a + b, 0) / legs.length) : null,
+    sobreLimite: legs.filter((n) => n > cfg.maxSel).length,
+    partidosRepetidos: [...seenMatch.values()].filter((n) => n > 1).length,
+    montosAltos: unit ? items.filter(({ c }) => (Number(c.stake) || 0) > unit * 2).length : null,
+    porMercado: [...cats.values()].sort((a, b) => b.ganados + b.perdidos - (a.ganados + a.perdidos)),
+  };
+}
+function renderWeekCard() {
+  const el = $("weekCard");
+  if (!el) return;
+  const w = weekSummary();
+  if (!w.cupones) {
+    el.innerHTML = "";
+    return;
+  }
+  const best = w.porMercado
+    .filter((x) => x.ganados + x.perdidos >= 3)
+    .sort((a, b) => b.ganados / (b.ganados + b.perdidos) - a.ganados / (a.ganados + a.perdidos))[0];
+  const warns = [];
+  if (w.sobreLimite) warns.push(w.sobreLimite + " cupón(es) por encima de tu límite de selecciones");
+  if (w.partidosRepetidos) warns.push(w.partidosRepetidos + " partido(s) repetidos en varios cupones");
+  if (w.montosAltos) warns.push(w.montosAltos + " monto(s) de más de 2 unidades");
+  el.innerHTML =
+    '<section class="panel week-card"><div class="ph"><h2>📅 Tus últimos 7 días</h2><button type="button" class="btn sm" data-week-analyst>🤖 Analizar</button></div><div class="pb"><div class="stats mini-stats"><div class="stat"><strong>' +
+    w.cupones +
+    '</strong><span>Cupones</span></div><div class="stat"><strong>' +
+    w.ganados +
+    " / " +
+    w.perdidos +
+    '</strong><span>Ganados / perdidos</span></div><div class="stat"><strong class="' +
+    (w.neto >= 0 ? "gain" : "loss") +
+    '">' +
+    signed(w.neto) +
+    "</strong><span>Resultado" +
+    (w.roi != null ? " · ROI " + spct(w.roi) : "") +
+    "</span></div></div>" +
+    (best
+      ? '<p class="small">✅ Lo mejor: <b>' +
+        esc(best.tipo) +
+        "</b> (" +
+        best.ganados +
+        " de " +
+        (best.ganados + best.perdidos) +
+        ").</p>"
+      : "") +
+    (warns.length ? '<p class="small week-warn">⚠️ ' + esc(warns.join(" · ")) + ".</p>" : "") +
+    "</div></section>";
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-week-analyst]")) return;
+  go("analyst");
+  requestAnimationFrame(() => $("analystOut-semana")?.closest("section")?.scrollIntoView({ block: "start" }));
+});
+// Datos de riesgo de un cupón en texto (para la revisión del Analista).
+function riskForText(text, excludeId = null) {
+  try {
+    const p = parseCoupon(text);
+    if (!p.fixtures?.length) return null;
+    const r = couponRisk(p.fixtures, { totalOdds: Number(p.meta?.odds) || 0, excludeId });
+    return {
+      selecciones: r.legs,
+      limiteSelecciones: bankrollCfg().maxSel,
+      probabilidadSegunHistorial: r.pHist != null ? r2(r.pHist) : null,
+      mercadosConHistorial: r.histKnown,
+      probabilidadSegunCuota: r.pOdds != null ? r2(r.pOdds) : null,
+      relleno: r.filler.map(
+        (x) => x.f.home + " vs " + x.f.away + " · " + (x.m.pick || x.m.market) + " @ " + x.odd,
+      ),
+      repetidosEnOtrosCupones: r.exposure.map((e) => ({
+        partido: e.f.home + " vs " + e.f.away,
+        cupones: e.coupons.length,
+      })),
+      historialMismoTamano: r.band.n ? { tamano: r.band.name, cupones: r.band.n, ganados: r.band.won } : null,
+      rachaPerdidos: lossStreak(),
+    };
+  } catch {
+    return null;
+  }
+}
 document.addEventListener("click", (e) => {
   const c = e.target.closest("[data-confidence]");
   if (c) {

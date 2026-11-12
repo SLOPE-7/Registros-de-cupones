@@ -313,7 +313,8 @@ function renderAnalyst() {
   const st = analystState(),
     settled = analystMarketHistory().markets.length,
     pending = db.coupons.filter((c) => calcCoupon(c).status === "pending");
-  const enough = settled >= ANALYST_MIN_MARKETS;
+  const enough = settled >= ANALYST_MIN_MARKETS,
+    week = weekSummary();
   const sel = $("analystCouponPick")?.value || "";
   el.innerHTML =
     '<div class="notice analyst-warn">🤖 El Analista te ayuda a decidir mejor, pero <b>ninguna predicción es segura</b>. Apuesta solo lo que tu presupuesto permite.</div>' +
@@ -333,6 +334,31 @@ function renderAnalyst() {
     ">✦ Analizar mi historial</button>" +
     '<div class="analyst-out" id="analystOut-historial" aria-live="polite">' +
     analystResultHtml("historial") +
+    "</div></div></section>" +
+    // Mi semana
+    '<section class="panel analyst-card"><div class="ph"><div><h2>📅 Mi semana</h2><div class="marketmeta">Resumen de tus últimos 7 días frente a tu historial, y qué ajustar</div></div></div><div class="pb">' +
+    (week.cupones
+      ? '<p class="small muted">' + week.cupones + " cupones liquidados en los últimos 7 días.</p>"
+      : '<p class="small muted">Aún no hay cupones liquidados en los últimos 7 días.</p>') +
+    '<button type="button" class="btn gold" data-analyst-run="semana"' +
+    (week.cupones ? "" : " disabled") +
+    ">✦ Analizar mi semana</button>" +
+    '<div class="analyst-out" id="analystOut-semana" aria-live="polite">' +
+    analystResultHtml("semana") +
+    "</div></div></section>" +
+    // Armar cupones
+    '<section class="panel analyst-card"><div class="ph"><div><h2>🧩 Armar cupones</h2><div class="marketmeta">Escribe los partidos o picks que estás pensando y te propone cupones cortos</div></div></div><div class="pb">' +
+    '<div class="field"><label for="analystBuildText">Partidos o picks</label><textarea id="analystBuildText" class="analyst-text" placeholder="Ej.\nEspaña vs Suiza\nAlemania vs Italia — me gusta más de 2.5\nPortugal vs Polonia">' +
+    esc(st.armarBorrador || "") +
+    "</textarea></div>" +
+    '<p class="small muted">Respeta tu límite de ' +
+    bankrollCfg().maxSel +
+    " selecciones, no repite partidos entre cupones y usa tu historial y tu unidad de " +
+    money(unitStake()) +
+    ".</p>" +
+    '<button type="button" class="btn gold" data-analyst-run="armar">✦ Armar cupones</button>' +
+    '<div class="analyst-out" id="analystOut-armar" aria-live="polite">' +
+    analystResultHtml("armar") +
     "</div></div></section>" +
     // 2) Revisar cupón
     '<section class="panel analyst-card"><div class="ph"><div><h2>🔍 Revisar un cupón antes de apostar</h2><div class="marketmeta">Busca la forma, lesiones y rotaciones de cada partido y señala el más débil</div></div></div><div class="pb">' +
@@ -399,6 +425,34 @@ async function runAnalyst(modo) {
     delete h._mercadosLiquidados;
     datos = { historial: h };
     titulo = h.resumen.cuponesLiquidados + " cupones";
+  } else if (modo === "semana") {
+    const w = weekSummary();
+    if (!w.cupones) return toast("No hay cupones liquidados en los últimos 7 días.");
+    const h = analystHistoryPayload();
+    datos = {
+      semana: {
+        ultimos7dias: w,
+        general: { resumen: h.resumen, porMercado: h.porMercado, porTamano: h.porTamano },
+        banca: h.banca,
+      },
+    };
+    titulo = w.cupones + " cupones";
+  } else if (modo === "armar") {
+    const partidos = ($("analystBuildText")?.value || "").trim();
+    if (partidos.length < 10) return toast("Escribe los partidos o picks que estás considerando.");
+    titulo = partidos.split("\n")[0].slice(0, 40);
+    datos = { partidos: partidos.slice(0, 6000) };
+    const h = analystShortHistory();
+    if (h) datos.historial = h;
+    if (bankrollAmount())
+      datos.banca = {
+        unidad: unitStake(),
+        maxSelecciones: bankrollCfg().maxSel,
+        rachaPerdidos: lossStreak(),
+      };
+    else datos.banca = { maxSelecciones: bankrollCfg().maxSel };
+    const budget = Number(db.settings?.budget) || 0;
+    if (budget) datos.presupuesto = { mensual: budget, gastadoEsteMes: r2(monthSpent()) };
   } else {
     const cupon = ($("analystCouponText")?.value || "").trim();
     if (cupon.length < 10) return toast("Pega o elige el cupón que quieres revisar.");
@@ -411,6 +465,9 @@ async function runAnalyst(modo) {
     }
     const budget = Number(db.settings?.budget) || 0;
     if (budget) datos.presupuesto = { mensual: budget, gastadoEsteMes: r2(monthSpent()) };
+    const riesgo = riskForText(cupon, pick?.id || null);
+    if (riesgo) datos.riesgo = riesgo;
+    if (bankrollAmount()) datos.banca = { unidad: unitStake(), maxSelecciones: bankrollCfg().maxSel };
   }
   analystBusy = true;
   setAnalystButtons(true);
@@ -484,6 +541,11 @@ document.addEventListener("change", (e) => {
   }
 });
 document.addEventListener("input", (e) => {
+  if (e.target.id === "analystBuildText") {
+    clearTimeout(analystSave.tb);
+    analystSave.tb = setTimeout(() => analystSave({ armarBorrador: e.target.value.slice(0, 6000) }), 400);
+    return;
+  }
   if (e.target.id !== "analystCouponText") return;
   clearTimeout(analystSave.t);
   analystSave.t = setTimeout(() => analystSave({ borrador: e.target.value.slice(0, 12000) }), 400);

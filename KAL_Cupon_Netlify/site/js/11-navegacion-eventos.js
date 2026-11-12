@@ -6,6 +6,7 @@ const VIEW_RENDER = {
   home: () => {
     renderHomeNotices();
     renderBudget();
+    renderWeekCard();
     renderTodayPanel();
     renderDashboard();
   },
