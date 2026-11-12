@@ -97,6 +97,7 @@ function readText() {
   $("couponName").value = $("couponName").value || `Cupón ${new Date().toLocaleDateString("es-HN")}`;
   $("couponType").value = draftSelections.reduce((n, f) => n + f.markets.length, 0) > 1 ? "parlay" : "simple";
   applyQuickDefaults();
+  updatePayoutHint();
   renderPreview();
   renderLogos();
   $("raw").value = "";

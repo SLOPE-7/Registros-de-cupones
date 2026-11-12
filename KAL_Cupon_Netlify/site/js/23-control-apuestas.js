@@ -567,3 +567,16 @@ function clearSlipHint() {
   if ($("previewAnalystOut") && !analystBusy) $("previewAnalystOut").innerHTML = "";
   ["stake", "totalOdds", "bonus", "payout"].forEach((id) => $(id)?.classList.remove("need-input"));
 }
+
+// Ganancia total: si está vacía, se muestra la que resulta de valor apostado × cuota total (es la que se guarda).
+function updatePayoutHint() {
+  const el = $("payout");
+  if (!el) return;
+  const stake = Number($("stake")?.value) || 0,
+    odds = Number($("totalOdds")?.value) || 0;
+  if (stake && odds) {
+    el.placeholder = (stake * odds).toFixed(2) + " (calculada)";
+    if (!String(el.value).trim()) el.classList.remove("need-input");
+  } else el.placeholder = "0.00";
+}
+["stake", "totalOdds", "payout"].forEach((id) => $(id)?.addEventListener("input", updatePayoutHint));

@@ -840,6 +840,9 @@ section("22. Cupones antes de apostar (boleto sin totales)");
   check("Nuevo cupón: pone la cuota calculada, avisa qué falta y resalta valor apostado y ganancia", Number(ui.odds) > 100 && /antes de apostar/i.test(ui.hint) && /valor apostado/.test(ui.hint) && ui.need.includes("stake") && ui.need.includes("payout") && ui.risk, JSON.stringify(ui));
   await page.fill("#stake", "20");
   check("al escribir el valor apostado deja de estar resaltado", !(await page.$eval("#stake", (e) => e.classList.contains("need-input"))));
+  const ph = await page.$eval("#payout", (e) => ({ ph: e.placeholder, need: e.classList.contains("need-input") }));
+  const oddsNow = Number(await page.$eval("#totalOdds", (e) => e.value));
+  check("ganancia total vacía: muestra la calculada (valor × cuota) y deja de pedirla", ph.ph === (20 * oddsNow).toFixed(2) + " (calculada)" && !ph.need, JSON.stringify(ph));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
