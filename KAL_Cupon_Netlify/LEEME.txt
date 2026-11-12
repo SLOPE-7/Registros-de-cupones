@@ -380,3 +380,9 @@ VERSIÓN 16 — CONTROL, VALOR, DATOS Y COPIAS
    - La carpeta sigue llamándose KAL_Cupon_Netlify a propósito: Cloudflare publica desde esa ruta; cambiarla obligaría a cambiar también la configuración en Cloudflare.
    - Caché de instrucciones del Analista: no aplica todavía; las instrucciones fijas son más cortas que el mínimo que Anthropic guarda en caché, así que no ahorraría nada.
 Pruebas: 199.
+
+SI CLOUDFLARE DEJA DE PUBLICAR
+- Señal: en kal-cupones → Settings → Builds aparece "Este proyecto está desconectado de tu cuenta de Git", o la app no muestra las Novedades de la versión nueva.
+- Arreglo: Settings → Builds → Git repository → Manage → vuelve a conectar GitHub (repositorio SLOPE-7/Registros-de-cupones, rama main, Root directory KAL_Cupon_Netlify, Deploy command npx wrangler deploy).
+- Cloudflare publica solo cuando llega un cambio nuevo a la rama main; tras reconectar, el siguiente cambio dispara la publicación.
+- Variables (todas como "Secret"): API_FOOTBALL_KEY, ANTHROPIC_API_KEY, ANALISTA_CLAVE, FOOTBALL_DATA_KEY.
