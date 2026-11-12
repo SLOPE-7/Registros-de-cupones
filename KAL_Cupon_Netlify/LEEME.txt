@@ -406,3 +406,4 @@ V16.2 — MARCADOR EN VIVO POR PARTIDO (site/js/27-marcador.js)
 - Los contadores anteriores se pasan solos al marcador al abrir. El marcador viaja con la nube, los respaldos y las copias.
 - Corrección: la recuperación desde la copia interna compara con los datos tal como estaban al abrir (las migraciones del arranque ya no la confunden).
 Pruebas: 223.
+- V16.3: los remates se cuentan como "🎯 A puerta" + "↗️ Fuera o bloqueado"; el total de remates es la suma (se muestra). Cada jugador solo muestra los contadores que usan sus líneas (con solo líneas a puerta, solo "A puerta"). Los conteos anteriores de "Remates" pasan a "Fuera o bloqueado".

@@ -434,3 +434,8 @@
 .lb-player-head > b {
   flex: 1;
 }
+.lb-total {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: right;
+}

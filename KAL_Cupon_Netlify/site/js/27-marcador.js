@@ -53,12 +53,16 @@ function statsOf(f) {
   db.stats = db.stats || {};
   return db.stats[fixtureKey(f)] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} };
 }
+// Remates de un jugador: "a puerta" y "fuera o bloqueado"; el total de remates es la suma de los dos.
+// (Datos guardados antes con "shots" = total se leen igual.)
+const offOf = (o) =>
+  o?.off != null ? Number(o.off) || 0 : Math.max(0, (Number(o?.shots) || 0) - (Number(o?.onTarget) || 0));
+const shotValue = (o, stat) => (!o ? 0 : (Number(o.onTarget) || 0) + (stat === "shots" ? offOf(o) : 0));
 function lineValueFromStats(st, kind) {
   if (kind.type !== "player") return Number(st[kind.type]) || 0;
   const p = st.players?.[kind.playerKey];
   if (!p) return 0;
-  const own = Number(p[kind.stat]) || 0;
-  return kind.incl && p.sub ? own + (Number(p.sub[kind.stat]) || 0) : own;
+  return shotValue(p, kind.stat) + (kind.incl && p.sub ? shotValue(p.sub, kind.stat) : 0);
 }
 // Valor actual de un mercado de línea: del marcador del partido o de su contador propio.
 function lineValue(f, m, key = marketKey(f, m)) {
@@ -74,17 +78,16 @@ function statStep(fk, target, delta) {
   );
   st.players = st.players || {};
   st.auto = st.auto || {};
-  const [kind, pk, who, stat] = target.split(":"); // "goals" | "player:<clave>:main|sub:shots|onTarget"
+  const [kind, pk, who, stat] = target.split(":"); // "goals" | "player:<clave>:main|sub:onTarget|off"
   if (kind !== "player") st[kind] = Math.max(0, (Number(st[kind]) || 0) + delta);
   else {
-    const p = (st.players[pk] = st.players[pk] || { shots: 0, onTarget: 0 });
+    const p = (st.players[pk] = st.players[pk] || { onTarget: 0, off: 0 });
     const o = who === "sub" ? p.sub : p;
     if (!o) return;
-    if (stat === "onTarget") {
-      // Un remate a puerta también es un remate.
-      o.onTarget = Math.max(0, (Number(o.onTarget) || 0) + delta);
-      o.shots = Math.max(o.onTarget, (Number(o.shots) || 0) + delta);
-    } else o.shots = Math.max(Number(o.onTarget) || 0, (Number(o.shots) || 0) + delta);
+    o.off = offOf(o);
+    delete o.shots;
+    if (stat === "onTarget") o.onTarget = Math.max(0, (Number(o.onTarget) || 0) + delta);
+    else o.off = Math.max(0, o.off + delta);
   }
   st.updatedAt = new Date().toISOString();
   db.stats[fk] = st;
@@ -144,8 +147,8 @@ async function addStatsSub(fk, pk) {
   db.stats = db.stats || {};
   const st = (db.stats[fk] = db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} });
   st.players = st.players || {};
-  const p = (st.players[pk] = st.players[pk] || { shots: 0, onTarget: 0 });
-  p.sub = { name, shots: 0, onTarget: 0, photo: "" };
+  const p = (st.players[pk] = st.players[pk] || { onTarget: 0, off: 0 });
+  p.sub = { name, onTarget: 0, off: 0, photo: "" };
   st.updatedAt = new Date().toISOString();
   save();
   renderAll();
@@ -216,13 +219,13 @@ function migrateProgressToStats() {
     st.auto = st.auto || {};
     if (kind.type !== "player") st[kind.type] = Math.max(Number(st[kind.type]) || 0, Number(p.count) || 0);
     else {
-      const pl = (st.players[kind.playerKey] = st.players[kind.playerKey] || { shots: 0, onTarget: 0 });
-      pl[kind.stat] = Math.max(Number(pl[kind.stat]) || 0, Number(p.count) || 0);
-      pl.shots = Math.max(pl.shots, pl.onTarget);
+      // Antes había un contador por mercado: "a puerta" pasa a A puerta y "remates" a Fuera o bloqueado.
+      const field = kind.stat === "onTarget" ? "onTarget" : "off";
+      const pl = (st.players[kind.playerKey] = st.players[kind.playerKey] || { onTarget: 0, off: 0 });
+      pl[field] = Math.max(Number(pl[field]) || 0, Number(p.count) || 0);
       if (p.sub && kind.incl) {
-        pl.sub = pl.sub || { name: p.sub.name, photo: p.sub.photo || "", shots: 0, onTarget: 0 };
-        pl.sub[kind.stat] = Math.max(Number(pl.sub[kind.stat]) || 0, Number(p.sub.count) || 0);
-        pl.sub.shots = Math.max(pl.sub.shots, pl.sub.onTarget);
+        pl.sub = pl.sub || { name: p.sub.name, photo: p.sub.photo || "", onTarget: 0, off: 0 };
+        pl.sub[field] = Math.max(Number(pl.sub[field]) || 0, Number(p.sub.count) || 0);
       }
     }
     if (p.auto) st.auto[key] = p.auto;
@@ -343,7 +346,24 @@ function liveBoardHtml(f) {
         .join("") +
       "</div>";
   for (const [pk, pl] of players) {
-    const p = st.players?.[pk] || { shots: 0, onTarget: 0 };
+    const p = st.players?.[pk] || { onTarget: 0, off: 0 };
+    // Solo los contadores que usan sus líneas: con líneas de remates, "A puerta" + "Fuera o bloqueado" (y el total);
+    // con solo líneas a puerta, únicamente "A puerta".
+    const needOff = pl.stats.has("shots");
+    const shotCounters = (o, who) =>
+      statCounter(
+        fk,
+        "player:" + pk + ":" + who + ":onTarget",
+        "🎯 A puerta",
+        Number(o?.onTarget) || 0,
+        editable,
+      ) +
+      (needOff
+        ? statCounter(fk, "player:" + pk + ":" + who + ":off", "↗️ Fuera o bloqueado", offOf(o), editable) +
+          '<div class="lb-total">Total de remates: <b>' +
+          shotValue(o, "shots") +
+          "</b></div>"
+        : "");
     const photo = resolveImage(pl.photo);
     const face = (src, name) =>
       src
@@ -364,8 +384,7 @@ function liveBoardHtml(f) {
       "<b>" +
       esc(pl.name) +
       "</b></div>" +
-      statCounter(fk, "player:" + pk + ":main:onTarget", "🎯 A puerta", Number(p.onTarget) || 0, editable) +
-      statCounter(fk, "player:" + pk + ":main:shots", "Remates", Number(p.shots) || 0, editable) +
+      shotCounters(p, "main") +
       (pl.incl
         ? p.sub
           ? '<div class="lb-sub"><div class="lb-player-head">' +
@@ -377,14 +396,7 @@ function liveBoardHtml(f) {
             '" data-st-pk="' +
             esc(pk) +
             '" aria-label="Quitar suplente">🗑</button></div>' +
-            statCounter(
-              fk,
-              "player:" + pk + ":sub:onTarget",
-              "🎯 A puerta",
-              Number(p.sub.onTarget) || 0,
-              editable,
-            ) +
-            statCounter(fk, "player:" + pk + ":sub:shots", "Remates", Number(p.sub.shots) || 0, editable) +
+            shotCounters(p.sub, "sub") +
             "</div>"
           : '<button type="button" class="btn sm pg-add-sub" data-st-sub-add data-st-fk="' +
             esc(fk) +
