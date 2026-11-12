@@ -152,7 +152,8 @@ function parseCoupon(raw) {
     if (STAKE_LINE_RE.test(l)) {
       v = getAmount(l, lines[i + 1]);
       if (v !== null) meta.stake = v;
-    } else if (/^(?:CUOTAS|CUOTA TOTAL|ODDS)\s*:?/i.test(l)) {
+    } else if (/^CUOTAS\b/.test(l) || /^(?:cuota total|total odds)\b/i.test(l)) {
+      // El total va en mayúsculas ("CUOTAS: 2.20"); "Cuotas: 1.36" (minúsculas) es la cuota de cada partido.
       v = getAmount(l, lines[i + 1]);
       if (v !== null) meta.odds = v;
     } else if (/^BONO\b/i.test(l)) {
