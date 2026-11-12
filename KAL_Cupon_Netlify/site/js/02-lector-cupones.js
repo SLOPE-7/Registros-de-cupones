@@ -283,7 +283,18 @@ function parseCoupon(raw) {
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (looksLikeBetslip(lines)) return parseBetslip(lines);
+  // Variante del boleto con los equipos en líneas separadas ("Turquía" · "competitor logo" · "vs" · "Bélgica"):
+  // se juntan en "Turquía vs. Bélgica" solo para decidir y leer el formato de antes de apostar.
+  const joined = [];
+  lines
+    .filter((l) => !/^competitor\s+logo$/i.test(l))
+    .forEach((l, i, arr) => {
+      if (/^(?:vs\.?|v)$/i.test(l) && joined.length && i + 1 < arr.length)
+        joined.push(joined.pop() + " vs. " + arr[i + 1]);
+      else if (i > 0 && /^(?:vs\.?|v)$/i.test(arr[i - 1]) && joined.length) return;
+      else joined.push(l);
+    });
+  if (looksLikeBetslip(joined)) return parseBetslip(joined);
   const fixtures = [],
     meta = { stake: null, odds: null, bonus: 0, payout: null };
   const dateRe = /\b(\d{1,2})[/.\-](\d{1,2})(?:[/.\-](\d{2,4}))?\s*(?:[•·,\-]\s*)?(\d{1,2}):(\d{2})\b/;
