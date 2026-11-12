@@ -53,11 +53,17 @@ function statsOf(f) {
   db.stats = db.stats || {};
   return db.stats[fixtureKey(f)] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} };
 }
-// Remates de un jugador: "a puerta" y "fuera o bloqueado"; el total de remates es la suma de los dos.
-// (Datos guardados antes con "shots" = total se leen igual.)
-const offOf = (o) =>
-  o?.off != null ? Number(o.off) || 0 : Math.max(0, (Number(o?.shots) || 0) - (Number(o?.onTarget) || 0));
-const shotValue = (o, stat) => (!o ? 0 : (Number(o.onTarget) || 0) + (stat === "shots" ? offOf(o) : 0));
+// Remates de un jugador, como en Sofascore: "Remates" = tiros totales (a puerta, bloqueados, fuera, al palo) y
+// "Remates a puerta" = tiros a puerta. Un remate a puerta también es un remate.
+// (Datos guardados en la versión anterior como "a puerta" + "fuera" se convierten: total = a puerta + fuera.)
+const shotsOf = (o) =>
+  !o
+    ? 0
+    : Math.max(
+        Number(o.onTarget) || 0,
+        o.shots != null ? Number(o.shots) || 0 : (Number(o.onTarget) || 0) + (Number(o.off) || 0),
+      );
+const shotValue = (o, stat) => (!o ? 0 : stat === "onTarget" ? Number(o.onTarget) || 0 : shotsOf(o));
 function lineValueFromStats(st, kind) {
   if (kind.type !== "player") return Number(st[kind.type]) || 0;
   const p = st.players?.[kind.playerKey];
@@ -78,16 +84,19 @@ function statStep(fk, target, delta) {
   );
   st.players = st.players || {};
   st.auto = st.auto || {};
-  const [kind, pk, who, stat] = target.split(":"); // "goals" | "player:<clave>:main|sub:onTarget|off"
+  const [kind, pk, who, stat] = target.split(":"); // "goals" | "player:<clave>:main|sub:onTarget|shots"
   if (kind !== "player") st[kind] = Math.max(0, (Number(st[kind]) || 0) + delta);
   else {
-    const p = (st.players[pk] = st.players[pk] || { onTarget: 0, off: 0 });
+    const p = (st.players[pk] = st.players[pk] || { onTarget: 0, shots: 0 });
     const o = who === "sub" ? p.sub : p;
     if (!o) return;
-    o.off = offOf(o);
-    delete o.shots;
-    if (stat === "onTarget") o.onTarget = Math.max(0, (Number(o.onTarget) || 0) + delta);
-    else o.off = Math.max(0, o.off + delta);
+    const total = shotsOf(o);
+    delete o.off;
+    if (stat === "onTarget") {
+      // Un remate a puerta también suma (o resta) un remate.
+      o.onTarget = Math.max(0, (Number(o.onTarget) || 0) + delta);
+      o.shots = Math.max(o.onTarget, total + delta);
+    } else o.shots = Math.max(Number(o.onTarget) || 0, total + delta);
   }
   st.updatedAt = new Date().toISOString();
   db.stats[fk] = st;
@@ -147,8 +156,8 @@ async function addStatsSub(fk, pk) {
   db.stats = db.stats || {};
   const st = (db.stats[fk] = db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} });
   st.players = st.players || {};
-  const p = (st.players[pk] = st.players[pk] || { onTarget: 0, off: 0 });
-  p.sub = { name, onTarget: 0, off: 0, photo: "" };
+  const p = (st.players[pk] = st.players[pk] || { onTarget: 0, shots: 0 });
+  p.sub = { name, onTarget: 0, shots: 0, photo: "" };
   st.updatedAt = new Date().toISOString();
   save();
   renderAll();
@@ -219,13 +228,15 @@ function migrateProgressToStats() {
     st.auto = st.auto || {};
     if (kind.type !== "player") st[kind.type] = Math.max(Number(st[kind.type]) || 0, Number(p.count) || 0);
     else {
-      // Antes había un contador por mercado: "a puerta" pasa a A puerta y "remates" a Fuera o bloqueado.
-      const field = kind.stat === "onTarget" ? "onTarget" : "off";
-      const pl = (st.players[kind.playerKey] = st.players[kind.playerKey] || { onTarget: 0, off: 0 });
+      // Antes había un contador por mercado: "a puerta" pasa a Remates a puerta y "remates" a Remates.
+      const field = kind.stat;
+      const pl = (st.players[kind.playerKey] = st.players[kind.playerKey] || { onTarget: 0, shots: 0 });
       pl[field] = Math.max(Number(pl[field]) || 0, Number(p.count) || 0);
+      pl.shots = Math.max(Number(pl.shots) || 0, Number(pl.onTarget) || 0);
       if (p.sub && kind.incl) {
-        pl.sub = pl.sub || { name: p.sub.name, photo: p.sub.photo || "", onTarget: 0, off: 0 };
+        pl.sub = pl.sub || { name: p.sub.name, photo: p.sub.photo || "", onTarget: 0, shots: 0 };
         pl.sub[field] = Math.max(Number(pl.sub[field]) || 0, Number(p.sub.count) || 0);
+        pl.sub.shots = Math.max(Number(pl.sub.shots) || 0, Number(pl.sub.onTarget) || 0);
       }
     }
     if (p.auto) st.auto[key] = p.auto;
@@ -249,19 +260,27 @@ function statCounter(fk, target, label, value, editable, extraClass = "") {
         '" data-st-target="' +
         esc(target) +
         '" aria-label="Restar ' +
-        esc(label) +
+        esc(label.replace(/<[^>]+>/g, "")) +
         '">－</button>'
       : "") +
-    '<b class="pg-num">' +
-    value +
-    "</b>" +
+    (editable
+      ? '<button type="button" class="pg-num lb-num" data-st-set data-st-fk="' +
+        esc(fk) +
+        '" data-st-target="' +
+        esc(target) +
+        '" aria-label="Escribir ' +
+        esc(label.replace(/<[^>]+>/g, "")) +
+        '">' +
+        value +
+        "</button>"
+      : '<b class="pg-num">' + value + "</b>") +
     (editable
       ? '<button type="button" class="pg-btn plus" data-st-step="1" data-st-fk="' +
         esc(fk) +
         '" data-st-target="' +
         esc(target) +
         '" aria-label="Sumar ' +
-        esc(label) +
+        esc(label.replace(/<[^>]+>/g, "")) +
         '">＋</button>'
       : "") +
     "</div>"
@@ -296,7 +315,7 @@ function linesFor(fk, filter) {
         (s === "won" ? "won" : s === "lost" ? "lost" : "pending") +
         '">' +
         (s === "won" ? "✓ " : s === "lost" ? "✕ " : "") +
-        (kind.type === "player" ? (kind.stat === "onTarget" ? "A puerta " : "Remates ") : "") +
+        (kind.type === "player" ? (kind.stat === "onTarget" ? "Remates a puerta " : "Remates ") : "") +
         (info.dir === "over" ? "+" : "−") +
         info.line +
         (kind.incl ? " (con suplente)" : kind.type === "player" ? " (solo él)" : "") +
@@ -346,23 +365,27 @@ function liveBoardHtml(f) {
         .join("") +
       "</div>";
   for (const [pk, pl] of players) {
-    const p = st.players?.[pk] || { onTarget: 0, off: 0 };
-    // Solo los contadores que usan sus líneas: con líneas de remates, "A puerta" + "Fuera o bloqueado" (y el total);
-    // con solo líneas a puerta, únicamente "A puerta".
-    const needOff = pl.stats.has("shots");
+    const p = st.players?.[pk] || { onTarget: 0, shots: 0 };
+    // Solo los contadores que usan sus líneas: "Remates" si hay líneas de remates, "Remates a puerta" si hay
+    // líneas a puerta. Toca el número para escribirlo (p. ej. copiado de Sofascore).
     const shotCounters = (o, who) =>
-      statCounter(
-        fk,
-        "player:" + pk + ":" + who + ":onTarget",
-        "🎯 A puerta",
-        Number(o?.onTarget) || 0,
-        editable,
-      ) +
-      (needOff
-        ? statCounter(fk, "player:" + pk + ":" + who + ":off", "↗️ Fuera o bloqueado", offOf(o), editable) +
-          '<div class="lb-total">Total de remates: <b>' +
-          shotValue(o, "shots") +
-          "</b></div>"
+      (pl.stats.has("shots")
+        ? statCounter(
+            fk,
+            "player:" + pk + ":" + who + ":shots",
+            "Remates <small>(tiros totales)</small>",
+            shotsOf(o),
+            editable,
+          )
+        : "") +
+      (pl.stats.has("onTarget")
+        ? statCounter(
+            fk,
+            "player:" + pk + ":" + who + ":onTarget",
+            "🎯 Remates a puerta",
+            Number(o?.onTarget) || 0,
+            editable,
+          )
         : "");
     const photo = resolveImage(pl.photo);
     const face = (src, name) =>
@@ -413,7 +436,54 @@ function liveBoardHtml(f) {
   return html + "</section>";
 }
 
+// Escribe directamente un valor (p. ej. lo que dice Sofascore): se aplica como la diferencia con el actual.
+function statSet(fk, target) {
+  const st = db.stats?.[fk] || {};
+  const [kind, pk, who, stat] = target.split(":");
+  let cur;
+  if (kind !== "player") cur = Number(st[kind]) || 0;
+  else {
+    const p = st.players?.[pk],
+      o = who === "sub" ? p?.sub : p;
+    cur = stat === "onTarget" ? Number(o?.onTarget) || 0 : shotsOf(o);
+  }
+  const a = prompt("Escribe el número actual:", String(cur));
+  if (a === null) return;
+  const v = Number(String(a).trim());
+  if (!Number.isInteger(v) || v < 0 || v > 99) return toast("Escribe un número entero entre 0 y 99.");
+  if (kind === "player" && stat === "shots") {
+    const p = st.players?.[pk],
+      o = who === "sub" ? p?.sub : p;
+    if (v < (Number(o?.onTarget) || 0))
+      return toast(
+        "Los remates no pueden ser menos que los remates a puerta (" + (Number(o?.onTarget) || 0) + ").",
+      );
+  }
+  if (kind === "player" && stat === "onTarget") {
+    // Escrito a mano (copiado de Sofascore): el total solo sube si queda por debajo de los de a puerta.
+    db.stats = db.stats || {};
+    const nst = JSON.parse(
+      JSON.stringify(db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} }),
+    );
+    nst.players = nst.players || {};
+    nst.auto = nst.auto || {};
+    const p = (nst.players[pk] = nst.players[pk] || { onTarget: 0, shots: 0 });
+    const o = who === "sub" ? p.sub : p;
+    if (!o) return;
+    const total = shotsOf(o);
+    delete o.off;
+    o.onTarget = v;
+    o.shots = Math.max(total, v);
+    nst.updatedAt = new Date().toISOString();
+    db.stats[fk] = nst;
+    applyStatsToLines(fk);
+    return;
+  }
+  statStep(fk, target, v - cur);
+}
 document.addEventListener("click", (e) => {
+  const set = e.target.closest("[data-st-set]");
+  if (set) return statSet(set.dataset.stFk, set.dataset.stTarget);
   const s = e.target.closest("[data-st-step]");
   if (s) return statStep(s.dataset.stFk, s.dataset.stTarget, Number(s.dataset.stStep));
   const a = e.target.closest("[data-st-sub-add]");

@@ -439,3 +439,18 @@
   color: var(--muted);
   text-align: right;
 }
+.lb-num {
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  min-width: 34px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.lb-counter > span small {
+  color: var(--muted);
+  font-weight: 500;
+}
