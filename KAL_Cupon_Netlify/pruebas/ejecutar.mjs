@@ -591,8 +591,17 @@ section("14. Analista con IA (pantalla y datos que se envían)");
   check("el botón del Analista no aparece sin cupón leído", !(await page.isVisible("[data-analyst-preview]")));
   await page.fill("#raw", "España, La Liga\nBarcelona\nvs.\nReal Madrid\n25/10/2026 • 08:00\nMás de 2.5 goles\nCuotas: 1.85\nVALOR APOSTADO L 120.00");
   await page.click("#readBtn"); await page.waitForTimeout(200);
-  await page.click("[data-analyst-preview]"); await page.waitForTimeout(300);
-  check("'Revisar con el Analista' lleva el cupón leído a la pantalla del Analista", (await page.evaluate(() => activeView)) === "analyst" && /Barcelona vs Real Madrid/.test(await page.$eval("#analystCouponText", (e) => e.value)));
+  const nPosts = analystPosts.length;
+  await tap(page, "[data-analyst-preview]"); await page.waitForTimeout(900);
+  const inl = await page.evaluate(() => ({ view: activeView, out: $("previewAnalystOut").innerText }));
+  const ip = analystPosts.at(-1);
+  check("'Analizar este cupón ahora' analiza ahí mismo, sin salir de Nuevo cupón", inl.view === "new" && /Recomendaciones/.test(inl.out) && analystPosts.length === nPosts + 1 && ip.modo === "cupon" && /Barcelona vs Real Madrid/.test(ip.datos.cupon) && /Valor apostado: L 120/.test(ip.datos.cupon) && ip.datos.riesgo?.selecciones === 1, JSON.stringify(inl).slice(0, 200));
+  await page.fill("#raw", "España, La Liga\nBetis\nvs.\nSevilla\n26/10/2026 • 08:00\nMás de 1.5 goles\nCuotas: 1.30"); await tap(page, "#readBtn"); await page.waitForTimeout(200);
+  check("al leer otro cupón se borra el análisis anterior", (await page.$eval("#previewAnalystOut", (e) => e.innerText.trim())) === "");
+  await page.evaluate(() => { analystSave({ clave: "" }); });
+  await tap(page, "[data-analyst-preview]"); await page.waitForTimeout(150);
+  check("sin código del Analista explica cómo configurarlo", /primero escribe tu código/.test(await page.$eval("#previewAnalystOut", (e) => e.innerText)) && !!(await page.$("[data-analyst-open-config]")));
+  await page.evaluate(() => { analystSave({ clave: "secreto" }); });
   const comp = await page.evaluate(() => ({
     names: ["UEFA Liga Campeones", "UEFA Champions League", "Liga de Campeones de la UEFA", "UEFA Liga Europa", "UEFA Europa League", "UEFA Conference League", "AFC Champions League", "CONCACAF Liga de Campeones", "Championship", "LaLiga", "Liga de Naciones de la UEFA", "UEFA Nations League", "CONCACAF Liga de Naciones"].map(canonicalCompetition),
     builder: (() => {

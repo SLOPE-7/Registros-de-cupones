@@ -415,11 +415,14 @@ function setAnalystButtons(disabled) {
   });
 }
 
-async function runAnalyst(modo) {
+async function runAnalyst(modo, opts = {}) {
   if (analystBusy) return;
-  const out = $("analystOut-" + modo);
-  let datos, titulo;
-  if (modo === "historial") {
+  const out = opts.out || $("analystOut-" + modo);
+  let datos = opts.datos,
+    titulo = opts.titulo;
+  if (datos) {
+    // Datos ya preparados (p. ej. desde Nuevo cupón).
+  } else if (modo === "historial") {
     const h = analystHistoryPayload();
     if (h._mercadosLiquidados < ANALYST_MIN_MARKETS) return toast("Aún no hay suficientes resultados.");
     delete h._mercadosLiquidados;
@@ -489,6 +492,7 @@ async function runAnalyst(modo) {
     cancelAnimationFrame(frame);
     analystSave({ [modo]: { texto: text, fecha: new Date().toISOString(), titulo } });
     out.innerHTML = analystResultHtml(modo);
+    if (opts.onDone) opts.onDone();
   } catch (e) {
     cancelAnimationFrame(frame);
     const partial = md.innerHTML;
@@ -502,6 +506,44 @@ async function runAnalyst(modo) {
     analystAbort = null;
     setAnalystButtons(false);
   }
+}
+
+// Analiza el cupón leído en "Nuevo cupón" sin salir de esa pantalla: el resultado aparece debajo del freno.
+function draftAsText() {
+  const extra = [];
+  if ($("stake")?.value) extra.push("Valor apostado: L " + $("stake").value);
+  if ($("totalOdds")?.value) extra.push("Cuota total: " + $("totalOdds").value);
+  if (Number($("bonus")?.value)) extra.push("Bono: L " + $("bonus").value);
+  if ($("payout")?.value) extra.push("Ganancia total: L " + $("payout").value);
+  return fixturesAsText(draftSelections) + (extra.length ? "\n" + extra.join("\n") : "");
+}
+function analyzeDraftHere() {
+  const out = $("previewAnalystOut");
+  if (!draftSelections.length) return toast("Primero lee un cupón.");
+  if (!out) return openAnalystWith(draftAsText());
+  if (!analystState().clave) {
+    out.innerHTML =
+      '<div class="notice">Para analizar, primero escribe tu código del Analista.</div><button type="button" class="btn sm" data-analyst-open-config>⚙ Configurar el Analista</button>';
+    return;
+  }
+  const cupon = draftAsText();
+  const datos = { cupon: cupon.slice(0, 12000) };
+  const h = analystShortHistory();
+  if (h) datos.historial = h;
+  const budget = Number(db.settings?.budget) || 0;
+  if (budget) datos.presupuesto = { mensual: budget, gastadoEsteMes: r2(monthSpent()) };
+  try {
+    datos.riesgo = riskSummary(
+      couponRisk(draftSelections, {
+        totalOdds: Number($("totalOdds")?.value) || 0,
+        excludeId: editingCouponId,
+      }),
+    );
+  } catch {}
+  if (bankrollAmount()) datos.banca = { unidad: unitStake(), maxSelecciones: bankrollCfg().maxSel };
+  analystSave({ borrador: cupon });
+  runAnalyst("cupon", { out, datos, titulo: $("couponName")?.value || "Nuevo cupón" });
+  requestAnimationFrame(() => out.scrollIntoView({ block: "start", behavior: "smooth" }));
 }
 
 // Abre el Analista con un cupón ya cargado (desde la vista previa de "Nuevo cupón").
@@ -524,12 +566,12 @@ document.addEventListener("click", (e) => {
     if (!analystBusy) renderAnalyst();
     return;
   }
-  if (e.target.closest("[data-analyst-preview]")) {
-    if (!draftSelections.length) return toast("Primero lee un cupón.");
-    const extra = [];
-    if ($("stake")?.value) extra.push("Importe: L " + $("stake").value);
-    if ($("totalOdds")?.value) extra.push("Cuota total: " + $("totalOdds").value);
-    openAnalystWith(fixturesAsText(draftSelections) + (extra.length ? "\n" + extra.join("\n") : ""));
+  if (e.target.closest("[data-analyst-preview]")) analyzeDraftHere();
+  if (e.target.closest("[data-analyst-open-config]")) {
+    go("analyst");
+    requestAnimationFrame(() =>
+      document.querySelector(".analyst-config")?.scrollIntoView({ block: "center" }),
+    );
   }
 });
 document.addEventListener("change", (e) => {

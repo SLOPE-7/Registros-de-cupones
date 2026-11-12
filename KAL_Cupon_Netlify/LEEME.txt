@@ -392,3 +392,4 @@ V16.1 — CUPONES ANTES DE APOSTAR
 - Como el boleto no trae totales, la app calcula la cuota total (multiplicando cada partido; un BetBuilder cuenta una vez), avisa y resalta lo que falta: valor apostado, bono y ganancia total. Si los pegas al final ("Cuota total 245.10", "Valor total 50", "Bono 5", "Ganancia total 12,255"), los lee.
 - Funciona en Nuevo cupón (con el freno al guardar) y en Analista → Revisar cupón.
 Pruebas: 210.
+- Nuevo cupón → "🤖 Analizar este cupón ahora": el Analista revisa el cupón ahí mismo (debajo del freno), con tu historial, el riesgo calculado, tu banca y los totales que escribiste. Queda guardado también en Analista → Revisar cupón.

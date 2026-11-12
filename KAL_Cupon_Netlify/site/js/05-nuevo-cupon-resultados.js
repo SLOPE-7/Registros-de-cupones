@@ -71,6 +71,7 @@ function readText() {
     return;
   }
   draftSelections = parsed.fixtures;
+  if ($("previewAnalystOut") && !analystBusy) $("previewAnalystOut").innerHTML = "";
   draftEditOpen = new Set();
   draftSelections.forEach(applySavedCrests);
   draftDuplicateCount = parsed.meta.duplicateFixtures || 0;

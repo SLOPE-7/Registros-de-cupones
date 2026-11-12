@@ -515,7 +515,13 @@ function riskForText(text, excludeId = null) {
   try {
     const p = parseCoupon(text);
     if (!p.fixtures?.length) return null;
-    const r = couponRisk(p.fixtures, { totalOdds: Number(p.meta?.odds) || 0, excludeId });
+    return riskSummary(couponRisk(p.fixtures, { totalOdds: Number(p.meta?.odds) || 0, excludeId }));
+  } catch {
+    return null;
+  }
+}
+function riskSummary(r) {
+  {
     return {
       selecciones: r.legs,
       limiteSelecciones: bankrollCfg().maxSel,
@@ -532,8 +538,6 @@ function riskForText(text, excludeId = null) {
       historialMismoTamano: r.band.n ? { tamano: r.band.name, cupones: r.band.n, ganados: r.band.won } : null,
       rachaPerdidos: lossStreak(),
     };
-  } catch {
-    return null;
   }
 }
 document.addEventListener("click", (e) => {
@@ -560,5 +564,6 @@ document.addEventListener("input", (e) => {
 });
 function clearSlipHint() {
   if ($("slipHint")) $("slipHint").innerHTML = "";
+  if ($("previewAnalystOut") && !analystBusy) $("previewAnalystOut").innerHTML = "";
   ["stake", "totalOdds", "bonus", "payout"].forEach((id) => $(id)?.classList.remove("need-input"));
 }
