@@ -1,0 +1,94 @@
+/* Control de apuestas (V16): tarjeta "Antes de guardar", diario de confianza y gestión de banca. */
+.risk-card {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--panel2);
+}
+.risk-card.is-mid {
+  border-left-color: var(--gold);
+}
+.risk-card.is-high {
+  border-left-color: var(--red);
+}
+.risk-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.risk-probs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+.risk-probs > div {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.risk-probs strong {
+  font-size: 20px;
+}
+.risk-probs small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+.risk-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.risk-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.risk-list li.is-bad div {
+  color: var(--red);
+}
+.risk-list li.is-ok div {
+  color: var(--green);
+}
+.risk-stake {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+  font-size: 13px;
+}
+.risk-stake small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+.diary-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+.diary-row > .field {
+  width: 100%;
+}
+.conf-picker {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.conf-chip {
+  justify-content: center;
+}
+.bankroll-box .btn.gold {
+  width: 100%;
+}

@@ -3,6 +3,7 @@
 let draftEditOpen = new Set();
 function renderPreview() {
   if (typeof updateSaveBar === "function") setTimeout(updateSaveBar);
+  if (typeof renderRiskBox === "function") setTimeout(renderRiskBox);
   const el = $("preview");
   $("previewCount").textContent = draftSelections.reduce((s, f) => s + f.markets.length, 0) + " selecciones";
   if (!draftSelections.length) {
@@ -191,6 +192,8 @@ function saveCoupon() {
     bonus: Number($("bonus").value) || 0,
     payout,
     notes: $("notes").value.trim(),
+    confidence: Number($("couponConfidence").value) || null,
+    reason: $("couponReason").value.trim().slice(0, 140),
     fixtures: JSON.parse(JSON.stringify(draftSelections)),
   };
   pushCouponAction(
@@ -227,6 +230,8 @@ function saveCoupon() {
   );
   $("couponName").value = "";
   $("notes").value = "";
+  $("couponReason").value = "";
+  setConfidence(0);
   $("autoStakeTx").checked = false;
   draftSelections = [];
   renderPreview();

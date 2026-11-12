@@ -573,6 +573,9 @@ function renderPerformance() {
     '<section class="perf-block"><h3>Acierto por competición</h3>' +
     perfRows(d.byComp, "Aún no hay competiciones con resultados.") +
     "</section>" +
+    '<section class="perf-block"><h3>Según tu confianza</h3><p class="small muted">¿Tus cupones de confianza alta ganan más que los de confianza baja?</p>' +
+    confidenceHtml(d.coupons) +
+    "</section>" +
     '<section class="perf-block"><h3>Por casa de apuestas</h3>' +
     (d.houses.length
       ? '<div class="perf-houses">' +

@@ -70,11 +70,11 @@ function renderHomeNotices() {
     );
   }
   const streak = lossStreak();
-  if (streak >= 3 && Number(readLS("kal_streak_snooze") || 0) < now)
+  if (streak >= (Number(bankrollCfg().pausaTras) || 3) && Number(readLS("kal_streak_snooze") || 0) < now)
     out.push(
       '<div class="home-notice warn"><span class="hn-ico">⚠️</span><div><b>Llevas ' +
         streak +
-        ' cupones perdidos seguidos</b><small>Puede ser buen momento para una pausa o para bajar el importe de los próximos cupones.</small></div><button type="button" class="btn sm" data-view="stats">Ver rendimiento</button><button type="button" class="hn-close" data-snooze="kal_streak_snooze" data-days="1" aria-label="Ocultar aviso">×</button></div>',
+        ' cupones perdidos seguidos</b><small>Pausa sugerida: apuesta media unidad o descansa hoy. El monto sugerido ya se redujo a la mitad.</small></div><button type="button" class="btn sm" data-view="stats">Ver rendimiento</button><button type="button" class="hn-close" data-snooze="kal_streak_snooze" data-days="1" aria-label="Ocultar aviso">×</button></div>',
     );
   el.innerHTML = out.join("");
 }

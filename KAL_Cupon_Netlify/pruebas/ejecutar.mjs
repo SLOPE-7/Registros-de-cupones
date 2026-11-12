@@ -99,6 +99,8 @@ async function open(db, { ctxOpts = {}, init } = {}) {
 }
 // Cambia de pantalla y espera un instante a que el navegador dibuje (las listas usan content-visibility).
 const view = async (page, v) => { await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`).click(), v); await page.waitForTimeout(120); };
+// Toca un botón aunque la barra fija o el menú inferior lo tapen en la pantalla del teléfono.
+const tap = (page, sel) => page.evaluate((sel) => document.querySelector(sel).click(), sel);
 const texts = async (page, sel) => { await page.waitForTimeout(100); return page.$$eval(sel, (x) => x.map((e) => e.innerText.replace(/\s+/g, " ").trim())); };
 
 // ---------- 1. Lector y detección de jugadores (funciones puras) ----------
@@ -597,6 +599,46 @@ section("14. Analista con IA (pantalla y datos que se envían)");
   const nube = await page.evaluate(() => ["tutujwepbvlxfmizehkf.supabase.co", " https://tutujwepbvlxfmizehkf.supabase.co/rest/v1/ ", "tutujwepbvlxfmizehkf", "http://x.supabase.co", "no es url", ""].map(normalizeCloudUrl));
   check("nube: acepta la dirección de Supabase sin https://, con rutas o solo el proyecto", nube.join("|") === "https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://x.supabase.co||", nube.join("|"));
   check("el código queda solo en este teléfono (no entra en los datos sincronizados)", await page.evaluate(() => !JSON.stringify(db).includes("secreto") && JSON.parse(localStorage.getItem("kal_analista_v1")).clave === "secreto"));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("17. Control de apuestas: freno al guardar, banca y diario");
+{
+  const db0 = baseDb();
+  // 3 perdidos seguidos para probar la pausa
+  for (let i = 0; i < 3; i++) db0.coupons.push({ id: "P" + i, name: "Perdido " + i, created: new Date(Date.now() - (5 - i) * 86400e3).toISOString(), updated: new Date(Date.now() - (5 - i) * 86400e3).toISOString(), stake: 10, odds: 2, payout: 20, fixtures: [{ id: "p" + i, home: "X" + i, away: "Y" + i, date: "01/11/2026", time: "10:00", markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "lost" }] }] });
+  const { ctx, page } = await open(db0);
+  await view(page, "settings");
+  await page.fill("#brAmount", "1000"); await page.fill("#brUnit", "2"); await page.fill("#brMax", "5"); await page.fill("#brPause", "3");
+  await tap(page, "[data-bankroll-save]");
+  const bank = await page.evaluate(() => ({ unit: unitStake(), cfg: bankrollCfg(), txt: $("bankrollBox").innerText }));
+  check("banca: 1 unidad = 2 % de L 1,000 y se guarda en los datos (viaja con la nube)", bank.unit === 20 && bank.cfg.maxSel === 5 && /L 20.00/.test(bank.txt), JSON.stringify(bank));
+  await view(page, "new");
+  const legs = [["Fenerbahce", "Liverpool", "1x2: 2", "1.40"], ["Celtic", "Rangers", "Total de goles: Más de 1.5", "1.05"], ["Ajax", "PSV", "1x2: 1", "2.10"], ["Porto", "Benfica", "Ambos equipos marcan: Sí", "1.70"], ["Roma", "Lazio", "1x2: X", "3.20"], ["Lyon", "Lille", "1x2: 1", "1.90"], ["Sevilla", "Betis", "1x2: 1", "2.00"]];
+  const raw = legs.map(([h, a, mk, o]) => `Europa, Liga\n${h}\nvs.\n${a}\n20/11/2026 • 14:00\n${mk}\nCuotas: ${o}`).join("\n") + "\nVALOR APOSTADO L 50.00";
+  await page.fill("#raw", raw); await tap(page, "#readBtn"); await page.waitForTimeout(250);
+  const risk = await page.$eval("#riskBox", (e) => ({ cls: e.querySelector(".risk-card")?.className, text: e.innerText.replace(/\s+/g, " ") }));
+  check("freno: cupón de 7 selecciones marcado como riesgo alto, con su probabilidad", /is-high/.test(risk.cls) && /7 selecciones/.test(risk.text) && /tu límite es 5/.test(risk.text) && /Probabilidad según tu historial/.test(risk.text), risk.text.slice(0, 200));
+  check("freno: avisa del partido repetido en otros cupones y de la selección de relleno", /Fenerbahce vs Liverpool.*ya está en 1 cupón/.test(risk.text) && /relleno.*Celtic.*1.05/.test(risk.text), risk.text);
+  check("freno: con 3 perdidos seguidos sugiere pausa y media unidad", /3 cupones perdidos seguidos/.test(risk.text) && /Monto sugerido: L 10.00/.test(risk.text), risk.text.match(/Monto sugerido[^)]*\)/)?.[0]);
+  await tap(page, '[data-confidence="5"]'); await page.waitForTimeout(80);
+  const sug5 = await page.$eval("#riskBox", (e) => e.innerText.match(/Monto sugerido[^:]*: (L [\d.,]+)/)?.[1]);
+  await tap(page, "[data-use-stake]");
+  check("freno: confianza 5 = 2 unidades (a la mitad por la racha) y 'Usar' pone el importe", sug5 === "L 20.00" && (await page.$eval("#stake", (e) => e.value)) === "20", sug5);
+  await page.fill("#couponReason", "Local fuerte");
+  await tap(page, "#saveBtn"); await page.waitForTimeout(300);
+  const saved = await page.evaluate(() => { const c = db.coupons[0]; return { conf: c.confidence, reason: c.reason, pickerReset: !$("couponConfidence").value }; });
+  check("diario: guarda la confianza y el motivo, y limpia el formulario", saved.conf === 5 && saved.reason === "Local fuerte" && saved.pickerReset, JSON.stringify(saved));
+  await page.evaluate(() => { db.coupons[0].fixtures.forEach((f) => f.markets.forEach((m) => (m.settlement = "won"))); db.coupons[0].payout = 400; save(); });
+  await view(page, "stats");
+  check("estadísticas: sección 'Según tu confianza'", /Confianza 5 · Muy alta/.test(await page.$eval("#perfSection", (e) => e.innerText)));
+  const pay = await page.evaluate(() => analystHistoryPayload());
+  check("Analista: recibe confianza, motivo y la banca", pay.porConfianza?.[0]?.confianza === 5 && pay.ultimosCupones.some((c) => c.motivo === "Local fuerte") && pay.banca?.unidad === 20);
+  // Editar recupera la confianza
+  await view(page, "saved");
+  await page.evaluate(() => { const b = document.createElement("button"); b.dataset.detail = db.coupons[0].id; document.body.appendChild(b); b.click(); b.remove(); }); await page.waitForTimeout(200);
+  check("editar un cupón recupera su confianza y motivo", (await page.$eval("#couponConfidence", (e) => e.value)) === "5" && (await page.$eval("#couponReason", (e) => e.value)) === "Local fuerte");
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

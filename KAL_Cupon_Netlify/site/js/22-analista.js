@@ -98,6 +98,8 @@ function analystHistoryPayload() {
       importe: r2(Number(c.stake) || 0),
       cuota: r2(Number(c.odds) || null),
       resultado: r.status,
+      confianza: Number(c.confidence) || undefined,
+      motivo: c.reason || undefined,
       neto: r2(r.net),
       selecciones: c.fixtures.flatMap((f) => f.markets.map((m) => legLine(f, m, true))).slice(0, 14),
     }));
@@ -126,6 +128,16 @@ function analystHistoryPayload() {
     })),
     porTamano: [...sizes.values()].map((s) => ({ ...s, apostado: r2(s.apostado), neto: r2(s.neto) })),
     porMes: p.months.map(([mes, neto]) => ({ mes, neto: r2(neto) })),
+    porConfianza: confidenceRows(p.coupons).map((x) => ({
+      confianza: x.k,
+      cupones: x.n,
+      ganados: x.won,
+      apostado: r2(x.stake),
+      neto: r2(x.net),
+    })),
+    banca: bankrollAmount()
+      ? { banca: r2(bankrollAmount()), unidad: unitStake(), maxSelecciones: bankrollCfg().maxSel }
+      : null,
     presupuesto: budget ? { mensual: budget, gastadoEsteMes: r2(monthSpent()) } : null,
     ultimosCupones: recent,
     _mercadosLiquidados: p.markets.length,

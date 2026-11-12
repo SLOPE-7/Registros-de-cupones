@@ -9,7 +9,10 @@ const VIEW_RENDER = {
     renderTodayPanel();
     renderDashboard();
   },
-  new: () => renderPreview(),
+  new: () => {
+    renderPreview();
+    renderConfidencePicker();
+  },
   calendar: () => renderCalendar(),
   markets: () => {
     renderMarkets();
@@ -28,6 +31,7 @@ const VIEW_RENDER = {
     renderAlertsBox();
     renderInstallHelp();
     renderStorageBox();
+    renderBankrollBox();
   },
 };
 function renderView(name = activeView) {
@@ -255,7 +259,10 @@ $("clearBtn").addEventListener("click", () => {
   editingCouponId = null;
   draftSelections = [];
   draftDuplicateCount = 0;
-  ["couponName", "stake", "totalOdds", "bonus", "payout", "notes"].forEach((id) => ($(id).value = ""));
+  ["couponName", "stake", "totalOdds", "bonus", "payout", "notes", "couponReason"].forEach(
+    (id) => ($(id).value = ""),
+  );
+  setConfidence(0);
   $("couponType").value = "auto";
   $("couponHouse").value = "";
   $("autoStakeTx").checked = false;
@@ -647,6 +654,9 @@ document.body.addEventListener("click", (e) => {
       $("bonus").value = c.bonus;
       $("payout").value = c.payout;
       $("notes").value = c.notes || "";
+      $("couponReason").value = c.reason || "";
+      $("couponConfidence").value = c.confidence ? String(c.confidence) : "";
+      renderConfidencePicker();
       $("autoStakeTx").checked = !!c.stakeTxId;
       draftDuplicateCount = 0;
       renderPreview();
