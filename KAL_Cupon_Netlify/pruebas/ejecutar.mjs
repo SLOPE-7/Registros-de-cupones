@@ -714,6 +714,9 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
   const req = (q) => new Request("https://x/api/datos-partido?" + new URLSearchParams(q));
   const r1 = await (await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch })).json();
   check("datos: encuentra el partido y arma tabla, forma, enfrentamientos y modelo", r1.encontrado && r1.tabla.local.posicion === 1 && r1.tabla.local.forma === "GGEPG" && r1.forma.local[0].resultado === "G" && r1.forma.local[0].marcador === "3-0" && r1.h2h.partidos === 4 && r1.modelo.p1 > r1.modelo.p2 && r1.modelo.base === "tabla de local y visitante", JSON.stringify(r1).slice(0, 300));
+  const onlyTotal = [{ type: "TOTAL", table: [row(5, 1, 12, 40, 10), row(4, 2, 12, 20, 20), row(9, 3, 12, 14, 18), row(10, 4, 12, 10, 36)] }];
+  const xg = D.expectedGoals(onlyTotal, 5, 10), xr = D.expectedGoals(onlyTotal, 10, 5);
+  check("modelo: con solo la tabla general (plan gratis) usa ataque, defensa y ventaja de local", xg && xg.lh > xg.la && xg.lh > xr.lh && /tabla general/.test(xg.base), JSON.stringify(xg));
   const n1 = calls.length;
   await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch });
   check("datos: la segunda consulta sale de la caché (cuida el límite de 10 por minuto)", n1 === 5 && calls.length === 5, n1 + "/" + calls.length);

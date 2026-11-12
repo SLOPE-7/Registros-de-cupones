@@ -178,14 +178,27 @@ export function expectedGoals(standings, homeId, awayId) {
   const table = (type) => standings?.find((s) => s.type === type)?.table || [];
   const H = table("HOME"),
     A = table("AWAY");
-  if (!H.length || !A.length) return null;
   const sum = (t, k) => t.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const shrink = (v, n, mean) => (v * n + mean * 4) / (n + 4);
+  if (!H.length || !A.length) {
+    // El plan gratis solo trae la tabla general: se usa con una ventaja de local típica (±10 %).
+    const T = table("TOTAL");
+    const avg = sum(T, "goalsFor") / Math.max(1, sum(T, "playedGames"));
+    const h = T.find((r) => r.team?.id === homeId),
+      a = T.find((r) => r.team?.id === awayId);
+    if (!T.length || !h || !a || !avg) return null;
+    const rate = (r, k) => shrink(r[k] / Math.max(1, r.playedGames), r.playedGames, avg) / avg;
+    return {
+      lh: rate(h, "goalsFor") * rate(a, "goalsAgainst") * avg * 1.1,
+      la: rate(a, "goalsFor") * rate(h, "goalsAgainst") * avg * 0.9,
+      base: "tabla general (con ventaja de local)",
+    };
+  }
   const avgHome = sum(H, "goalsFor") / Math.max(1, sum(H, "playedGames")),
     avgAway = sum(A, "goalsFor") / Math.max(1, sum(A, "playedGames"));
   const h = H.find((r) => r.team?.id === homeId),
     a = A.find((r) => r.team?.id === awayId);
   if (!h || !a || !avgHome || !avgAway) return null;
-  const shrink = (v, n, mean) => (v * n + mean * 4) / (n + 4);
   const hAtt = shrink(h.goalsFor / Math.max(1, h.playedGames), h.playedGames, avgHome) / avgHome,
     hDef = shrink(h.goalsAgainst / Math.max(1, h.playedGames), h.playedGames, avgAway) / avgAway,
     aAtt = shrink(a.goalsFor / Math.max(1, a.playedGames), a.playedGames, avgAway) / avgAway,
