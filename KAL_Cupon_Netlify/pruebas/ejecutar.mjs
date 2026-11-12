@@ -30,19 +30,19 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   // API-Football (escudos y jugadores), TheSportsDB (imagenes) y el proxy de imágenes, simulados.
   const sendJson = (obj, status = 200) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
-  if (url.pathname === "/.netlify/functions/escudos") {
+  if (url.pathname === "/api/escudos") {
     seen.push("escudos:" + url.searchParams.get("home"));
     return sendJson({ home: { options: [{ name: url.searchParams.get("home"), country: "Turkey", logo: "https://media.api-sports.io/football/teams/611.png" }] }, away: { options: [] }, league: { options: [] } });
   }
-  if (url.pathname === "/.netlify/functions/jugadores") return sendJson({ players: [] });
-  if (url.pathname === "/.netlify/functions/imagenes") {
+  if (url.pathname === "/api/jugadores") return sendJson({ players: [] });
+  if (url.pathname === "/api/imagenes") {
     seen.push("imagenes:" + url.searchParams.get("tipo") + ":" + url.searchParams.get("q"));
     return sendJson({ options: url.searchParams.get("tipo") === "equipo"
       ? [{ id: "1", name: url.searchParams.get("q") + " (TSDB)", country: "Turkey", logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png", source: "TheSportsDB" }]
       : /nico|paz/i.test(url.searchParams.get("q")) ? [{ id: "9", name: "Nico Paz", team: "Como", photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png", source: "TheSportsDB" }] : [] });
   }
-  if (url.pathname === "/.netlify/functions/logo") { res.writeHead(200, { "content-type": "image/png" }); return fs.createReadStream(path.join(ROOT, "pruebas/escudo-prueba.png")).pipe(res); }
-  if (url.pathname === "/.netlify/functions/avisos") {
+  if (url.pathname === "/api/logo") { res.writeHead(200, { "content-type": "image/png" }); return fs.createReadStream(path.join(ROOT, "pruebas/escudo-prueba.png")).pipe(res); }
+  if (url.pathname === "/api/avisos") {
     if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ publicKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U" })); }
     let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { posts.push(JSON.parse(b)); res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); });
     return;
@@ -94,6 +94,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
   await ctx.addInitScript(([d, extra]) => {
     if (!localStorage.getItem("kal_coupon_organizer_v2") && d) localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
     localStorage.setItem("kal_last_backup", String(Date.now()));
+    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "16");
     if (extra === "push") {
       let perm = "default";
       Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -737,7 +738,7 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
 
 section("20. Analista: mi semana, armar cupones y riesgo en la revisión");
 {
-  const A = await import(path.join(ROOT, "netlify/lib/analista-comun.mjs"));
+  const A = await import(path.join(ROOT, "servidor/analista.mjs"));
   const pa = A.construirPeticion("armar", { partidos: "España vs Suiza\nAlemania vs Italia", banca: { unidad: 20, maxSelecciones: 4 } });
   const ps = A.construirPeticion("semana", { semana: { ultimos7dias: { cupones: 3 } } });
   const bad = await A.leerPeticion(new Request("https://x", { method: "POST", headers: { "x-kal-clave": "s" }, body: JSON.stringify({ modo: "armar", datos: { partidos: "" } }) }), { ANTHROPIC_API_KEY: "k", ANALISTA_CLAVE: "s" });
@@ -768,16 +769,38 @@ section("20. Analista: mi semana, armar cupones y riesgo en la revisión");
   await ctx.close();
 }
 
-// ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
-section("8. Funciones de Netlify");
+section("21. Copias automáticas, espejo, novedades y rutas /api");
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kal-fn-"));
-  fs.mkdirSync(path.join(tmp, "functions")); fs.mkdirSync(path.join(tmp, "lib"));
-  for (const f of ["partido.mjs", "avisos.mjs", "avisos-envio.mjs"]) fs.copyFileSync(path.join(ROOT, "netlify/functions", f), path.join(tmp, "functions", f));
-  fs.writeFileSync(path.join(tmp, "lib/avisos-comun.mjs"), `const mem=new Map();export const sent=[];
-export const store=()=>({get:async k=>mem.has(k)?JSON.parse(mem.get(k)):null,setJSON:async(k,v)=>mem.set(k,JSON.stringify(v)),delete:async k=>mem.delete(k),list:async({prefix})=>({blobs:[...mem.keys()].filter(k=>k.startsWith(prefix)).map(key=>({key}))})});
-export const subKey=e=>'sub/'+e;export const vapidKeys=async()=>({publicKey:'P',privateKey:'Q'});export const pusher=async()=>({});
-export async function sendPush(wp,sub,p){sent.push(p.title+' | '+p.body);return 'ok'}`);
+  const { ctx, page } = await open(baseDb(), { init: "news" });
+  await page.waitForTimeout(1400);
+  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 16/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
+  await tap(page, "[data-news-close]");
+  await page.reload(); await page.waitForTimeout(1500);
+  check("novedades: no se repiten al volver a abrir", (await page.$(".news-wrap")) === null);
+  const snaps = await page.evaluate(async () => (await snapshots()).map((s) => s.motivo));
+  check("copias: copia semanal automática al abrir", snaps.includes("Copia semanal"), JSON.stringify(snaps));
+  // Espejo: se borra el almacenamiento normal y al abrir se recupera
+  await page.evaluate(async () => { db.coupons[0].name = "Cambiado"; save(); await new Promise((r) => setTimeout(r, 1500)); localStorage.removeItem("kal_coupon_organizer_v2"); });
+  await page.reload(); await page.waitForTimeout(1500);
+  const rec = await page.evaluate(() => ({ n: db.coupons.length, name: db.coupons[0]?.name, ls: !!localStorage.getItem("kal_coupon_organizer_v2") }));
+  check("espejo: si se pierde el almacenamiento normal, los datos se recuperan solos", rec.n === 3 && rec.name === "Cambiado" && rec.ls, JSON.stringify(rec));
+  // Restaurar una copia
+  await view(page, "settings");
+  await page.evaluate(async () => { db.coupons = []; save(); renderAll(); await renderSnapshotBox(); });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector("[data-snap-restore]").click());
+  await page.waitForTimeout(600);
+  const after = await page.evaluate(async () => ({ n: db.coupons.length, motivos: (await snapshots()).map((s) => s.motivo) }));
+  check("copias: restaurar desde Ajustes recupera los cupones (y guarda antes una copia de lo actual)", after.n === 3 && after.motivos[0] === "Antes de restaurar", JSON.stringify(after));
+  check("copias: el respaldo descargable usa el mismo formato", await page.evaluate(() => { const p = backupPayload(); return p.version === 3 && Array.isArray(p.db.coupons) && typeof p.logos === "object"; }));
+  check("la app llama a las funciones en /api/ (ya no en /.netlify/)", seen.length > 0 && !(await page.evaluate(() => [...document.scripts].length && performance.getEntriesByType("resource").some((r) => r.name.includes("/.netlify/")))));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+// ---------- 8. Funciones del servidor (con API simulada) ----------
+section("8. Funciones del servidor (API-Football y TheSportsDB)");
+{
   process.env.API_FOOTBALL_KEY = "x";
   let mode = "ok";
   globalThis.fetch = async (u) => {
@@ -787,23 +810,12 @@ export async function sendPush(wp,sub,p){sent.push(p.title+' | '+p.body);return 
     if (p.get("from")) return json({ errors: [], response: [{ fixture: { id: 9, date: "2026-11-04T14:00:00Z" }, league: { id: 2, season: 2026 }, teams: { home: { id: 1 }, away: { id: 2 } } }] });
     return json({ errors: [], response: [{ fixture: { id: 9 }, statistics: [] }] });
   };
-  const { default: partido } = await import(path.join(tmp, "functions/partido.mjs"));
+  const { default: partido } = await import(path.join(ROOT, "servidor/partido.mjs"));
   let r = await partido(new Request("https://x/p?homeId=1&awayId=2&date=2026-11-04&mode=match", { headers: { "x-nf-client-connection-ip": "a" } }));
   check("partido: envía la temporada y encuentra el partido", (await r.json()).fixture?.fixture?.id === 9);
   mode = "plan";
   r = await partido(new Request("https://x/p?homeId=1&awayId=3&date=2026-11-04&mode=match", { headers: { "x-nf-client-connection-ip": "b" } }));
   check("partido: explica el límite del plan gratis en español", /plan gratis/.test((await r.json()).error || ""));
-  const { default: avisos } = await import(path.join(tmp, "functions/avisos.mjs"));
-  const { default: envio } = await import(path.join(tmp, "functions/avisos-envio.mjs"));
-  const { sent } = await import(path.join(tmp, "lib/avisos-comun.mjs"));
-  const now = Date.now(), sub = { endpoint: "https://push.example/1", keys: { p256dh: "a", auth: "b" } };
-  await avisos(new Request("https://x/a", { method: "POST", body: JSON.stringify({ accion: "guardar", subscription: sub, lead: 15, matches: [
-    { id: "m1", title: "Lens vs Como · 14:00", body: "🏆 UEFA", kickoff: new Date(now + 12 * 60e3).toISOString() },
-    { id: "m2", title: "Betis vs Sevilla · 13:00", body: "🏆 La Liga", kickoff: new Date(now - 60e3).toISOString() }] }) }));
-  await envio();
-  check("avisos: 'empieza en' y 'empezó' en el momento justo", sent.length === 2 && /Empieza en 12 min/.test(sent[0]) && /Empezó/.test(sent[1]), sent.join(" / "));
-  await envio();
-  check("avisos: no repite notificaciones", sent.length === 2);
   // TheSportsDB (con respuestas simuladas como las reales: un resultado por búsqueda)
   const tsdbCalls = [];
   globalThis.fetch = async (u) => {
@@ -817,17 +829,16 @@ export async function sendPush(wp,sub,p){sent.push(p.title+' | '+p.body);return 
     };
     return { ok: true, status: 200, json: async () => R[q] || { teams: null, player: null } };
   };
-  const { default: imagenes } = await import(path.join(ROOT, "netlify/functions/imagenes.mjs"));
+  const { default: imagenes } = await import(path.join(ROOT, "servidor/imagenes.mjs"));
   let ri = await (await imagenes(new Request("https://x/i?tipo=equipo&q=Club%20Brugge%20KV"))).json();
   check("TheSportsDB: prueba el nombre sin 'KV' y pone primero el equipo correcto", ri.options.map((o) => o.name).join() === "Club Brugge,Club NXT" && tsdbCalls.includes("Club Brugge"), JSON.stringify(ri.options.map((o) => o.name)));
   ri = await (await imagenes(new Request("https://x/i?tipo=jugador&q=Anastasios%20Douvikas&club=Como"))).json();
   check("TheSportsDB: prueba el apellido y descarta fichas sin foto", ri.options.length === 1 && ri.options[0].name === "Tasos Douvikas" && ri.options[0].photo.includes("cutout"), JSON.stringify(ri.options));
-  fs.rmSync(tmp, { recursive: true, force: true });
 }
 
 section("15. Función del Analista (Claude simulado)");
 {
-  const A = await import(path.join(ROOT, "netlify/lib/analista-comun.mjs"));
+  const A = await import(path.join(ROOT, "servidor/analista.mjs"));
   const env = { ANTHROPIC_API_KEY: "sk-prueba", ANALISTA_CLAVE: "secreto" };
   const req = (body, clave = "secreto", method = "POST") => new Request("https://x/api/analista", { method, headers: { "x-kal-clave": clave }, body: method === "POST" ? JSON.stringify(body) : undefined });
   const status = async (r, e = env) => (await A.leerPeticion(r, e)).error?.status;
@@ -865,8 +876,8 @@ section("15. Función del Analista (Claude simulado)");
   const lines = (await resp.text()).trim().split("\n").map((l) => JSON.parse(l));
   check("respuesta en streaming: empieza con 'Pensando…' y traduce los errores de la API", resp.headers.get("content-type").includes("ndjson") && lines[0].t === "estado" && lines.at(-1).t === "error" && /límite de uso/.test(lines.at(-1).v), JSON.stringify(lines));
   check("mensajes de error claros (sin saldo, clave mala)", /saldo/.test(A.mensajeDeError({ status: 400, message: "Your credit balance is too low" })) && /ANTHROPIC_API_KEY/.test(A.mensajeDeError({ status: 401 })));
-  const edge = fs.readFileSync(path.join(ROOT, "netlify/edge-functions/analista.js"), "utf8");
-  check("función de borde en /api/analista con el SDK oficial y la clave desde variables", /path: "\/api\/analista"/.test(edge) && /from "@anthropic-ai\/sdk"/.test(edge) && /Netlify\.env\.get\("ANTHROPIC_API_KEY"\)/.test(edge));
+  const edge = fs.readFileSync(path.join(ROOT, "cloudflare/worker.mjs"), "utf8");
+  check("Worker: /api/analista con el SDK oficial y la clave desde las variables de Cloudflare", /nombre === "analista"/.test(edge) && /from "@anthropic-ai\/sdk"/.test(edge) && /env\.ANTHROPIC_API_KEY/.test(edge));
 }
 
 section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
@@ -874,7 +885,7 @@ section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
   const W = await import(path.join(ROOT, "cloudflare/webpush.mjs"));
   const { avisosHandler, enviarAvisos } = await import(path.join(ROOT, "cloudflare/avisos.mjs"));
   const nodeCrypto = await import("node:crypto");
-  const ece = require(path.join(ROOT, "node_modules/http_ece"));
+  const ece = require("http_ece");
   // Teléfono simulado: sus claves y una captura del envío
   const ua = nodeCrypto.createECDH("prime256v1"); ua.generateKeys();
   const auth = nodeCrypto.randomBytes(16);
@@ -934,11 +945,11 @@ section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
   if (up) {
     const home = await realFetch(B2 + "/"), swr = await realFetch(B2 + "/sw.js"), css = await realFetch(B2 + "/css/16-analista.css");
     check("workerd: sirve la app sin caché en la página y con el permiso del service worker", home.headers.get("cache-control") === "no-cache" && /<title>/.test(await home.text()) && swr.headers.get("service-worker-allowed") === "/" && css.ok);
-    const clave = await (await realFetch(B2 + "/.netlify/functions/avisos?accion=clave")).json();
+    const clave = await (await realFetch(B2 + "/api/avisos?accion=clave")).json();
     check("workerd: avisos con almacenamiento (Durable Object) y claves generadas", W.unb64u(clave.publicKey).length === 65);
-    const guard = await (await realFetch(B2 + "/.netlify/functions/avisos", { method: "POST", body: JSON.stringify({ accion: "guardar", lead: 15, subscription: sub, matches: [{ id: "w1", title: "A vs B", kickoff: new Date(Date.now() + 10 * 60000).toISOString() }] }) })).json();
+    const guard = await (await realFetch(B2 + "/api/avisos", { method: "POST", body: JSON.stringify({ accion: "guardar", lead: 15, subscription: sub, matches: [{ id: "w1", title: "A vs B", kickoff: new Date(Date.now() + 10 * 60000).toISOString() }] }) })).json();
     const an = await realFetch(B2 + "/api/analista", { method: "POST", headers: { "x-kal-clave": "malo" }, body: "{}" });
-    const nf = await realFetch(B2 + "/.netlify/functions/nada");
+    const nf = await realFetch(B2 + "/api/nada");
     const fb = await (await realFetch(B2 + "/.netlify/functions/escudos")).json().catch(() => ({}));
     check("workerd: rutas de funciones y Analista protegidas", guard.partidos === 1 && an.status === 401 && nf.status === 404 && typeof fb === "object", JSON.stringify(guard));
     const dp = await realFetch(B2 + "/api/datos-partido?home=Barcelona&away=Madrid&date=2026-11-22");

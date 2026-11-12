@@ -2,8 +2,8 @@
 // - La página se pide primero a la red (para recibir siempre la última versión) y, si no hay
 //   conexión, se usa la copia guardada.
 // - Iconos y manifiesto se sirven desde la caché.
-// - Las funciones de Netlify (API-Football) nunca se guardan: siempre van a la red.
-const CACHE = 'kal-v23';
+// - Las funciones del servidor (/api/…) nunca se guardan: siempre van a la red.
+const CACHE = 'kal-v24';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-32.png',
   '/css/01-base.css',
   '/css/02-tema-claro.css',
@@ -47,6 +47,7 @@ const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon
   '/js/23-control-apuestas.js',
   '/js/24-valor.js',
   '/js/25-datos-partido.js',
+  '/js/26-copias-novedades.js',
   '/js/99-arranque.js'];
 
 self.addEventListener('install', event => {

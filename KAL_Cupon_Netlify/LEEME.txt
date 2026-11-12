@@ -359,3 +359,24 @@ V15.1 — Correcciones detectadas por el propio Analista
 - Estadísticas: "UEFA Liga Campeones" y "UEFA Champions League" (y lo mismo con Europa y Conference League) cuentan como una sola competición.
 - BetBuilder: su cuota es la del paquete completo, así que ya no se usa como cuota de cada selección (inflaba la rentabilidad y los rangos de cuota). En la ficha del partido dice "Cuota del BetBuilder completo" en lugar de una probabilidad engañosa.
 Pruebas: 158.
+
+
+VERSIÓN 16 — CONTROL, VALOR, DATOS Y COPIAS
+1. Freno al guardar (Nuevo cupón, debajo de la vista previa): probabilidad del cupón con tu historial y con la cuota, aviso si pasas tu límite de selecciones, si un partido ya está en otros cupones pendientes, si hay selecciones de relleno (cuota < 1.15), si estás en racha de pérdidas o te pasas del presupuesto, y monto sugerido con botón "Usar".
+2. Gestión de banca (Ajustes): banca (o el total de tus casas), unidad en % (1 unidad = % de la banca), máximo de selecciones y pausa tras N perdidos seguidos (el monto sugerido baja a la mitad). Confianza 1–2 = ½ unidad, 3 = 1, 4 = 1½, 5 = 2.
+3. Diario: confianza de 1 a 5 y motivo en cada cupón; Estadísticas → "Según tu confianza".
+4. Valor de la cuota: "＋ Cuota de cierre" en cada mercado de la ficha del partido y "Valor frente al cierre (CLV)" en Estadísticas. Analista → "Calculadora de valor": quita el margen de una casa de referencia (p. ej. Pinnacle), da la probabilidad y cuota justas, el valor esperado, un monto prudente (¼ de Kelly, máx. 2 unidades) y compara tus casas.
+5. Datos del partido (ficha → 📈 Datos): modelo de goles (Poisson) con 1X2, más/menos goles y ambos marcan; tus mercados frente al modelo con su valor; tabla (con local/visita), forma reciente y enfrentamientos directos.
+   Requiere la variable FOOTBALL_DATA_KEY en Cloudflare (gratis):
+     a) Regístrate en football-data.org (Get a free API key) y copia la clave que llega por correo.
+     b) Cloudflare → Workers & Pages → kal-cupones → Settings → Variables and Secrets → Add → tipo Secret → nombre FOOTBALL_DATA_KEY.
+   El plan gratis cubre las ligas principales de Europa, la Champions, el Mundial y la Eurocopa (10 consultas por minuto; la app guarda las respuestas un tiempo). La Nations League y otras no están incluidas.
+6. Analista: "Mi semana" (también tarjeta "Tus últimos 7 días" en Inicio) y "Armar cupones" (con búsqueda web; respeta tu límite, tu unidad, tu historial y no repite partidos). La revisión de un cupón recibe el riesgo calculado por la app.
+7. Técnico:
+   - Se quitó todo lo de Netlify. Las funciones están en servidor/ y el Worker en cloudflare/. La app llama a /api/<función> (las rutas antiguas /.netlify/functions/… siguen funcionando).
+   - Copias automáticas (Ajustes → 🛟): espejo en IndexedDB en cada guardado (si se pierde el almacenamiento normal, se recupera solo al abrir) y copias restaurables: una semanal y otra antes de importar, borrar o restaurar (se guardan 6).
+   - Novedades: al abrir una versión nueva se muestra qué cambió (también en Ajustes).
+   - Corrección: el lector ya no toma la cuota del último partido como cuota total cuando el cupón no trae "CUOTAS".
+   - La carpeta sigue llamándose KAL_Cupon_Netlify a propósito: Cloudflare publica desde esa ruta; cambiarla obligaría a cambiar también la configuración en Cloudflare.
+   - Caché de instrucciones del Analista: no aplica todavía; las instrucciones fijas son más cortas que el mínimo que Anthropic guarda en caché, así que no ahorraría nada.
+Pruebas: 199.

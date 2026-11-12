@@ -1,18 +1,18 @@
 // KAL en Cloudflare: un solo Worker que
 //   - sirve la app (carpeta site/) como archivos estáticos;
-//   - atiende las mismas rutas que usaba en Netlify (/.netlify/functions/… y /api/analista), así la app no cambia;
+//   - atiende las funciones en /api/<nombre> (y las rutas antiguas /.netlify/functions/<nombre>, por compatibilidad);
 //   - envía los avisos de partidos cada 5 minutos (tarea programada).
 // Variables y secretos (Cloudflare → Workers → kal-cupones → Settings → Variables and Secrets):
 //   API_FOOTBALL_KEY, ANTHROPIC_API_KEY, ANALISTA_CLAVE, FOOTBALL_DATA_KEY y, opcional, THESPORTSDB_KEY.
 import { DurableObject } from "cloudflare:workers";
 import Anthropic from "@anthropic-ai/sdk";
-import escudos from "../netlify/functions/escudos.mjs";
-import logo from "../netlify/functions/logo.mjs";
-import partido from "../netlify/functions/partido.mjs";
-import jugadores from "../netlify/functions/jugadores.mjs";
-import catalogo from "../netlify/functions/catalogo.mjs";
-import imagenes from "../netlify/functions/imagenes.mjs";
-import { manejar as analista } from "../netlify/lib/analista-comun.mjs";
+import escudos from "../servidor/escudos.mjs";
+import logo from "../servidor/logo.mjs";
+import partido from "../servidor/partido.mjs";
+import jugadores from "../servidor/jugadores.mjs";
+import catalogo from "../servidor/catalogo.mjs";
+import imagenes from "../servidor/imagenes.mjs";
+import { manejar as analista } from "../servidor/analista.mjs";
 import { avisosHandler, enviarAvisos } from "./avisos.mjs";
 import { datosPartido } from "./datos-partido.mjs";
 
@@ -42,7 +42,7 @@ function almacen(env) {
   };
 }
 
-// Las funciones de Netlify leen sus claves de process.env.
+// Las funciones de servidor/ leen sus claves de process.env.
 function exponerVariables(env) {
   globalThis.process ??= { env: {} };
   process.env ??= {};

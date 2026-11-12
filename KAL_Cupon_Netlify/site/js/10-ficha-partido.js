@@ -103,7 +103,7 @@ async function loadMatchTab(tab, force = false) {
   if (ids.league) url.set("leagueId", ids.league);
   if (force) url.set("refresh", "1");
   try {
-    const r = await fetch("/.netlify/functions/partido?" + url.toString(), {
+    const r = await fetch("/api/partido?" + url.toString(), {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(18000),
       }),
@@ -742,7 +742,7 @@ async function lookupMatchPlayerPhoto(marketKeyValue, refOverride = null, player
           teamId: teamId || "",
           season: scheduleISO(f).slice(0, 4),
         });
-        const response = await fetch("/.netlify/functions/jugadores?" + params.toString(), {
+        const response = await fetch("/api/jugadores?" + params.toString(), {
           headers: { Accept: "application/json" },
           signal: AbortSignal.timeout(16000),
         });

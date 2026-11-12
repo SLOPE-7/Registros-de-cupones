@@ -19,6 +19,10 @@ indexSavedCrests();
 autoCompact();
 renderAll();
 hideSplash();
+recoverFromMirror()
+  .then(() => autoSnapshot())
+  .catch(() => {});
+setTimeout(maybeShowNews, 1200);
 initCrestImageCache();
 if (cloudSession) {
   cloudPull()

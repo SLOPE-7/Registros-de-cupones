@@ -77,7 +77,7 @@ async function pushSubscription(create) {
   const reg = await navigator.serviceWorker.ready;
   let sub = await reg.pushManager.getSubscription();
   if (!sub && create) {
-    const r = await fetch("/.netlify/functions/avisos?accion=clave");
+    const r = await fetch("/api/avisos?accion=clave");
     const d = await r.json();
     if (!r.ok || !d.publicKey) throw Error(d.error || "No se pudo preparar el servicio de avisos.");
     sub = await reg.pushManager.subscribe({
@@ -88,7 +88,7 @@ async function pushSubscription(create) {
   return sub;
 }
 async function postAlerts(body) {
-  const r = await fetch("/.netlify/functions/avisos", {
+  const r = await fetch("/api/avisos", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),

@@ -233,7 +233,7 @@ async function loadCrestImage(url) {
     // Imagen subida desde el teléfono: ya está dentro de la app.
     if (/^data:image\//i.test(url)) return await (await fetch(url)).blob();
     if (location.protocol === "file:") return null;
-    const response = await fetch("/.netlify/functions/logo?url=" + encodeURIComponent(url));
+    const response = await fetch("/api/logo?url=" + encodeURIComponent(url));
     if (!response.ok) throw Error("No se pudo descargar este escudo.");
     const blob = await response.blob();
     if (!/^image\//i.test(blob.type) || blob.size > 2000000)
@@ -374,7 +374,7 @@ async function lookupCrests(fi, force = false) {
   try {
     let data = force ? null : cache[cacheKey];
     if (!data) {
-      const r = await fetch("/.netlify/functions/escudos?" + params.toString(), {
+      const r = await fetch("/api/escudos?" + params.toString(), {
         headers: { Accept: "application/json" },
       });
       data = await r.json();

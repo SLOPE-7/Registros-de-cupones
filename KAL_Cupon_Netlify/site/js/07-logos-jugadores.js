@@ -75,7 +75,7 @@ async function lookupCatalogItem(kind) {
     const params = new URLSearchParams(
         kind === "country" ? { countryCode: value.toUpperCase() } : { leagueId: value },
       ),
-      r = await fetch("/.netlify/functions/catalogo?" + params, {
+      r = await fetch("/api/catalogo?" + params, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(22000),
       }),
@@ -977,7 +977,7 @@ async function lookupSavedLeagueLogo(i) {
   box.textContent = "Consultando catálogo…";
   try {
     const p = new URLSearchParams({ home: "", away: "", league: x.name, country: x.country || "" }),
-      r = await fetch("/.netlify/functions/escudos?" + p, {
+      r = await fetch("/api/escudos?" + p, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(16000),
       }),
@@ -1135,7 +1135,7 @@ async function lookupSavedTeamLogo(index, query = "") {
       cacheKey = crestNorm([q, "", "", team.country || ""].join("|"));
     let data = cache[cacheKey];
     if (!data) {
-      const r = await fetch("/.netlify/functions/escudos?" + params.toString(), {
+      const r = await fetch("/api/escudos?" + params.toString(), {
         headers: { Accept: "application/json" },
       });
       data = await r.json();

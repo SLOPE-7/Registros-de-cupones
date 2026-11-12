@@ -305,7 +305,7 @@ async function addSubstitute(key) {
     // API-Football y TheSportsDB a la vez.
     const club = (side && found.f[side]) || "";
     const [af, ts] = await Promise.allSettled([
-      fetch("/.netlify/functions/jugadores?" + params, {
+      fetch("/api/jugadores?" + params, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(16000),
       }).then(async (r) => {

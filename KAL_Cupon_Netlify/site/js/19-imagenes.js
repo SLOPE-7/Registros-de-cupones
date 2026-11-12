@@ -7,7 +7,7 @@
 // --- TheSportsDB ---
 async function tsdbSearch(tipo, q, club = "") {
   if (location.protocol === "file:" || String(q || "").trim().length < 3) return [];
-  const r = await fetch("/.netlify/functions/imagenes?" + new URLSearchParams({ tipo, q, club }), {
+  const r = await fetch("/api/imagenes?" + new URLSearchParams({ tipo, q, club }), {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(15000),
   });

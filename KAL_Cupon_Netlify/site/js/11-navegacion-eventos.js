@@ -36,6 +36,7 @@ const VIEW_RENDER = {
     renderInstallHelp();
     renderStorageBox();
     renderBankrollBox();
+    renderSnapshotBox();
   },
 };
 function renderView(name = activeView) {
@@ -122,24 +123,7 @@ function backup() {
     localStorage.setItem("kal_last_backup", String(Date.now()));
   } catch {}
   renderHomeNotices();
-  download(
-    "KAL-respaldo-" + stamp + ".json",
-    JSON.stringify(
-      {
-        version: 3,
-        exportedAt: new Date().toISOString(),
-        db,
-        logos: {
-          dir: readCrestDirectory(),
-          hidden: JSON.parse(localStorage.getItem(LOGO_HIDDEN) || "[]"),
-          trash: readLogoTrash(),
-          images: localImages(),
-        },
-      },
-      null,
-      2,
-    ),
-  );
+  download("KAL-respaldo-" + stamp + ".json", JSON.stringify(backupPayload(), null, 2));
   toast("Respaldo descargado.");
 }
 function addHouse() {
@@ -204,6 +188,7 @@ function importBackup(file) {
         )
       )
         return;
+      snapshotNow("Antes de importar");
       db = {
         coupons: incoming.coupons || [],
         houses: incoming.houses || [],
@@ -302,6 +287,7 @@ $("wipeBtn").addEventListener("click", () => {
       "¿Borrar todos los cupones, casas y movimientos de este navegador? Los escudos y logos guardados se conservarán. Esta acción no se puede deshacer.",
     )
   ) {
+    snapshotNow("Antes de borrar");
     db = { coupons: [], houses: [], transactions: [], resultHistory: [], actionHistory: [] };
     draftSelections = [];
     localStorage.removeItem(KEY);
@@ -689,6 +675,7 @@ try {
       deleted: d.deleted && typeof d.deleted === "object" ? d.deleted : {},
       settings: d.settings && typeof d.settings === "object" ? d.settings : {},
       progress: d.progress && typeof d.progress === "object" ? d.progress : {},
+      savedAt: d.savedAt || null,
     };
   } else {
     const old = JSON.parse(localStorage.getItem(OLD) || "[]");

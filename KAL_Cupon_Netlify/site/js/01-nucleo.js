@@ -50,6 +50,8 @@ const validTeamLogo = (s) => {
   );
 };
 function save() {
+  db.savedAt = new Date().toISOString();
+  if (typeof queueMirror === "function") queueMirror();
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
   } catch (e) {
@@ -58,7 +60,9 @@ function save() {
       compactData(true);
       localStorage.setItem(KEY, JSON.stringify(db));
     } catch (e2) {
-      toast("No queda espacio para guardar. Descarga un respaldo y libera espacio en Ajustes; tus datos no se borraron.");
+      toast(
+        "No queda espacio para guardar. Descarga un respaldo y libera espacio en Ajustes; tus datos no se borraron.",
+      );
       return false;
     }
   }
