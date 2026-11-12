@@ -69,6 +69,7 @@ function normalizedDb(d) {
     deleted: d.deleted && typeof d.deleted === "object" ? d.deleted : {},
     settings: d.settings && typeof d.settings === "object" ? d.settings : {},
     progress: d.progress && typeof d.progress === "object" ? d.progress : {},
+    stats: d.stats && typeof d.stats === "object" ? d.stats : {},
   };
 }
 // Al abrir: si el espejo es más nuevo que lo guardado (o no hay nada guardado), se recupera.
@@ -83,8 +84,9 @@ async function recoverFromMirror() {
     if (db.coupons.length) queueMirror();
     return false;
   }
-  const local = localStorage.getItem(KEY);
-  const localAt = Date.parse(db.savedAt || "") || 0,
+  // Se compara con lo que había guardado al abrir: el arranque puede haber guardado después (migraciones).
+  const local = kalLoadedState.found;
+  const localAt = Date.parse(kalLoadedState.savedAt || "") || 0,
     mirrorAt = Date.parse(m.savedAt || "") || 0;
   if (local && mirrorAt <= localAt + 1000) return false;
   let d;

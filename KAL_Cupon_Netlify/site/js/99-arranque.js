@@ -15,6 +15,7 @@ $("raw").value = localStorage.getItem(DRAFT) || "";
 cleanSavedPlayerNames();
 if (migrateEarlyPayout()) save();
 if (migrateInlineImages()) save();
+if (migrateProgressToStats()) save();
 indexSavedCrests();
 autoCompact();
 renderAll();

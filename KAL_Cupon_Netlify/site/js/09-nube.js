@@ -32,6 +32,14 @@ function mergeDatabases(local, remote) {
     resultHistory: list(local.resultHistory, remote.resultHistory),
     actionHistory: (local.actionHistory || []).slice(-100),
     deleted,
+    stats: (() => {
+      const out = { ...(remote.stats || {}) };
+      Object.entries(local.stats || {}).forEach(([k, v]) => {
+        if (!out[k] || String(v?.updatedAt || "") >= String(out[k]?.updatedAt || "")) out[k] = v;
+      });
+      return out;
+    })(),
+    statsMigrated: !!(local.statsMigrated || remote.statsMigrated),
     progress: (() => {
       const out = { ...(remote.progress || {}) };
       Object.entries(local.progress || {}).forEach(([k, v]) => {

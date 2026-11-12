@@ -344,3 +344,93 @@
   border-color: var(--gold);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent);
 }
+/* Marcador en vivo (un conteo por partido para todos los cupones) */
+.live-board {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel2);
+  display: grid;
+  gap: 10px;
+}
+.lb-head {
+  display: grid;
+  gap: 2px;
+}
+.lb-head small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.lb-team {
+  display: grid;
+  gap: 8px;
+}
+.lb-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lb-counter > span {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14px;
+}
+.lb-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.lb-line {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+}
+.lb-line.is-won {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+}
+.lb-line.is-lost {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+}
+.lb-player,
+.lb-sub {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.lb-sub {
+  margin-left: 14px;
+}
+.lb-player-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lb-player-head > span {
+  flex: 1;
+}
+.lb-player-head small {
+  color: var(--muted);
+}
+.pg-shared .pg-head small {
+  color: var(--muted);
+}
+.live-board .pg-photo {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  display: inline-grid;
+  place-items: center;
+  font-size: 11px;
+}
+.lb-player-head > b {
+  flex: 1;
+}

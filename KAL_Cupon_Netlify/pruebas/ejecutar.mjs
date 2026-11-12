@@ -364,25 +364,27 @@ section("9. Barra de progreso de mercados");
   check("temas de ligas, copas, competiciones europeas y selecciones", themes === "champions,europa-league,conference,uefa-super-cup,premier-league,english-football-league,fa-cup,league-cup,laliga,laliga-2,copa-del-rey,supercopa-espana,serie-a,coppa-italia,bundesliga,dfb-pokal,pais,ligue-1,eredivisie,primeira-liga,scottish-premiership,super-lig,pais,pais,liga-nacional,nations-league,qualifiers,qualifiers,friendlies,world-cup,euro,copa-america,concacaf-nations,gold-cup", themes);
   const flags = await page.evaluate(() => ["España", "Inglaterra", "Países Bajos", "Estados Unidos", "Honduras", "Costa de Marfil", "Brasil Sub 20", "Real Madrid"].map(nationFlag).join(" "));
   check("banderas de selecciones (y ninguna para clubes)", flags.split(" ").filter(Boolean).length === 7 && !flags.trim().endsWith("🇪🇸 "), flags);
-  for (let i = 0; i < 3; i++) { await page.click(`${card("Total de goles")} .pg-btn.plus`); await page.waitForTimeout(80); }
-  check("Más de 2.5 goles: con 3 se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
-  check("avisa con un mensaje de mercado ganado", /Mercado ganado/.test(await page.$eval("#toast", (e) => e.textContent)));
-  await page.click("[data-marked-toggle]");
-  await page.click(`.marked-fold ${card("Total de goles")} .pg-btn:not(.plus)`); await page.waitForTimeout(100);
+  const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
+  for (let i = 0; i < 3; i++) { await tap(page, stBtn("goals")); await page.waitForTimeout(80); }
+  check("Más de 2.5 goles: con 3 en el marcador se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
+  check("avisa con un mensaje de línea superada", /superada/.test(await page.$eval("#toast", (e) => e.textContent)), await page.$eval("#toast", (e) => e.textContent));
+  await tap(page, stBtn("goals", -1)); await page.waitForTimeout(100);
   check("si restas, vuelve a pendiente", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "pending");
-  for (let i = 0; i < 3; i++) { await page.click(`.match-tab-content > ${card("Tiros De Esquina")} .pg-btn.plus`); await page.waitForTimeout(80); }
+  for (let i = 0; i < 3; i++) { await tap(page, stBtn("corners")); await page.waitForTimeout(80); }
   check("Menos de 2.5 córners: con 3 se marca perdido solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[1].settlement)) === "lost");
-  await page.evaluate(() => { db.coupons[0].fixtures[0].markets[1].settlement = "pending"; db.progress = {}; save(); renderAll(); });
-  await page.click(`.match-tab-content > ${card("Mbappe")} .pg-btn.plus`); await page.waitForTimeout(80);
+  await page.evaluate(() => { db.coupons[0].fixtures[0].markets[1].settlement = "pending"; db.stats = {}; db.progress = {}; save(); renderAll(); });
+  await page.waitForTimeout(100);
+  const pk = await page.evaluate(() => crestNorm("Kylian Mbappe"));
+  await tap(page, stBtn(`player:${pk}:main:onTarget`)); await page.waitForTimeout(80);
   page.promptAnswer = "Endrick";
-  await page.click(`${card("Mbappe")} [data-pg-sub-add]`); await page.waitForTimeout(400);
-  check("agrega al suplente con su nombre", (await page.$eval(card("Mbappe"), (e) => e.innerText)).includes("Endrick"));
-  await page.click(`${card("Mbappe")} .pg-player:has-text("Endrick") .pg-btn.plus`); await page.waitForTimeout(150);
-  check("Mbappé 1 + suplente 1 = 2: remates a puerta ganado", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[2].settlement)) === "won");
+  await tap(page, ".live-board [data-st-sub-add]"); await page.waitForTimeout(400);
+  check("agrega al suplente con su nombre", (await page.$eval(".live-board", (e) => e.innerText)).includes("Endrick"));
+  await tap(page, stBtn(`player:${pk}:sub:onTarget`)); await page.waitForTimeout(150);
+  check("Mbappé 1 + suplente 1 = 2: remates a puerta (incl. suplente) ganado", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[2].settlement)) === "won");
   await page.click(".match-close"); await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
   check("la Agenda muestra el progreso en miniatura", /Goles 0\/3/.test(await page.$eval("#agendaList", (e) => e.innerText)), await page.$eval("#agendaList", (e) => e.innerText.replace(/\s+/g, " ")));
   await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(150);
-  await page.click(`${card("tarjetas")} .pg-btn.plus`); await page.waitForTimeout(80);
+  await tap(page, stBtn("cards")); await page.waitForTimeout(80);
   await page.click("[data-pg-finish]"); await page.waitForTimeout(200);
   const st = await page.evaluate(() => db.coupons[0].fixtures[0].markets.map((m) => m.settlement).join(","));
   check("Terminó el partido: Más de sin llegar → perdido, Menos de → ganado", st === "lost,won,won,lost,pending", st);
@@ -843,6 +845,48 @@ section("22. Cupones antes de apostar (boleto sin totales)");
   const ph = await page.$eval("#payout", (e) => ({ ph: e.placeholder, need: e.classList.contains("need-input") }));
   const oddsNow = Number(await page.$eval("#totalOdds", (e) => e.value));
   check("ganancia total vacía: muestra la calculada (valor × cuota) y deja de pedirla", ph.ph === (20 * oddsNow).toFixed(2) + " (calculada)" && !ph.need, JSON.stringify(ph));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
+{
+  const now = Date.now(), day = isoDay(now), time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
+  const fx = (id, markets) => ({ id, home: "Italia", away: "Francia", competition: "UEFA Nations League", dateISO: day, time, builderOdd: "1.80", markets });
+  const mk = (market, pick, builder = true) => ({ market, pick, odd: "", builder, builderOdd: "1.80", settlement: "pending" });
+  const db = { coupons: [
+    { id: "C1", name: "Cupón 1", created: new Date(now).toISOString(), stake: 5, odds: 1.8, payout: 9, fixtures: [fx("a", [mk("Total", "Más de 1.5"), mk("Remates a Puerta - Michael Olise (FRA)", "Más de 0.5"), mk("Remates (Michael Olise (FRA)) y suplente", "Más de 2.5")])] },
+    { id: "C2", name: "Cupón 2", created: new Date(now).toISOString(), stake: 5, odds: 1.8, payout: 9, fixtures: [fx("b", [mk("Total de goles", "Más de 1.5"), mk("Remates a Puerta (Michael Olise (FRA)) - Incl. suplente", "Más de 1.5"), mk("Remates - Michael Olise (FRA)", "Más de 1.5")])] },
+  ], houses: [], transactions: [], resultHistory: [], actionHistory: [],
+    // contadores viejos (uno por mercado) para probar el paso al marcador
+    progress: {} };
+  const { ctx, page } = await open(db);
+  await page.evaluate(() => { const f = db.coupons[1].fixtures[0], m = f.markets[2]; db.progress[marketKey(f, m)] = { count: 1, updatedAt: "2026-11-12T10:00:00Z" }; db.statsMigrated = false; migrateProgressToStats(); save(); renderAll(); });
+  const mig = await page.evaluate(() => { const s = Object.values(db.stats)[0]; return s.players[crestNorm("Michael Olise")]; });
+  check("los contadores viejos pasan al marcador del partido", mig?.shots === 1 && mig.onTarget === 0, JSON.stringify(mig));
+  await page.evaluate(() => { db.stats = {}; save(); renderAll(); }); // se empieza el partido desde cero
+  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(200);
+  const cards = await page.$$eval(".match-tab-content > .mk-card", (els) => els.map((e) => e.innerText.replace(/\s+/g, " ")));
+  check("'Total · Más de 1.5' y 'Total de goles · Más de 1.5' de cupones distintos se ven en una sola tarjeta", cards.filter((t) => /Más de 1.5/.test(t) && /^(Total|⚽|🥅)/.test(t.replace(/^\S+\s/, "")) && /Total/.test(t) && !/Olise/.test(t)).length === 1 && cards.length === 5, cards.join(" || "));
+  const board = await page.$eval(".live-board", (e) => e.innerText.replace(/\s+/g, " "));
+  check("marcador: goles y una ficha de Olise con 'A puerta', 'Remates' y su suplente", /Goles/.test(board) && /Michael Olise/.test(board) && /A puerta/.test(board) && /Remates/.test(board) && /Agregar suplente de Olise/.test(board), board);
+  const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
+  const pk = await page.evaluate(() => crestNorm("Michael Olise"));
+  const status = () => page.evaluate(() => db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "));
+  for (let i = 0; i < 2; i++) { await tap(page, stBtn("goals")); await page.waitForTimeout(100); }
+  check("2 goles: las dos líneas de +1.5 (una en cada cupón) quedan ganadas a la vez", (await status()) === "wpp wpp", await status());
+  await tap(page, stBtn(`player:${pk}:main:onTarget`)); await page.waitForTimeout(150);
+  const s1 = await page.evaluate((pk) => ({ st: db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "), p: Object.values(db.stats)[0].players[pk] }), pk);
+  check("1 a puerta de Olise: '+0.5 a puerta (solo él)' ganada; '+1.5 con suplente' espera; también cuenta como remate", s1.st === "wwp wpp" && s1.p.onTarget === 1 && s1.p.shots === 1, JSON.stringify(s1));
+  page.promptAnswer = "Kolo Muani";
+  await tap(page, ".live-board [data-st-sub-add]"); await page.waitForTimeout(400);
+  await tap(page, stBtn(`player:${pk}:sub:onTarget`)); await page.waitForTimeout(150);
+  check("suplente 1 a puerta: '+1.5 a puerta con suplente' ganada (1 + 1); 'remates +1.5 solo él' sigue esperando", (await status()) === "wwp wwp", await status());
+  await tap(page, stBtn(`player:${pk}:main:shots`)); await page.waitForTimeout(150);
+  check("Olise llega a 2 remates: '+1.5 remates solo él' ganada; '+2.5 con suplente' (2 + 1 = 3) también", (await status()) === "www www", await status());
+  await tap(page, stBtn(`player:${pk}:main:shots`, -1)); await page.waitForTimeout(150);
+  check("si restas, las líneas que ganó el marcador vuelven a pendiente", (await status()) === "wwp wwp", await status());
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

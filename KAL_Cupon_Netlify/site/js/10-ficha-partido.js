@@ -225,7 +225,7 @@ function matchMarketCard(x) {
       cls +
       (s === v ? " selected" : "") +
       '" data-status="' +
-      esc(x.key) +
+      esc(x.statusKey || x.key) +
       '" data-value="' +
       v +
       '" aria-pressed="' +
@@ -309,6 +309,7 @@ function renderMatchMarkets(merged) {
       ? '<div class="notice">Vista previa del cupón. Guarda el cupón para marcar resultados.</div>'
       : "") +
     finishMatchButton(all[0].f, pending) +
+    liveBoardHtml(all[0].f) +
     (pending.length
       ? pending.map(matchMarketCard).join("")
       : '<div class="empty small"><strong>Todo marcado ✓</strong>No quedan mercados pendientes en este partido.</div>') +
@@ -883,12 +884,35 @@ function renderMatchDetail(ref = currentMatchRef) {
         if (fixtureKey(g) === fk) g.markets.forEach((m) => items.push({ f: g, m, c: coupon }));
       }),
     );
+  // El mismo mercado de línea escrito distinto en otro cupón ("Total" / "Total de goles", "Remates (X) y suplente" /
+  // "Remates - X (incl. suplente)") se muestra una sola vez; sus botones marcan todos a la vez.
   const merged = new Map();
   items.forEach((x) => {
-    const k = marketKey(x.f, x.m);
-    if (!merged.has(k)) merged.set(k, { key: k, f: x.f, m: x.m, coupons: new Set() });
-    merged.get(k).coupons.add(x.c.id);
+    const k = marketKey(x.f, x.m),
+      info = parseLine(x.m, x.f),
+      kind = info && statKind(x.m, x.f, info),
+      g = kind
+        ? [
+            "linea",
+            kind.type,
+            kind.stat || "",
+            kind.playerKey || "",
+            kind.incl ? "s" : "",
+            info.dir,
+            info.line,
+          ].join("|")
+        : k;
+    if (!merged.has(g)) merged.set(g, { key: k, keys: [], f: x.f, m: x.m, coupons: new Set() });
+    const e = merged.get(g);
+    if (!e.keys.includes(k)) e.keys.push(k);
+    if (
+      String(x.m.market || "").length > String(e.m.market || "").length &&
+      x.m.settlement === e.m.settlement
+    )
+      e.m = x.m;
+    e.coupons.add(x.c.id);
   });
+  merged.forEach((e) => (e.statusKey = e.keys.join("||")));
   const comp =
       [f.competition || f.league, f.country].filter(Boolean).join(" · ") || "Competencia sin identificar",
     title = esc(f.home) + " vs " + esc(f.away),

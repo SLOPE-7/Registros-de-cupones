@@ -40,6 +40,11 @@ function compactData(deep = false) {
   Object.keys(db.progress || {}).forEach((k) => {
     if (!liveKeys.has(k)) delete db.progress[k];
   });
+  // Marcador de partidos que ya no están en ningún cupón
+  const liveFixtures = new Set(db.coupons.flatMap((c) => c.fixtures.map((f) => fixtureKey(f))));
+  Object.keys(db.stats || {}).forEach((k) => {
+    if (!liveFixtures.has(k)) delete db.stats[k];
+  });
   // Imágenes subidas que ya nadie usa
   try {
     const used = new Set();
@@ -52,6 +57,9 @@ function compactData(deep = false) {
       c.fixtures.forEach((f) => ["homeCrest", "awayCrest", "leagueCrest"].forEach((k) => mark(f[k]))),
     );
     Object.values(db.progress || {}).forEach((p) => mark(p?.sub?.photo));
+    Object.values(db.stats || {}).forEach((s) =>
+      Object.values(s?.players || {}).forEach((p) => mark(p?.sub?.photo)),
+    );
     const images = { ...localImages() };
     let removed = false;
     Object.keys(images).forEach((id) => {

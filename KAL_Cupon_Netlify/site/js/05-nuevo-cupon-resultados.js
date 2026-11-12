@@ -261,13 +261,14 @@ function saveCoupon() {
 }
 function setMarketStatus(key, status) {
   const statusBefore = couponStatusSnapshot();
+  const keys = new Set(String(key).split("||"));
   let count = 0,
     oldStatus = null,
     label = "Mercado";
   db.coupons.forEach((c) =>
     c.fixtures.forEach((f) =>
       f.markets.forEach((m) => {
-        if (marketKey(f, m) === key) {
+        if (keys.has(marketKey(f, m))) {
           if (oldStatus === null) {
             oldStatus = m.settlement;
             label = `${f.home} vs ${f.away} · ${m.market}${m.pick ? " · " + m.pick : ""}`;
@@ -292,12 +293,13 @@ function setMarketStatus(key, status) {
           c.voidGross == null &&
           c.fixtures
             .flatMap((f) => f.markets)
-            .some(
-              (m) =>
+            .some((m) =>
+              keys.has(
                 marketKey(
                   c.fixtures.find((f) => f.markets.includes(m)),
                   m,
-                ) === key,
+                ),
+              ),
             ) &&
           c.fixtures.flatMap((f) => f.markets).every((m) => m.settlement !== "pending") &&
           c.fixtures.flatMap((f) => f.markets).some((m) => m.settlement === "void"),

@@ -198,6 +198,8 @@ function importBackup(file) {
         deleted: {},
         settings: incoming.settings && typeof incoming.settings === "object" ? incoming.settings : {},
         progress: incoming.progress && typeof incoming.progress === "object" ? incoming.progress : {},
+        stats: incoming.stats && typeof incoming.stats === "object" ? incoming.stats : {},
+        statsMigrated: !!incoming.statsMigrated,
       };
       if (obj.logos) mergeLogoStores(obj.logos);
       indexSavedCrests();
@@ -663,10 +665,13 @@ document.body.addEventListener("click", (e) => {
     renderAll();
   }
 });
+// Cómo estaban los datos guardados al abrir (antes de que el arranque guarde algo): lo usa la copia interna.
+var kalLoadedState = { found: false, savedAt: null };
 try {
   const saved = localStorage.getItem(KEY);
   if (saved) {
     const d = JSON.parse(saved);
+    kalLoadedState = { found: true, savedAt: d.savedAt || null };
     db = {
       coupons: Array.isArray(d.coupons) ? d.coupons : [],
       houses: Array.isArray(d.houses) ? d.houses : [],
@@ -676,6 +681,8 @@ try {
       deleted: d.deleted && typeof d.deleted === "object" ? d.deleted : {},
       settings: d.settings && typeof d.settings === "object" ? d.settings : {},
       progress: d.progress && typeof d.progress === "object" ? d.progress : {},
+      stats: d.stats && typeof d.stats === "object" ? d.stats : {},
+      statsMigrated: !!d.statsMigrated,
       savedAt: d.savedAt || null,
     };
   } else {

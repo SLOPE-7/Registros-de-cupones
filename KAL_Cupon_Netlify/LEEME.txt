@@ -393,3 +393,16 @@ V16.1 — CUPONES ANTES DE APOSTAR
 - Funciona en Nuevo cupón (con el freno al guardar) y en Analista → Revisar cupón.
 Pruebas: 210.
 - Nuevo cupón → "🤖 Analizar este cupón ahora": el Analista revisa el cupón ahí mismo (debajo del freno), con tu historial, el riesgo calculado, tu banca y los totales que escribiste. Queda guardado también en Analista → Revisar cupón.
+
+V16.2 — MARCADOR EN VIVO POR PARTIDO (site/js/27-marcador.js)
+- En la ficha del partido → Mercados aparece "📊 Marcador en vivo": un solo conteo para TODOS tus cupones de ese partido.
+  · Goles, córners y tarjetas del partido (− / ＋).
+  · Una ficha por jugador con "🎯 A puerta" y "Remates" (un remate a puerta también suma un remate) y "＋ Agregar suplente", con sus propios contadores.
+- Cada línea lee de ese marcador y se marca sola al superarse; las demás siguen esperando. Ej.: Olise 1 a puerta → "+0.5 a puerta (solo él)" ganada y "+1.5 a puerta (con suplente)" espera hasta que él o su suplente sumen otro.
+  · Líneas "solo él": cuentan solo al jugador. Líneas "incl. suplente" / "y suplente": jugador + suplente.
+  · Si restas, las líneas que había marcado el marcador vuelven a pendiente.
+- El mismo mercado escrito distinto en otro cupón ("Total · Más de 1.5" y "Total de goles · Más de 1.5") se ve en una sola tarjeta y se marca a la vez.
+- Mercados de un solo equipo ("Total de goles - Como", "1 total de goles") siguen con su contador propio.
+- Los contadores anteriores se pasan solos al marcador al abrir. El marcador viaja con la nube, los respaldos y las copias.
+- Corrección: la recuperación desde la copia interna compara con los datos tal como estaban al abrir (las migraciones del arranque ya no la confunden).
+Pruebas: 223.

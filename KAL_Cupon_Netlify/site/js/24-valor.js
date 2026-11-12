@@ -29,18 +29,19 @@ function closeOddHtml(x, odd) {
         "</span>"
       : '<span class="small muted">¿A cuánto cerró esta cuota?</span>') +
     '<button type="button" class="btn sm" data-close-odd="' +
-    esc(x.key) +
+    esc(x.statusKey || x.key) +
     '">' +
     (c ? "✎ Cierre" : "＋ Cuota de cierre") +
     "</button></div>"
   );
 }
 function setCloseOdd(key) {
+  const keys = new Set(String(key).split("||"));
   let current = "";
   db.coupons.forEach((c) =>
     c.fixtures.forEach((f) =>
       f.markets.forEach((m) => {
-        if (marketKey(f, m) === key && m.closeOdd) current = m.closeOdd;
+        if (keys.has(marketKey(f, m)) && m.closeOdd) current = m.closeOdd;
       }),
     ),
   );
@@ -55,7 +56,7 @@ function setCloseOdd(key) {
   db.coupons.forEach((c) =>
     c.fixtures.forEach((f) =>
       f.markets.forEach((m) => {
-        if (marketKey(f, m) !== key) return;
+        if (!keys.has(marketKey(f, m))) return;
         if (v) m.closeOdd = v;
         else delete m.closeOdd;
         n++;

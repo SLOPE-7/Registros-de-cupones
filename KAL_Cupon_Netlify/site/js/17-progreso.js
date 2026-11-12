@@ -19,7 +19,10 @@ function parseLine(m, f) {
   const raw = (m?.market || "") + " " + (m?.pick || "");
   const n = raw.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   if (/ambos|1x2|doble oportunidad|handicap|marcador (correcto|exacto)/.test(n)) return null;
-  const cat = LINE_CATEGORIES.find(([re]) => re.test(n));
+  let cat = LINE_CATEGORIES.find(([re]) => re.test(n));
+  // "Total · Más de 1.5" (sin decir de qué) son los goles del partido.
+  if (!cat && /^total\s+(?:mas de|menos de|over|under)\b/.test(n))
+    cat = LINE_CATEGORIES.find((c) => c[1] === "goles");
   if (!cat) return null;
   let dir = null,
     line = null,
@@ -152,6 +155,24 @@ function progressBlock(x) {
   if (currentMatchRef?.draft) return "";
   const info = parseLine(x.m, x.f);
   if (!info) return "";
+  // Goles, córners, tarjetas y jugadores se cuentan en el marcador en vivo del partido (arriba).
+  if (statKind(x.m, x.f, info)) {
+    const total = lineValue(x.f, x.m, x.key);
+    return (
+      '<div class="pg pg-shared">' +
+      progressBar(info, total) +
+      '<div class="pg-head"><span><b>' +
+      total +
+      "</b> / " +
+      (info.dir === "over" ? info.goal : "máx. " + (info.goal - 1)) +
+      " " +
+      esc(info.cat) +
+      (info.incl ? " (con suplente)" : "") +
+      "</span><small>" +
+      progressStatusText(info, total) +
+      " · se cuenta en el marcador ↑</small></div></div>"
+    );
+  }
   const p = progressOf(x.key),
     total = progressTotal(p),
     s = x.m.settlement || "pending";
@@ -250,7 +271,7 @@ function finishMatch(fixtureKeyValue) {
         const info = parseLine(m, f),
           key = marketKey(f, m);
         if (!info || (m.settlement || "pending") !== "pending" || todo.has(key)) return;
-        const total = progressTotal(progressOf(key));
+        const total = lineValue(f, m, key);
         todo.set(key, {
           status:
             info.dir === "over" ? (total >= info.goal ? "won" : "lost") : total >= info.goal ? "lost" : "won",
@@ -295,6 +316,29 @@ async function addSubstitute(key) {
   renderAll();
   if (location.protocol === "file:") return;
   try {
+    const chosen = await pickPlayerPhoto(name, found.info.player.code, found.f);
+    if (!chosen?.photo) return;
+    const cur = progressOf(key);
+    if (!cur.sub) return;
+    db.progress[key] = {
+      ...cur,
+      sub: { ...cur.sub, name: chosen.name || name, photo: chosen.photo, playerId: String(chosen.id || "") },
+      updatedAt: new Date().toISOString(),
+    };
+    save();
+    renderAll();
+    toast("Suplente: " + (chosen.name || name) + " con su foto.");
+  } catch (e) {
+    toast("Se guardó el suplente sin foto: " + (e?.message || "no se pudo buscar"));
+  }
+}
+
+// Busca la foto de un jugador por nombre (API-Football y TheSportsDB) y la guarda en el catálogo.
+// Devuelve el jugador elegido o null.
+async function pickPlayerPhoto(name, code, fixture) {
+  if (location.protocol === "file:") return null;
+  {
+    const found = { f: fixture, info: { player: { code } } };
     const side = playerClubForCode(found.info.player.code, found.f).side,
       ids = matchApiIds(found.f);
     const params = new URLSearchParams({
@@ -350,14 +394,7 @@ async function addSubstitute(key) {
       if (/^\d{1,10}$/.test(id))
         chosen = { id, name, photo: "https://media.api-sports.io/football/players/" + id + ".png", team: "" };
     }
-    if (!chosen?.photo) return;
-    const cur = progressOf(key);
-    if (!cur.sub) return;
-    db.progress[key] = {
-      ...cur,
-      sub: { ...cur.sub, name: chosen.name || name, photo: chosen.photo, playerId: String(chosen.id || "") },
-      updatedAt: new Date().toISOString(),
-    };
+    if (!chosen?.photo) return null;
     const dir = readCrestDirectory(),
       pid = String(chosen.id || "");
     if (pid) {
@@ -376,11 +413,7 @@ async function addSubstitute(key) {
         localStorage.setItem(CREST_DIR, JSON.stringify(dir));
       } catch {}
     }
-    save();
-    renderAll();
-    toast("Suplente: " + (chosen.name || name) + " con su foto.");
-  } catch (e) {
-    toast("Se guardó el suplente sin foto: " + (e?.message || "no se pudo buscar"));
+    return chosen;
   }
 }
 
@@ -398,7 +431,7 @@ function miniProgressText(entries) {
     .map(({ f, m }) => {
       const info = parseLine(m, f);
       if (!info) return null;
-      const total = progressTotal(progressOf(marketKey(f, m)));
+      const total = lineValue(f, m);
       const who = info.player ? info.player.name.split(" ").slice(-1)[0] : info.label;
       return (
         '<span class="pg-chip' +
