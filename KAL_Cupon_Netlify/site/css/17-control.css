@@ -92,3 +92,63 @@
 .bankroll-box .btn.gold {
   width: 100%;
 }
+/* Valor de la cuota: cierre (CLV) en la ficha y calculadora */
+.mk-clv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.clv-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+}
+.clv-chip.pos {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+}
+.clv-chip.neg {
+  background: color-mix(in srgb, var(--red) 18%, transparent);
+  color: var(--red);
+}
+.value-card {
+  margin-top: 12px;
+}
+.vc-houses {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+.vc-house {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.vc-result {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.vc-verdict {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 4px solid var(--gold);
+  background: var(--panel2);
+}
+.vc-verdict.is-good {
+  border-left-color: var(--green);
+}
+.vc-verdict.is-bad {
+  border-left-color: var(--red);
+}
+.vc-verdict small {
+  color: var(--muted);
+}

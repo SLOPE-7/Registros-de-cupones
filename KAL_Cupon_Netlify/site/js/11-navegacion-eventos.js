@@ -26,7 +26,10 @@ const VIEW_RENDER = {
   houses: () => renderHouses(),
   stats: () => renderStats(),
   // Mientras escribe un análisis no se redibuja (se perdería el texto que va llegando).
-  analyst: () => analystBusy || renderAnalyst(),
+  analyst: () => {
+    if (!analystBusy) renderAnalyst();
+    renderValueCalc();
+  },
   settings: () => {
     renderAlertsBox();
     renderInstallHelp();

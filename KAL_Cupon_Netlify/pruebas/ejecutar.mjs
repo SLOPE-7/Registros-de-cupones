@@ -644,6 +644,37 @@ section("17. Control de apuestas: freno al guardar, banca y diario");
   await ctx.close();
 }
 
+section("18. Valor de la cuota: cierre (CLV), calculadora y comparador");
+{
+  const { ctx, page } = await open(baseDb());
+  const vc = await page.evaluate(() => valueCalc({ odd: 2.1, ref: [1.95, 3.6, 4.2], houses: [{ name: "Hondubet", odd: 2.05 }, { name: "Doradobet", odd: 2.2 }] }));
+  check("calculadora: quita el margen y calcula probabilidad, cuota justa y valor esperado", Math.abs(vc.fairP - 0.4985) < 0.001 && Math.abs(vc.fairOdd - 2.006) < 0.01 && Math.abs(vc.margin - 0.0287) < 0.001 && vc.use === 2.2 && Math.abs(vc.ev - (0.4985 * 2.2 - 1)) < 0.002 && vc.kellyQuarter > 0, JSON.stringify(vc));
+  await page.evaluate(() => { db.settings = { banca: { monto: 1000, unidadPct: 2, maxSel: 5, pausaTras: 3 } }; save(); });
+  await view(page, "analyst");
+  await page.fill("#vcOdd", "2.10"); await page.fill("#vcRef", "1.95 3.60 4.20");
+  await page.fill('[data-vc-house="h1"]', "2.05"); await page.fill('[data-vc-house="h2"]', "2.20");
+  const vt = await page.$eval("#vcResult", (e) => e.innerText.replace(/\s+/g, " "));
+  check("calculadora en pantalla: mejor casa, cuota justa y veredicto con monto prudente", /Mejor cuota: Doradobet 2.20/.test(vt) && /Cuota justa: 2.01/.test(vt) && /Tiene valor/.test(vt) && /¼ de Kelly/.test(vt), vt);
+  await page.fill("#vcOdd", "1.80"); await page.fill('[data-vc-house="h1"]', ""); await page.fill('[data-vc-house="h2"]', "");
+  check("calculadora: una cuota por debajo de la justa no tiene valor", /Sin valor/.test(await page.$eval("#vcResult", (e) => e.innerText)));
+  // Cuota de cierre desde la ficha del partido
+  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Fenerbahce")).click());
+  await page.waitForTimeout(200);
+  page.promptAnswer = "1.30";
+  await page.evaluate(() => [...document.querySelectorAll(".match-tab-content > .mk-card")].find((e) => e.innerText.includes("Total de goles")).querySelector("[data-close-odd]").click());
+  await page.waitForTimeout(200);
+  const chip = await page.evaluate(() => [...document.querySelectorAll(".match-tab-content > .mk-card")].find((e) => e.innerText.includes("Total de goles")).querySelector(".clv-chip")?.innerText);
+  check("cierre: se guarda y muestra el valor (1.50 contra cierre 1.30 = +15 %)", chip === "Cierre 1.30 · +15 %", chip);
+  const st = await page.evaluate(() => ({ s: clvStats(), saved: JSON.parse(localStorage.getItem("kal_coupon_organizer_v2")).coupons[0].fixtures[0].markets[0].closeOdd, pay: analystHistoryPayload().valorCierre }));
+  check("cierre: cuenta en las estadísticas y llega al Analista", st.s.n === 1 && Math.abs(st.s.avg - 0.1538) < 0.001 && st.saved === 1.3 && st.pay.mercados === 1, JSON.stringify(st));
+  await page.evaluate(() => closeMatchDetails());
+  await view(page, "stats");
+  check("estadísticas: sección de valor frente al cierre", /Valor medio frente al cierre/.test(await page.$eval("#perfSection", (e) => e.innerText)));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones de Netlify (con API y almacenamiento simulados) ----------
 section("8. Funciones de Netlify");
 {

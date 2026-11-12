@@ -272,6 +272,7 @@ function matchMarketCard(x) {
         (x.coupons.size === 1 ? "" : "es") +
         "</small>") +
     "</div>" +
+    closeOddHtml(x, odd) +
     progressBlock(x) +
     (bet && !photo && !currentMatchRef?.draft
       ? '<button type="button" class="btn sm player-photo-button" data-player-photo="' +

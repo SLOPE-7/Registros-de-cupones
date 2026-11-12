@@ -128,6 +128,10 @@ function analystHistoryPayload() {
     })),
     porTamano: [...sizes.values()].map((s) => ({ ...s, apostado: r2(s.apostado), neto: r2(s.neto) })),
     porMes: p.months.map(([mes, neto]) => ({ mes, neto: r2(neto) })),
+    valorCierre: (() => {
+      const s = clvStats();
+      return s ? { mercados: s.n, valorMedio: r2(s.avg), mejoresQueCierre: s.beat } : null;
+    })(),
     porConfianza: confidenceRows(p.coupons).map((x) => ({
       confianza: x.k,
       cupones: x.n,
