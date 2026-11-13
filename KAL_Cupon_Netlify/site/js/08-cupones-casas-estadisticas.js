@@ -101,7 +101,9 @@ function renderCoupons() {
             (r.net === null ? "—" : money(r.net)) +
             '</b></span></div><div class="saved-fixtures">' +
             matches +
-            '</div><div class="row"><button class="btn sm" data-detail="' +
+            "</div>" +
+            couponAnalysisHtml(c) +
+            '<div class="row"><button class="btn sm" data-detail="' +
             esc(c.id) +
             '">✎ Editar</button><button class="btn sm" data-cashout="' +
             esc(c.id) +
@@ -575,6 +577,9 @@ function renderPerformance() {
     "</section>" +
     '<section class="perf-block"><h3>Valor frente al cierre (CLV)</h3><p class="small muted">Si tus cuotas son mejores que las del cierre, tus picks tienen valor real aunque pierdas una racha.</p>' +
     clvHtml() +
+    "</section>" +
+    '<section class="perf-block"><h3>🤖 El Analista frente a tus resultados</h3><p class="small muted">¿Aciertan las selecciones que el Analista veía con confianza Alta? ¿Señaló la que te hizo perder?</p>' +
+    aiAccuracyHtml() +
     "</section>" +
     '<section class="perf-block"><h3>Según tu confianza</h3><p class="small muted">¿Tus cupones de confianza alta ganan más que los de confianza baja?</p>' +
     confidenceHtml(d.coupons) +

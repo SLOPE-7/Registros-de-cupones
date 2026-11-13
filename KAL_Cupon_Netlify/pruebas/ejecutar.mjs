@@ -68,6 +68,7 @@ const server = http.createServer((req, res) => {
       if (body.modo === "cupon") { await wait(150); send({ t: "estado", v: "Buscando: Fenerbahce Liverpool lesiones" }); }
       const slow = /LENTO/.test(body.datos?.cupon || "");
       const chunks = ["## 📌 En resumen\n", "Te va **bien** en goles de *1.5*.\n", "- Punto uno\n- Punto <img src=x onerror=alert(1)>\n", "## 🎯 Recomendaciones\n1. Combinadas cortas\n"];
+      if (body.modo === "cupon") chunks.push('Orientativo.\n<kal-json>{"veredicto":"arriesgado","probabilidad":0.4,"selecciones":[{"partido":"Fenerbahce vs Liverpool","mercado":"Total de goles","seleccion":"Más de 1.5","confianza":"Alta"},', '{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí","confianza":"Baja"}],"eslabonDebil":[{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí"}]}</kal-json>');
       for (const c of chunks) { await wait(slow ? 400 : 60); if (res.destroyed) return; send({ t: "texto", v: c }); }
       if (/FALLA/.test(body.datos?.cupon || "")) send({ t: "error", v: "Se alcanzó el límite de uso de la API." });
       else send({ t: "fin", uso: { entrada: 100, salida: 50, busquedas: 1 } });
@@ -94,7 +95,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
   await ctx.addInitScript(([d, extra]) => {
     if (!localStorage.getItem("kal_coupon_organizer_v2") && d) localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
     localStorage.setItem("kal_last_backup", String(Date.now()));
-    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "16");
+    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "16.5");
     if (extra === "push") {
       let perm = "default";
       Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -788,7 +789,7 @@ section("21. Copias automáticas, espejo, novedades y rutas /api");
 {
   const { ctx, page } = await open(baseDb(), { init: "news" });
   await page.waitForTimeout(1400);
-  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 16/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
+  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 16.5/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
   await tap(page, "[data-news-close]");
   await page.reload(); await page.waitForTimeout(1500);
   check("novedades: no se repiten al volver a abrir", (await page.$(".news-wrap")) === null);
@@ -901,6 +902,43 @@ section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
   await ctx.close();
 }
 
+section("24. El análisis se guarda en el cupón y se compara con el resultado");
+{
+  const { ctx, page } = await open(baseDb());
+  const pure = await page.evaluate(() => ({ s: stripAiJson("Hola\n<kal-json>{\"a\":1}</kal-json>"), partial: stripAiJson("Hola\n<kal-json>{\"a\""), v: parseAiVerdict("x <kal-json>{\"veredicto\":\"razonable\"}</kal-json>")?.veredicto }));
+  check("el bloque de datos se oculta (también a medias) y se lee", pure.s === "Hola" && pure.partial === "Hola" && pure.v === "razonable", JSON.stringify(pure));
+  await page.evaluate(() => { analystSave({ clave: "secreto" }); });
+  await view(page, "analyst");
+  await page.selectOption("#analystCouponPick", "A");
+  await tap(page, '[data-analyst-run="cupon"]'); await page.waitForTimeout(1200);
+  const shown = await page.$eval("#analystOut-cupon", (e) => e.innerText);
+  const a = await page.evaluate(() => { const c = db.coupons.find((x) => x.id === "A"); return { has: !!c.analysis, ver: c.analysis?.veredicto, ai: c.fixtures[0].markets.map((m) => m.ai || null), cloud: JSON.stringify(db).includes("analysis") }; });
+  check("revisión de un cupón pendiente: se guarda en el cupón (viaja con la nube) sin mostrar el bloque de datos", a.has && a.ver === "arriesgado" && a.cloud && !/kal-json/.test(shown), JSON.stringify(a));
+  check("cada selección queda con su confianza y el eslabón débil marcado", a.ai[0]?.nivel === "Alta" && !a.ai[0]?.debil && a.ai[1]?.nivel === "Baja" && a.ai[1]?.debil === true, JSON.stringify(a.ai));
+  await page.evaluate(() => { const f = db.coupons.find((x) => x.id === "A").fixtures[0]; setMarketStatus(marketKey(f, f.markets[1]), "lost"); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector(".result-card-wrap")?.click());
+  const out = await page.evaluate(() => couponAiOutcome(db.coupons.find((x) => x.id === "A")));
+  check("cupón perdido por el eslabón débil: 'El Analista lo vio venir'", out.kind === "good" && /lo vio venir/.test(out.text) && /Ambos equipos marcan/.test(out.text), JSON.stringify(out));
+  await view(page, "saved"); await page.evaluate(() => document.querySelector('[data-coupon-filter="lost"]')?.click()); await page.waitForTimeout(150);
+  check("Mis cupones muestra el resultado del Analista y su análisis plegado", /lo vio venir/.test(await page.$eval("#couponList", (e) => e.innerText)) && !!(await page.$("#couponList details.coupon-ai .analyst-md")));
+  await view(page, "stats");
+  const stx = await page.$eval("#perfSection", (e) => e.innerText.replace(/\s+/g, " "));
+  check("Estadísticas: el Analista frente a tus resultados", /El Analista frente a tus resultados/.test(stx) && /Confianza Baja 1 selecciones resueltas 0 % acertadas/.test(stx) && /1 de 1/.test(stx), stx.match(/El Analista frente[^]*?Según tu confianza/)?.[0]);
+  check("el Analista recibe su propia precisión", await page.evaluate(() => analystHistoryPayload().precisionAnalista?.perdidosQueVioVenir === 1));
+  // Desde Nuevo cupón: analizar y después guardar
+  await view(page, "new");
+  await page.fill("#raw", "Europa, UEFA Liga Campeones\nFenerbahce\nvs.\nLiverpool\n20/11/2026 • 14:00\nTotal de goles: Más de 1.5\nCuotas: 1.50\nAmbos equipos marcan: Sí\nCuotas: 1.70\nVALOR APOSTADO L 20.00");
+  await tap(page, "#readBtn"); await page.waitForTimeout(250);
+  await tap(page, "[data-analyst-preview]"); await page.waitForTimeout(1300);
+  const pend = await page.evaluate(() => !!analystState().pendiente);
+  await tap(page, "#saveBtn"); await page.waitForTimeout(300);
+  const saved = await page.evaluate(() => ({ has: !!db.coupons[0].analysis, ai: db.coupons[0].fixtures[0].markets.map((m) => m.ai?.nivel || null), left: !!analystState().pendiente, toast: $("toast").textContent }));
+  check("desde Nuevo cupón: el análisis espera y se pega al guardar el cupón", pend && saved.has && saved.ai.join() === "Alta,Baja" && !saved.left && /Con su análisis/.test(saved.toast), JSON.stringify(saved));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones del servidor (con API simulada) ----------
 section("8. Funciones del servidor (API-Football y TheSportsDB)");
 {
@@ -951,6 +989,7 @@ section("15. Función del Analista (Claude simulado)");
     (await status(new Request("https://x", { method: "GET" }))) === 405 && (await status(req({ modo: "historial", datos: { x: "a".repeat(130000) } }))) === 413);
   const pc = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2", historial: [{ tipo: "1X2" }], hoy: "2026-11-11" });
   const ph = A.construirPeticion("historial", { historial: { resumen: {} } });
+  check("revisión de cupón: pide el bloque de datos <kal-json> con confianza y eslabón débil", /<kal-json>/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system) && /eslabonDebil/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system));
   check("petición: modelo, respaldo ante rechazos, esfuerzo y búsqueda web solo al revisar cupones",
     pc.model === "claude-opus-5-5" && pc.fallbacks === "default" && pc.betas.includes("server-side-fallback-2026-07-01") && pc.output_config.effort === "medium" &&
     pc.tools[0].type === "web_search_20260209" && !ph.tools && /2026-11-11/.test(pc.messages[0].content) && /<cupon>/.test(pc.messages[0].content) && !("thinking" in pc) && !("temperature" in pc));

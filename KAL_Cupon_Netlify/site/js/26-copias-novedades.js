@@ -205,8 +205,19 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "16";
+const APP_VERSION = "16.5";
 const NOVEDADES = [
+  {
+    v: "16.5",
+    titulo: "Marcador en vivo y Analista en cada cupón",
+    items: [
+      "📊 Marcador en vivo por partido: goles, córners, tarjetas y, por jugador, Remates (tiros totales) y Remates a puerta, como en Sofascore. Toca el número para escribirlo.",
+      "🔗 El mismo mercado en varios cupones se cuenta una sola vez y se marca solo al superarse.",
+      "🧾 Lee el boleto antes de apostar y te pide valor apostado, bono y ganancia total.",
+      "🤖 “Analizar este cupón ahora” en Nuevo cupón; el análisis se guarda dentro del cupón.",
+      "✅ Cuando el cupón se resuelve, te dice si el Analista lo vio venir, y en Estadísticas ves su acierto.",
+    ],
+  },
   {
     v: "16",
     titulo: "Control, valor y datos",

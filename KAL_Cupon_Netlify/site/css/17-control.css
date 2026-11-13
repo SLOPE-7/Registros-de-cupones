@@ -454,3 +454,27 @@
   color: var(--muted);
   font-weight: 500;
 }
+/* Análisis del Analista dentro del cupón */
+.coupon-ai {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border-left: 4px solid var(--line);
+  font-size: 13px;
+}
+.coupon-ai.is-good {
+  border-left-color: var(--green);
+}
+.coupon-ai.is-bad {
+  border-left-color: var(--red);
+}
+.coupon-ai.is-mid {
+  border-left-color: var(--gold);
+}
+.coupon-ai summary {
+  cursor: pointer;
+}
+.coupon-ai .analyst-md {
+  margin-top: 8px;
+}

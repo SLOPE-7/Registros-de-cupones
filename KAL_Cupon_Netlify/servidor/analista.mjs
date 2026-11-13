@@ -53,7 +53,10 @@ Cuál quitarías o cambiarías y por qué. Propón un mercado alternativo más s
 ## 💡 Cómo lo armaría yo
 Versión ajustada del cupón (qué quitar o cambiar) y cuánto arriesgar según su presupuesto, si te lo pasan.
 Si la app te pasa "riesgo" (calculado con el historial de la persona: probabilidad estimada, selecciones de relleno, partidos repetidos en otros cupones, cómo le fue con cupones de ese tamaño), úsalo y menciónalo cuando sea relevante.
-Cierra con una línea recordando que es un análisis orientativo, no una garantía.`;
+Cierra con una línea recordando que es un análisis orientativo, no una garantía.
+Después de esa línea, y como lo último de tu respuesta, añade un bloque de datos para la app (no se le muestra a la persona), con JSON válido en una sola línea:
+<kal-json>{"veredicto":"razonable|arriesgado|muy arriesgado","probabilidad":0.35,"selecciones":[{"partido":"Equipo A vs Equipo B","mercado":"mercado tal como aparece en el cupón","seleccion":"selección tal como aparece","confianza":"Alta|Media|Baja"}],"eslabonDebil":[{"partido":"Equipo A vs Equipo B","mercado":"…","seleccion":"…"}]}</kal-json>
+Incluye en "selecciones" todas las del cupón, con los mismos nombres que en el cupón. "probabilidad" es tu estimación de acertar el cupón entero (0 a 1).`;
 
 const SISTEMA_SEMANA = `${BASE}
 

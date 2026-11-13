@@ -408,3 +408,11 @@ V16.2 — MARCADOR EN VIVO POR PARTIDO (site/js/27-marcador.js)
 Pruebas: 223.
 - V16.3: los remates se cuentan como "🎯 A puerta" + "↗️ Fuera o bloqueado"; el total de remates es la suma (se muestra). Cada jugador solo muestra los contadores que usan sus líneas (con solo líneas a puerta, solo "A puerta"). Los conteos anteriores de "Remates" pasan a "Fuera o bloqueado".
 - V16.4: como en Sofascore, cada jugador tiene "Remates (tiros totales)" y "🎯 Remates a puerta". Un remate a puerta también suma un remate. Solo se muestran los contadores que usan tus líneas. Toca el número para escribirlo (p. ej. copiado de Sofascore: remates 4, a puerta 2). Los datos de la versión anterior (a puerta + fuera) se convierten solos al total.
+
+V16.5 — EL ANALISTA DENTRO DE CADA CUPÓN (site/js/28-analista-cupon.js)
+- La revisión de un cupón termina con un bloque de datos oculto (<kal-json>) con la confianza de cada selección (Alta/Media/Baja), el eslabón más débil, el veredicto y la probabilidad.
+- Se guarda dentro del cupón (y por eso en la nube): desde Nuevo cupón se pega al guardarlo; desde el Analista, al cupón pendiente elegido o al que tenga los mismos partidos.
+- Mis cupones: "🤖 El Analista lo vio venir: había marcado como débil …", "Falló una selección que veía con confianza Alta …" o "lo veía razonable y acertó", con el análisis completo plegado.
+- Estadísticas → "🤖 El Analista frente a tus resultados": acierto por nivel de confianza y cuántos cupones perdidos había anticipado. El Analista recibe también su propia precisión.
+- Novedades de la versión 16.5 al abrir.
+Pruebas: 236.

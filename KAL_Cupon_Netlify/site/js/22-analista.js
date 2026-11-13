@@ -132,6 +132,17 @@ function analystHistoryPayload() {
       const s = clvStats();
       return s ? { mercados: s.n, valorMedio: r2(s.avg), mejoresQueCierre: s.beat } : null;
     })(),
+    precisionAnalista: (() => {
+      const a = aiAccuracy();
+      return a.analyzed
+        ? {
+            cuponesAnalizados: a.analyzed,
+            porConfianza: a.by,
+            perdidosQueVioVenir: a.foreseen,
+            perdidos: a.lostCoupons,
+          }
+        : null;
+    })(),
     porConfianza: confidenceRows(p.coupons).map((x) => ({
       confianza: x.k,
       cupones: x.n,
@@ -172,6 +183,7 @@ function inlineMd(s) {
     .replace(/(^|[\s(])_([^_]+)_(?=[\s).,;:!?]|$)/g, "$1<i>$2</i>");
 }
 function renderMd(text) {
+  text = typeof stripAiJson === "function" ? stripAiJson(text) : text;
   const out = [];
   let list = null;
   const closeList = () => {
@@ -419,7 +431,8 @@ async function runAnalyst(modo, opts = {}) {
   if (analystBusy) return;
   const out = opts.out || $("analystOut-" + modo);
   let datos = opts.datos,
-    titulo = opts.titulo;
+    titulo = opts.titulo,
+    source = opts.source || null;
   if (datos) {
     // Datos ya preparados (p. ej. desde Nuevo cupón).
   } else if (modo === "historial") {
@@ -461,6 +474,7 @@ async function runAnalyst(modo, opts = {}) {
     if (cupon.length < 10) return toast("Pega o elige el cupón que quieres revisar.");
     const pick = db.coupons.find((c) => c.id === $("analystCouponPick")?.value);
     titulo = pick?.name || cupon.split("\n")[0].slice(0, 40);
+    source = { couponId: pick?.id || null, text: cupon };
     datos = { cupon: cupon.slice(0, 12000) };
     if ($("analystWithHistory")?.checked) {
       const h = analystShortHistory();
@@ -492,6 +506,8 @@ async function runAnalyst(modo, opts = {}) {
     cancelAnimationFrame(frame);
     analystSave({ [modo]: { texto: text, fecha: new Date().toISOString(), titulo } });
     out.innerHTML = analystResultHtml(modo);
+    // La revisión de un cupón se guarda dentro del cupón (o queda esperando a que se guarde).
+    if (modo === "cupon") onAnalystCouponDone(text, source || {});
     if (opts.onDone) opts.onDone();
   } catch (e) {
     cancelAnimationFrame(frame);
@@ -542,7 +558,12 @@ function analyzeDraftHere() {
   } catch {}
   if (bankrollAmount()) datos.banca = { unidad: unitStake(), maxSelecciones: bankrollCfg().maxSel };
   analystSave({ borrador: cupon });
-  runAnalyst("cupon", { out, datos, titulo: $("couponName")?.value || "Nuevo cupón" });
+  runAnalyst("cupon", {
+    out,
+    datos,
+    titulo: $("couponName")?.value || "Nuevo cupón",
+    source: editingCouponId ? { couponId: editingCouponId } : { draft: true },
+  });
   requestAnimationFrame(() => out.scrollIntoView({ block: "start", behavior: "smooth" }));
 }
 

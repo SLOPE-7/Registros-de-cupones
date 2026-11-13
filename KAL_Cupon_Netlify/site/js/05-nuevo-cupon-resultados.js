@@ -216,6 +216,7 @@ function saveCoupon() {
     reason: $("couponReason").value.trim().slice(0, 140),
     fixtures: JSON.parse(JSON.stringify(draftSelections)),
   };
+  const analysisAttached = typeof attachPendingAnalysis === "function" && attachPendingAnalysis(c);
   pushCouponAction(
     existing
       ? { type: "edit", coupon: before, transactions: transactionsBefore, at: now }
@@ -245,7 +246,7 @@ function saveCoupon() {
     autoStakeMissing
       ? "Cupón guardado. Selecciona una casa para registrar la apuesta en el balance."
       : allMarkets
-        ? "Cupón guardado correctamente."
+        ? "Cupón guardado correctamente." + (analysisAttached ? " 🤖 Con su análisis." : "")
         : "Cupón guardado, pero no detecté mercados; puedes completar o revisar las selecciones.",
   );
   $("couponName").value = "";
