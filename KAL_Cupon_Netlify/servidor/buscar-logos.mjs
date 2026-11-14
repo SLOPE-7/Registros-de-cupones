@@ -57,6 +57,29 @@ const NOISE = new Set([
   "sk",
   "the",
 ]);
+const GENERIC = new Set([
+  "uefa",
+  "fifa",
+  "conmebol",
+  "concacaf",
+  "liga",
+  "league",
+  "copa",
+  "cup",
+  "premier",
+  "primera",
+  "division",
+  "championship",
+  "campeonato",
+  "nacional",
+  "national",
+  "united",
+  "city",
+  "real",
+  "sporting",
+  "athletic",
+  "atletico",
+]);
 const toks = (s) =>
   norm(s)
     .split(" ")
@@ -69,10 +92,12 @@ export function similarity(a, b) {
     joinB = B.join(" ");
   if (joinA === joinB) return 1;
   const inter = A.filter((t) =>
-    B.some((x) => x === t || (t.length >= 4 && (x.startsWith(t) || t.startsWith(x)))),
+    B.some((x) => x === t || (t.length >= 4 && x.length >= 4 && (x.startsWith(t) || t.startsWith(x)))),
   );
   let s = inter.length / Math.max(A.length, B.length);
   if (joinB.includes(joinA) || joinA.includes(joinB)) s = Math.max(s, 0.75);
+  // Si solo coinciden palabras genéricas ("UEFA", "Liga", "League"…), no es la misma competición ni equipo.
+  if (inter.length && inter.every((t) => GENERIC.has(t)) && A.some((t) => !GENERIC.has(t))) s *= 0.5;
   return s;
 }
 
@@ -307,7 +332,7 @@ export async function buscarLogos(
         s += 0.05;
       return { ...o, score: s + (priority[o.source] || 0) };
     })
-    .filter((o) => o.score >= 0.5)
+    .filter((o) => o.score >= 0.6)
     .sort((a, b) => b.score - a.score)
     .filter((o) => (seen.has(o.logo) ? false : seen.add(o.logo)))
     .slice(0, 8)

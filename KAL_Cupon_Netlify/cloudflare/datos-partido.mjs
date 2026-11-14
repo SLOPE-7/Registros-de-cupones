@@ -119,7 +119,7 @@ export function nameScore(query, team) {
       cs = c.join(" ");
     if (qs === cs) return 1;
     const inter = q.filter((t) =>
-      c.some((x) => x === t || (t.length >= 4 && (x.startsWith(t) || t.startsWith(x)))),
+      c.some((x) => x === t || (t.length >= 4 && x.length >= 4 && (x.startsWith(t) || t.startsWith(x)))),
     );
     let sc = inter.length / Math.max(q.length, c.length);
     if (cs.includes(qs) || qs.includes(cs)) sc = Math.max(sc, 0.75);
