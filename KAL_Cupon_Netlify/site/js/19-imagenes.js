@@ -16,6 +16,19 @@ async function tsdbSearch(tipo, q, club = "") {
   return Array.isArray(d.options) ? d.options : [];
 }
 
+// --- Búsqueda en varias fuentes a la vez, en español e inglés (football-data.org, Wikipedia, TheSportsDB y
+//     banderas). tipo: "equipo" | "liga" | "pais" ---
+async function logoSearch(tipo, q, pais = "") {
+  if (location.protocol === "file:" || String(q || "").trim().length < 2) return [];
+  const r = await fetch("/api/buscar-logo?" + new URLSearchParams({ tipo, q, pais }), {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(20000),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw Error(d.error || "No se pudo buscar el logo.");
+  return Array.isArray(d.options) ? d.options : [];
+}
+
 // --- Imagen del teléfono → cuadrado de 192 px (WebP o PNG, conserva la transparencia) ---
 const UPLOAD_SIZE = 192;
 async function imageFileToDataUrl(file) {
@@ -178,7 +191,7 @@ function crestOptionsHTML(options, attr) {
           esc([o.team, o.country, o.league].filter(Boolean).join(" · ")) +
           "</small></span>" +
           '<em class="src ' +
-          (o.source === "TheSportsDB" ? "tsdb" : "af") +
+          (o.source === "TheSportsDB" ? "tsdb" : o.source === "API-Football" || !o.source ? "af" : "alt") +
           '">' +
           esc(o.source || "API-Football") +
           "</em></button>",

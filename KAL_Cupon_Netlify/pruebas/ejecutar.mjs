@@ -41,6 +41,11 @@ const server = http.createServer((req, res) => {
       ? [{ id: "1", name: url.searchParams.get("q") + " (TSDB)", country: "Turkey", logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png", source: "TheSportsDB" }]
       : /nico|paz/i.test(url.searchParams.get("q")) ? [{ id: "9", name: "Nico Paz", team: "Como", photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png", source: "TheSportsDB" }] : [] });
   }
+  if (url.pathname === "/api/buscar-logo") {
+    const tipo = url.searchParams.get("tipo"), q = url.searchParams.get("q");
+    seen.push("buscar:" + tipo + ":" + q);
+    return sendJson({ options: tipo === "equipo" ? [{ name: q + " (TSDB)", country: "Turquía", logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png", source: "TheSportsDB" }] : tipo === "liga" ? [{ name: "UEFA Champions League", country: "", logo: "https://crests.football-data.org/CL.png", source: "football-data.org" }] : [] });
+  }
   if (url.pathname === "/api/logo") { res.writeHead(200, { "content-type": "image/png" }); return fs.createReadStream(path.join(ROOT, "pruebas/escudo-prueba.png")).pipe(res); }
   if (url.pathname === "/api/avisos") {
     if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ publicKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U" })); }
@@ -403,14 +408,14 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
   const fb = await idx("Fenerbahce");
   await page.click(`[data-logo-lookup="${fb}"]`); await page.waitForTimeout(300);
   const opts = await texts(page, `#logo-options-${fb} .img-opt`);
-  check("busca a la vez en API-Football y TheSportsDB", opts.length === 2 && /API-Football/.test(opts[0]) && /TheSportsDB/.test(opts[1]), opts.join(" / "));
-  await page.click(`#logo-options-${fb} .img-opt >> nth=1`); await page.waitForTimeout(200);
+  check("busca a la vez en varias fuentes (API-Football, TheSportsDB…)", opts.length === 2 && opts.some((o) => /API-Football/.test(o)) && opts.some((o) => /TheSportsDB/.test(o)), opts.join(" / "));
+  await page.evaluate((fb) => [...document.querySelectorAll(`#logo-options-${fb} .img-opt`)].find((b) => /TheSportsDB/.test(b.innerText)).click(), fb); await page.waitForTimeout(200);
   check("tocar un resultado de TheSportsDB guarda el escudo", (await page.evaluate(() => readCrestDirectory()["team:fenerbahce"]?.url || "")).includes("thesportsdb.com"));
   check("el escudo se aplica a sus partidos", (await page.evaluate(() => db.coupons[0].fixtures[0].homeCrest)).includes("thesportsdb.com"));
   const lv = await idx("Liverpool");
   await page.click(`[data-logo-lookup="${lv}"]`); await page.waitForTimeout(300);
   await page.fill(`#logo-q-${lv}`, "Liverpool FC"); await page.click(`[data-logo-requery="${lv}"]`); await page.waitForTimeout(300);
-  check("se puede buscar con otro nombre", seen.includes("imagenes:equipo:Liverpool FC") && seen.includes("escudos:Liverpool FC"), seen.slice(-4).join(" | "));
+  check("se puede buscar con otro nombre", seen.includes("buscar:equipo:Liverpool FC") && seen.includes("escudos:Liverpool FC"), seen.slice(-4).join(" | "));
   const aek = await idx("AEK");
   const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(`[data-logo-upload="${aek}"]`)]);
   await chooser.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
@@ -936,6 +941,51 @@ section("24. El análisis se guarda en el cupón y se compara con el resultado")
   const saved = await page.evaluate(() => ({ has: !!db.coupons[0].analysis, ai: db.coupons[0].fixtures[0].markets.map((m) => m.ai?.nivel || null), left: !!analystState().pendiente, toast: $("toast").textContent }));
   check("desde Nuevo cupón: el análisis espera y se pega al guardar el cupón", pend && saved.has && saved.ai.join() === "Alta,Baja" && !saved.left && /Con su análisis/.test(saved.toast), JSON.stringify(saved));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("25. Búsqueda de logos en varias fuentes, en español e inglés");
+{
+  const N = await import(path.join(ROOT, "servidor/nombres.mjs"));
+  const L = await import(path.join(ROOT, "servidor/buscar-logos.mjs"));
+  const G = await import(path.join(ROOT, "servidor/logo.mjs"));
+  check("países y selecciones en español o inglés → bandera", N.findCountry("España")?.flag === "es" && N.findCountry("Selección de Inglaterra")?.flag === "gb-eng" && N.findCountry("Ivory Coast")?.es === "Costa de Marfil" && N.findCountry("Países Bajos")?.en === "Netherlands" && N.findCountry("RD Congo")?.flag === "cd" && !N.findCountry("Real Madrid"));
+  check("ligas: nombre en español → país y código", N.leagueInfo("LaLiga EA Sports").code === "PD" && N.leagueInfo("Liga MX").country === "Mexico" && N.leagueInfo("UEFA Liga Campeones").code === "CL");
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    const u = String(url); calls.push(u);
+    const ok = (d) => ({ ok: true, status: 200, json: async () => d });
+    if (u.includes("api.football-data.org/v4/competitions/") && u.endsWith("/teams")) {
+      const code = u.split("/").at(-2);
+      return ok({ teams: code === "BL1" ? [{ name: "FC Bayern München", shortName: "Bayern", tla: "FCB", area: { name: "Germany" }, crest: "https://crests.football-data.org/5.png" }] : [] });
+    }
+    if (u.endsWith("api.football-data.org/v4/competitions")) return ok({ competitions: [{ code: "PD", name: "Primera Division", area: { name: "Spain" }, emblem: "https://crests.football-data.org/PD.png" }, { code: "CL", name: "UEFA Champions League", area: { name: "Europe" }, emblem: "https://crests.football-data.org/CL.png" }] });
+    if (u.includes("wbsearchentities")) return ok({ search: /bayern/i.test(decodeURIComponent(u)) ? [{ id: "Q15789" }] : /liga[+ ]mx/i.test(decodeURIComponent(u)) ? [{ id: "Q1068" }] : [] });
+    if (u.includes("wbgetentities")) return ok({ entities: {
+      Q15789: { id: "Q15789", labels: { es: { value: "FC Bayern de Múnich" }, en: { value: "FC Bayern Munich" } }, descriptions: { es: { value: "club de fútbol alemán" } }, claims: { P154: [{ mainsnak: { datavalue: { value: "FC Bayern München logo (2017).svg" } } }] } },
+      Q1068: { id: "Q1068", labels: { es: { value: "Liga MX" }, en: { value: "Liga MX" } }, descriptions: { es: { value: "liga de fútbol de México" } }, claims: { P154: [{ mainsnak: { datavalue: { value: "Liga MX logo.svg" } } }] } } } });
+    if (u.includes("searchteams.php")) return ok({ teams: /bayern/i.test(decodeURIComponent(u)) ? [{ strTeam: "Bayern Munich", strCountry: "Germany", strSport: "Soccer", strBadge: "https://r2.thesportsdb.com/images/media/team/badge/b.png" }] : null });
+    if (u.includes("search_all_leagues.php")) return ok({ countries: /Mexico/.test(u) ? [{ strLeague: "Mexican Primera League", strLeagueAlternate: "Liga MX", strCountry: "Mexico", strBadge: "https://r2.thesportsdb.com/images/media/league/badge/mx.png" }] : [] });
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const mem = new Map(), store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
+  const run = async (q) => (await (await L.buscarLogos(new Request("https://x/api/buscar-logo?" + new URLSearchParams(q)), { footballDataKey: "k", store, fetchImpl: fakeFetch })).json());
+  const b = await run({ tipo: "equipo", q: "Bayern Múnich", pais: "Alemania" });
+  check("'Bayern Múnich' (en español) encuentra el escudo en football-data, Wikipedia y TheSportsDB; el país sale en español", b.options.length === 3 && b.options[0].source === "football-data.org" && b.options.some((o) => o.source === "Wikipedia" && /Special:FilePath\/FC_Bayern_M%C3%BCnchen_logo/.test(o.logo)) && b.options.some((o) => o.source === "TheSportsDB") && b.options[0].country === "Alemania", JSON.stringify(b.options.map((o) => o.source + ":" + o.name + ":" + o.country)));
+  check("Wikipedia se consulta en español e inglés y con una identificación de la app (sin datos personales)", calls.some((u) => u.includes("language=es")) && calls.some((u) => u.includes("language=en")));
+  const e = await run({ tipo: "equipo", q: "Selección de España" });
+  check("selección nacional: bandera por su nombre en español", e.options[0]?.source === "Bandera" && e.options[0].logo === "https://flagcdn.com/w160/es.png", JSON.stringify(e.options));
+  const lmx = await run({ tipo: "liga", q: "Liga MX" });
+  check("liga: 'Liga MX' en Wikipedia y en TheSportsDB (por país)", lmx.options.some((o) => o.source === "Wikipedia") && lmx.options.some((o) => o.source === "TheSportsDB" && /mx\.png/.test(o.logo)), JSON.stringify(lmx.options));
+  const cl = await run({ tipo: "liga", q: "UEFA Liga Campeones" });
+  check("liga: 'UEFA Liga Campeones' → logo oficial de la Champions (football-data)", cl.options[0]?.logo === "https://crests.football-data.org/CL.png", JSON.stringify(cl.options));
+  const n1 = calls.length; await run({ tipo: "equipo", q: "Bayern Múnich", pais: "Alemania" });
+  check("las búsquedas repetidas salen de la caché", calls.length - n1 <= 1, String(calls.length - n1));
+  const ok = (u) => G.isExtraLogoSource(new URL(u));
+  check("proxy de imágenes: acepta las fuentes nuevas y rechaza otras", ok("https://crests.football-data.org/5.png") && ok("https://flagcdn.com/w160/gb-eng.png") && ok("https://commons.wikimedia.org/wiki/Special:FilePath/X.svg") && !ok("https://evil.example.com/x.png") && !ok("http://flagcdn.com/w160/es.png"));
+  const { ctx, page } = await open(null);
+  const safe = await page.evaluate(() => ["https://crests.football-data.org/5.svg", "https://flagcdn.com/w160/es.png", "https://commons.wikimedia.org/wiki/Special:FilePath/Liga_MX_logo.svg?width=200", "https://evil.example.com/logo.png"].map(safeCrestSource).join());
+  check("la app muestra escudos de las fuentes nuevas (y no de otras)", safe === "true,true,true,false", safe);
   await ctx.close();
 }
 

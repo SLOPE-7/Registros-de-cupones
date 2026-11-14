@@ -86,3 +86,8 @@
     grid-column: 1 / -1;
   }
 }
+/* Otras fuentes (football-data.org, Wikipedia, banderas) */
+.img-opt .src.alt {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+}

@@ -15,6 +15,7 @@ import imagenes from "../servidor/imagenes.mjs";
 import { manejar as analista } from "../servidor/analista.mjs";
 import { avisosHandler, enviarAvisos } from "./avisos.mjs";
 import { datosPartido } from "./datos-partido.mjs";
+import { buscarLogos } from "../servidor/buscar-logos.mjs";
 
 // Almacenamiento de los avisos (suscripciones, partidos y claves VAPID). Un único Durable Object con SQLite,
 // incluido en el plan gratis y sin nada que configurar.
@@ -55,6 +56,12 @@ const FUNCIONES = { escudos, logo, partido, jugadores, catalogo, imagenes };
 async function api(nombre, request, env) {
   if (FUNCIONES[nombre]) return FUNCIONES[nombre](request);
   if (nombre === "avisos") return avisosHandler(request, almacen(env));
+  if (nombre === "buscar-logo")
+    return buscarLogos(request, {
+      footballDataKey: env.FOOTBALL_DATA_KEY,
+      theSportsDbKey: /^[A-Za-z0-9]{1,40}$/.test(env.THESPORTSDB_KEY || "") ? env.THESPORTSDB_KEY : "123",
+      store: almacen(env),
+    });
   if (nombre === "datos-partido")
     return datosPartido(request, { token: env.FOOTBALL_DATA_KEY, store: almacen(env) });
   if (nombre === "analista")

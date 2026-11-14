@@ -974,16 +974,20 @@ async function lookupSavedLeagueLogo(i) {
   if (!x || !box) return;
   btn.disabled = true;
   btn.textContent = "Buscando…";
-  box.textContent = "Consultando catálogo…";
+  box.textContent = "Consultando catálogos (español e inglés)…";
   try {
-    const p = new URLSearchParams({ home: "", away: "", league: x.name, country: x.country || "" }),
-      r = await fetch("/api/escudos?" + p, {
+    const p = new URLSearchParams({ home: "", away: "", league: x.name, country: x.country || "" });
+    const [af, more] = await Promise.allSettled([
+      fetch("/api/escudos?" + p, {
         headers: { Accept: "application/json" },
         signal: AbortSignal.timeout(16000),
-      }),
-      d = await r.json();
-    if (!r.ok) throw Error(d.error || "No se pudo buscar la liga.");
-    const opts = d.league?.options || [];
+      }).then((r) => r.json().then((d) => (r.ok ? d.league?.options || [] : []))),
+      logoSearch("liga", x.name, x.country || ""),
+    ]);
+    const opts = [
+      ...(more.status === "fulfilled" ? more.value : []),
+      ...(af.status === "fulfilled" ? af.value : []),
+    ];
     if (!opts.length) {
       box.textContent = "Sin coincidencias. Prueba Buscar por ID.";
       return;
@@ -1001,6 +1005,7 @@ async function lookupSavedLeagueLogo(i) {
             '">' +
             esc(o.name) +
             (o.country ? " · " + esc(o.country) : "") +
+            (o.source ? " (" + esc(o.source) + ")" : "") +
             "</option>",
         )
         .join("") +
@@ -1128,7 +1133,8 @@ async function lookupSavedTeamLogo(index, query = "") {
     button.disabled = true;
     button.textContent = "Buscando…";
   }
-  box.innerHTML = '<span class="marketmeta">Buscando en API-Football y TheSportsDB…</span>';
+  box.innerHTML =
+    '<span class="marketmeta">Buscando en football-data.org, Wikipedia, TheSportsDB y API-Football…</span>';
   const apiFootball = (async () => {
     const params = new URLSearchParams({ home: q, away: "", league: "", country: team.country || "" }),
       cache = crestCacheRead(),
@@ -1150,11 +1156,12 @@ async function lookupSavedTeamLogo(index, query = "") {
     return (data.home?.options || []).map((o) => ({ ...o, source: "API-Football" }));
   })();
   try {
-    const [a, b] = await Promise.allSettled([apiFootball, tsdbSearch("equipo", q)]);
+    const [a, b] = await Promise.allSettled([apiFootball, logoSearch("equipo", q, team.country || "")]);
+    const seenLogo = new Set();
     const options = [
-      ...(a.status === "fulfilled" ? a.value : []),
       ...(b.status === "fulfilled" ? b.value : []),
-    ];
+      ...(a.status === "fulfilled" ? a.value : []),
+    ].filter((o) => o.logo && !seenLogo.has(o.logo) && seenLogo.add(o.logo));
     const errors = [a, b]
       .filter((x) => x.status === "rejected")
       .map((x) => x.reason?.message)

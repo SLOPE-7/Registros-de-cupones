@@ -254,6 +254,16 @@ function safeCrestSource(url) {
   if (/^data:image\/(?:png|jpeg|webp);base64,/i.test(String(url || ""))) return true;
   try {
     const u = new URL(url);
+    // football-data.org, Wikipedia (Wikimedia Commons) y banderas de flagcdn
+    if (u.protocol === "https:") {
+      if (u.hostname === "crests.football-data.org" && /^\/[\w.-]+\.(?:png|svg)$/i.test(u.pathname))
+        return true;
+      if (u.hostname === "flagcdn.com" && /^\/w\d{2,4}\/[a-z]{2}(?:-[a-z]{2,3})?\.png$/i.test(u.pathname))
+        return true;
+      if (u.hostname === "commons.wikimedia.org" && /^\/wiki\/Special:FilePath\/[^/]+$/.test(u.pathname))
+        return true;
+      if (u.hostname === "upload.wikimedia.org" && /^\/wikipedia\/commons\//.test(u.pathname)) return true;
+    }
     if (
       u.protocol === "https:" &&
       /^(?:r2|www)\.thesportsdb\.com$/i.test(u.hostname) &&
@@ -386,14 +396,18 @@ async function lookupCrests(fi, force = false) {
       if (keys.length > 200) delete cache[keys[0]];
       localStorage.setItem(CREST_CACHE, JSON.stringify(cache));
     }
-    const [tsHome, tsAway] = await Promise.all([
-      needsHome ? tsdbSearch("equipo", f.home).catch(() => []) : [],
-      needsAway ? tsdbSearch("equipo", f.away).catch(() => []) : [],
+    // Más fuentes, en español e inglés: football-data.org, Wikipedia, TheSportsDB y banderas.
+    const league = f.competition || f.league || "";
+    const [moreHome, moreAway, moreLeague] = await Promise.all([
+      needsHome ? logoSearch("equipo", f.home, f.country).catch(() => []) : [],
+      needsAway ? logoSearch("equipo", f.away, f.country).catch(() => []) : [],
+      league ? logoSearch("liga", league, f.country).catch(() => []) : [],
     ]);
     data = {
       ...data,
-      home: { options: [...(data.home?.options || []), ...tsHome] },
-      away: { options: [...(data.away?.options || []), ...tsAway] },
+      home: { options: [...moreHome, ...(data.home?.options || [])] },
+      away: { options: [...moreAway, ...(data.away?.options || [])] },
+      league: { options: [...moreLeague, ...(data.league?.options || [])] },
     };
     crestChoices[fi] = data;
     const field = (key, label) => {
@@ -415,7 +429,7 @@ async function lookupCrests(fi, force = false) {
               '">' +
               esc(x.name) +
               (x.country ? " · " + esc(x.country) : "") +
-              (x.source === "TheSportsDB" ? " (TheSportsDB)" : "") +
+              (x.source && x.source !== "API-Football" ? " (" + esc(x.source) + ")" : "") +
               "</option>",
           )
           .join("") +

@@ -416,3 +416,14 @@ V16.5 — EL ANALISTA DENTRO DE CADA CUPÓN (site/js/28-analista-cupon.js)
 - Estadísticas → "🤖 El Analista frente a tus resultados": acierto por nivel de confianza y cuántos cupones perdidos había anticipado. El Analista recibe también su propia precisión.
 - Novedades de la versión 16.5 al abrir.
 Pruebas: 236.
+
+V16.6 — BÚSQUEDA DE LOGOS EN VARIAS FUENTES, EN ESPAÑOL E INGLÉS (servidor/buscar-logos.mjs, servidor/nombres.mjs)
+- Nueva ruta /api/buscar-logo?tipo=equipo|liga|pais&q=…&pais=… que consulta a la vez:
+  · football-data.org (escudos oficiales y logos de las ligas de su plan gratis; usa FOOTBALL_DATA_KEY; el catálogo se arma poco a poco y se guarda 7 días),
+  · Wikidata/Wikipedia (busca en español y en inglés; logo P154 o bandera P41; imágenes de Wikimedia Commons),
+  · TheSportsDB (equipos con el nombre en los dos idiomas; ligas por país),
+  · banderas de flagcdn.com para países y selecciones ("Selección de España", "Costa de Marfil", "Inglaterra"…).
+- Entiende nombres en español: países, selecciones, "Bayern Múnich", "Inter de Milán", "Oporto", "LaLiga", "Liga de Campeones"…
+- Se usa al leer un cupón (🔎 Buscar logos: equipos y liga), en Logos → equipos y en Logos → ligas ("Buscar por nombre"). Se muestran juntas con su fuente.
+- El proxy de imágenes y la app aceptan esas fuentes nuevas (los SVG no pueden ejecutar nada).
+Pruebas: 246.
