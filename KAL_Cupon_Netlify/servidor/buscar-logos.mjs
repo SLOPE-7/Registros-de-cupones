@@ -83,7 +83,7 @@ const GENERIC = new Set([
 const toks = (s) =>
   norm(s)
     .split(" ")
-    .filter((t) => t && !NOISE.has(t));
+    .filter((t) => t.length > 1 && !NOISE.has(t));
 export function similarity(a, b) {
   const A = toks(a),
     B = toks(b);
@@ -95,7 +95,14 @@ export function similarity(a, b) {
     B.some((x) => x === t || (t.length >= 4 && x.length >= 4 && (x.startsWith(t) || t.startsWith(x)))),
   );
   let s = inter.length / Math.max(A.length, B.length);
-  if (joinB.includes(joinA) || joinA.includes(joinB)) s = Math.max(s, 0.75);
+  // Un nombre contenido en el otro cuenta solo si son palabras enteras y de al menos dos palabras
+  // ("Bayern Munchen" en "FC Bayern Munchen II"), no "az" dentro de "internazionale" ni "milan" en "inter milan".
+  const shorter = A.length <= B.length ? A : B,
+    longer = A.length <= B.length ? B : A;
+  if (shorter.length >= 2 && (" " + longer.join(" ") + " ").includes(" " + shorter.join(" ") + " "))
+    s = Math.max(s, 0.75);
+  // Lo buscado es una sola palabra (p. ej. "Como", "Internazionale") y aparece entera en el nombre encontrado.
+  if (A.length === 1 && A[0].length >= 4 && !GENERIC.has(A[0]) && B.includes(A[0])) s = Math.max(s, 0.7);
   // Si solo coinciden palabras genéricas ("UEFA", "Liga", "League"…), no es la misma competición ni equipo.
   if (inter.length && inter.every((t) => GENERIC.has(t)) && A.some((t) => !GENERIC.has(t))) s *= 0.5;
   return s;

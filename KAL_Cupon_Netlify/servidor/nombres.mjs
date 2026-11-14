@@ -148,8 +148,11 @@ const COUNTRY_BY_NAME = new Map();
 COUNTRIES.forEach((c) => [c[0], c[1], ...c.slice(3)].forEach((n) => COUNTRY_BY_NAME.set(norm(n), c)));
 // Devuelve { es, en, flag } si el texto es un país o su selección ("Selección de España", "Spain U21"…).
 export function findCountry(text) {
+  const exact = COUNTRY_BY_NAME.get(norm(text));
+  if (exact) return { es: exact[0], en: exact[1], flag: exact[2] };
   const n = norm(text)
-    .replace(/\b(seleccion|selección|de|national|team|nt|fc)\b/g, " ")
+    .replace(/^(seleccion|national team) (de |of )?/, "")
+    .replace(/\b(national|team|nt|fc|women|femenil|femenina)\b/g, " ")
     .replace(/\b(u|sub)\s?(17|19|20|21|23)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
