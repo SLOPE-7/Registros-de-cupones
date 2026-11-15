@@ -39,24 +39,44 @@ Entre tres y cinco acciones concretas para las próximas semanas.
 
 Notas sobre los datos: "tasa" = ganados / (ganados + perdidos). "rentabSuelta" = lo que habría ganado apostando 1 unidad a cada mercado por separado, a su cuota (0.10 = +10 %). Los mercados se cuentan una sola vez aunque estén en varios cupones. Fíjate en el tamaño de cada muestra antes de sacar conclusiones.`;
 
+// Método común para revisar y armar cupones: cómo investigar y cómo estimar cada selección.
+const METODO = `Cómo investigar (tienes pocas búsquedas: úsalas donde más cambian la estimación)
+- Si la app te pasa "datosPartidos" (tabla, forma, goles esperados y probabilidades de un modelo de goles), úsalos como punto de partida y no busques lo que ya está ahí.
+- Una búsqueda por partido suele bastar; combínala ("X vs Y alineaciones probables bajas"). Prioriza: 1) alineaciones probables o confirmadas y bajas (lesión, sanción, descanso); 2) rotaciones y lo que hay en juego (partido ya decidido, otro partido en pocos días, amistoso); 3) forma reciente.
+- Mercados de jugador (remates, remates a puerta, goles): lo primero es saber si será titular y cuántos minutos suele jugar; después su posición y su promedio reciente en esa estadística. Si no puedes confirmar que será titular, dilo.
+- Fíjate en la fecha de cada dato: una noticia vieja sobre una lesión no sirve. Si el partido ya se jugó, dilo y no lo analices como futuro.
+- Si no encuentras información de un partido, dilo; no la inventes.
+
+Cómo estimar cada selección
+- Da una probabilidad en número (por ejemplo "≈ 72 %"), no solo una etiqueta. Parte de una base y ajústala con lo que encontraste: la base es el modelo de goles si la app lo pasa; si no, la probabilidad que implica la cuota individual (1 / cuota, menos el margen de la casa, que suele ser de 5 a 8 %), o tu conocimiento de la frecuencia típica de ese mercado.
+- Confianza según tu probabilidad: Alta = 80 % o más y con información que la respalde; Media = entre 65 y 80 %; Baja = menos de 65 %, o cuando falta un dato clave (por ejemplo, un mercado de jugador sin titularidad confirmada es como máximo Media, nunca Alta).
+- Un BetBuilder es una sola apuesta con una sola cuota: sus selecciones están relacionadas entre sí (si hay pocos ataques, bajan a la vez los goles, los remates y los córners). Estima la probabilidad de que salgan todas juntas, no multipliques como si fueran independientes, y compárala con la que implica la cuota del paquete.
+- Probabilidad del cupón = producto de las probabilidades de cada partido (o paquete). Compárala con la que implica la cuota total y di si la cuota paga el riesgo (valor = probabilidad × cuota − 1).
+- Sé honesto con la incertidumbre: las selecciones con cuota muy baja (1.05–1.20) fallan más de lo que parece, y en una combinada larga basta una. Si tu propio historial de aciertos viene en "precisionAnalista", úsalo para corregirte (si tus "Alta" aciertan menos de lo esperado, sé más conservador).
+- Usa el historial de la persona por tipo de mercado para avisarle cuando apueste a algo que le sale mal, pero no dejes que sustituya el análisis del partido.`;
+
 const SISTEMA_CUPON = `${BASE}
 
-Tarea: revisar un cupón ANTES de que la persona lo apueste. Usa la búsqueda web para informarte de cada partido: forma reciente, lesiones y sanciones, rotaciones probables (por ejemplo, si juega otra competición en pocos días), local/visitante y lo que haya en juego. Prioriza fuentes recientes y fiables. Si no encuentras información de un partido, dilo.
-Si la app te pasa el historial de la persona por tipo de mercado, úsalo para avisarle cuando apueste a algo que históricamente le sale mal.
-Estructura:
+Tarea: revisar un cupón ANTES de que la persona lo apueste y decirle, con números, qué tan probable es acertarlo y cuál es su punto más débil.
+
+${METODO}
+
+Si la app te pasa "riesgo" (calculado con el historial de la persona: selecciones de relleno, partidos repetidos en otros cupones pendientes, cómo le fue con cupones de ese tamaño, racha), menciónalo cuando sea relevante: un partido repetido en varios cupones multiplica la pérdida si falla.
+
+Estructura de la respuesta:
 ## 📌 Veredicto
-Una o dos frases: si el cupón es razonable o arriesgado, y la probabilidad aproximada de acertarlo entero comparada con la que implica la cuota total.
+Dos frases: probabilidad estimada de acertar el cupón entero, la que implica la cuota, y si vale la pena tal como está.
 ## 🔎 Partido por partido
-Para cada selección: "- **Equipo A vs Equipo B** · mercado · cuota → confianza Alta / Media / Baja" y debajo una o dos frases con el motivo.
+Para cada selección: "- **Equipo A vs Equipo B** · mercado · selección → ≈ NN % · confianza Alta / Media / Baja" y debajo una o dos frases con el dato concreto que lo respalda (o el que falta).
 ## 🚩 El eslabón más débil
-Cuál quitarías o cambiarías y por qué. Propón un mercado alternativo más seguro solo si tiene sentido.
+La selección con menor probabilidad: por qué, y qué harías (quitarla, bajar la línea o cambiar de mercado). Di cuánto sube la probabilidad del cupón sin ella.
 ## 💡 Cómo lo armaría yo
-Versión ajustada del cupón (qué quitar o cambiar) y cuánto arriesgar según su presupuesto, si te lo pasan.
-Si la app te pasa "riesgo" (calculado con el historial de la persona: probabilidad estimada, selecciones de relleno, partidos repetidos en otros cupones, cómo le fue con cupones de ese tamaño), úsalo y menciónalo cuando sea relevante.
+Versión ajustada del cupón y cuánto arriesgar según su unidad o presupuesto, si te los pasan.
 Cierra con una línea recordando que es un análisis orientativo, no una garantía.
+
 Después de esa línea, y como lo último de tu respuesta, añade un bloque de datos para la app (no se le muestra a la persona), con JSON válido en una sola línea:
-<kal-json>{"veredicto":"razonable|arriesgado|muy arriesgado","probabilidad":0.35,"selecciones":[{"partido":"Equipo A vs Equipo B","mercado":"mercado tal como aparece en el cupón","seleccion":"selección tal como aparece","confianza":"Alta|Media|Baja"}],"eslabonDebil":[{"partido":"Equipo A vs Equipo B","mercado":"…","seleccion":"…"}]}</kal-json>
-Incluye en "selecciones" todas las del cupón, con los mismos nombres que en el cupón. "probabilidad" es tu estimación de acertar el cupón entero (0 a 1).`;
+<kal-json>{"veredicto":"razonable|arriesgado|muy arriesgado","probabilidad":0.35,"selecciones":[{"partido":"Equipo A vs Equipo B","mercado":"mercado tal como aparece en el cupón","seleccion":"selección tal como aparece","p":0.72,"confianza":"Alta|Media|Baja"}],"eslabonDebil":[{"partido":"Equipo A vs Equipo B","mercado":"…","seleccion":"…"}]}</kal-json>
+Incluye en "selecciones" todas las del cupón, con los mismos nombres que en el cupón; "p" es tu probabilidad de esa selección (0 a 1) y debe coincidir con la que escribiste. "probabilidad" es la del cupón entero (0 a 1).`;
 
 const SISTEMA_SEMANA = `${BASE}
 
@@ -72,17 +92,21 @@ Tres acciones concretas.`;
 
 const SISTEMA_ARMAR = `${BASE}
 
-Tarea: ayudar a armar cupones con los partidos o picks que la persona está considerando. Usa la búsqueda web para revisar forma, bajas, rotaciones y contexto de cada partido. Si la persona solo da partidos, propón tú los mercados.
+Tarea: ayudar a armar cupones con los partidos o picks que la persona está considerando. Si solo da partidos, propón tú los mercados; elige en cada partido el mercado con mejor relación entre probabilidad y cuota, no el más llamativo.
+
+${METODO}
+
 Reglas para armar:
 - Propón entre 1 y 3 cupones cortos (de 1 a la cantidad máxima de selecciones que indique la app; si no la indica, máximo 4).
 - Un partido no se repite en dos cupones.
-- Evita selecciones de "relleno" con cuota menor que 1.15.
+- Solo entran selecciones con probabilidad estimada de 70 % o más; evita las de "relleno" con cuota menor que 1.15.
+- Mercados de jugador: solo con titularidad razonablemente confirmada, y como mucho uno por cupón.
 - Prioriza los tipos de mercado donde su historial es bueno y evita los que le salen mal (si la app te pasa el historial).
-- Si un partido no tiene un pick con sentido, descártalo y dilo.
-- Montos en unidades (½, 1, 1½ o 2) según tu confianza; si la app te da el valor de la unidad, conviértelo a lempiras.
+- Si un partido no tiene un pick con sentido, descártalo y dilo. Proponer menos cupones, o ninguno, es una respuesta válida.
+- Montos en unidades (½, 1, 1½ o 2) según la probabilidad del cupón; si la app te da el valor de la unidad, conviértelo a lempiras. En racha de pérdidas, como mucho 1 unidad.
 Estructura:
 ## 🧩 Cupón 1 · nombre corto
-Lista: "- **Equipo A vs Equipo B** · mercado · cuota aproximada si la conoces → confianza Alta/Media/Baja" y una frase con el motivo. Al final: probabilidad estimada del cupón y monto sugerido.
+Lista: "- **Equipo A vs Equipo B** · mercado · selección · cuota aproximada si la conoces → ≈ NN % · confianza Alta/Media/Baja" y una frase con el dato que lo respalda. Al final: probabilidad estimada del cupón y monto sugerido.
 (Repite para cada cupón.)
 ## 🗑️ Lo que descarté
 Partidos que no usaste y por qué.
@@ -149,6 +173,19 @@ export async function leerPeticion(req, env) {
     return { error: respuestaJson(400, { error: "Pega el texto del cupón que quieres revisar." }) };
   if (modo === "armar" && !(typeof datos.partidos === "string" && datos.partidos.trim().length >= 10))
     return { error: respuestaJson(400, { error: "Escribe los partidos o picks que estás considerando." }) };
+  // Lista opcional de partidos del cupón (para consultar sus datos antes de analizar).
+  datos.partidos = Array.isArray(datos.partidos)
+    ? datos.partidos
+        .filter((x) => x && typeof x.local === "string" && typeof x.visitante === "string")
+        .slice(0, 12)
+        .map((x) => ({
+          local: x.local.slice(0, 80),
+          visitante: x.visitante.slice(0, 80),
+          fecha: /^\d{4}-\d{2}-\d{2}$/.test(x.fecha || "") ? x.fecha : "",
+        }))
+    : modo === "armar"
+      ? datos.partidos
+      : [];
   return { modo, datos };
 }
 
@@ -189,6 +226,16 @@ export function construirPeticion(modo, datos) {
     };
   }
   const extras = [];
+  if (datos.datosPartidos?.length)
+    extras.push(
+      "datosPartidos (football-data.org; probabilidades de un modelo de goles de Poisson; p1/px/p2 = gana local/empate/gana visitante):\n" +
+        JSON.stringify(datos.datosPartidos),
+    );
+  if (datos.precisionAnalista)
+    extras.push(
+      "precisionAnalista (cómo te ha ido en cupones anteriores de esta persona):\n" +
+        JSON.stringify(datos.precisionAnalista),
+    );
   if (datos.historial) extras.push("Mi historial por tipo de mercado:\n" + JSON.stringify(datos.historial));
   if (datos.presupuesto) extras.push("Mi presupuesto:\n" + JSON.stringify(datos.presupuesto));
   if (datos.banca) extras.push("Mi gestión de banca:\n" + JSON.stringify(datos.banca));
@@ -196,9 +243,10 @@ export function construirPeticion(modo, datos) {
   if (modo === "armar") {
     return {
       ...base,
-      output_config: { effort: "medium" },
+      max_tokens: 24000,
+      output_config: { effort: "high" },
       system: SISTEMA_ARMAR,
-      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 8 }],
+      tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 10 }],
       messages: [
         {
           role: "user",
@@ -209,11 +257,19 @@ export function construirPeticion(modo, datos) {
       ],
     };
   }
+  // Búsquedas: una por partido y dos de margen (entre 4 y 12), para que un cupón largo no se quede a medias.
+  const nPartidos =
+    (Array.isArray(datos.partidos) && datos.partidos.length) ||
+    (datos.cupon.match(/\bvs\.?\b/gi) || []).length ||
+    1;
   return {
     ...base,
-    output_config: { effort: "medium" },
+    max_tokens: 24000,
+    output_config: { effort: "high" },
     system: SISTEMA_CUPON,
-    tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }],
+    tools: [
+      { type: "web_search_20260209", name: "web_search", max_uses: Math.min(12, Math.max(4, nPartidos + 2)) },
+    ],
     messages: [
       {
         role: "user",
@@ -308,9 +364,87 @@ export function respuestaEnStreaming(trabajo) {
   });
 }
 
-export async function manejar(req, { env, crearCliente }) {
+// Resume los datos de un partido (de /api/datos-partido) a lo que le sirve al análisis.
+export function resumirDatosPartido(d) {
+  if (!d?.encontrado) return null;
+  const fila = (r) =>
+    r && {
+      posicion: r.posicion,
+      puntos: r.puntos,
+      jugados: r.jugados,
+      golesFavor: r.golesFavor,
+      golesContra: r.golesContra,
+    };
+  const forma = (l) =>
+    (l || []).map((m) => m.resultado + " " + m.marcador + (m.enCasa ? " (casa)" : " (fuera)")).join(", ");
+  const m = d.modelo;
+  return {
+    partido: d.partido.local.nombre + " vs " + d.partido.visitante.nombre,
+    competicion: d.partido.competicion,
+    fecha: String(d.partido.fecha || "").slice(0, 16),
+    estado: d.partido.estado,
+    ...(d.alReves
+      ? { nota: "la casa lista los equipos al revés; este es el orden oficial (local primero)" }
+      : {}),
+    tabla: d.tabla
+      ? { local: fila(d.tabla.local), visitante: fila(d.tabla.visitante), equipos: d.tabla.equipos }
+      : null,
+    ultimos5: { local: forma(d.forma?.local), visitante: forma(d.forma?.visitante) },
+    enfrentamientos: d.h2h
+      ? {
+          partidos: d.h2h.partidos,
+          goles: d.h2h.goles,
+          ganaLocal: d.h2h.local?.ganados,
+          empates: d.h2h.local?.empates,
+          ganaVisitante: d.h2h.visitante?.ganados,
+        }
+      : null,
+    modelo: m
+      ? {
+          golesEsperados: [m.lambdaLocal, m.lambdaVisitante],
+          p1: m.p1,
+          px: m.px,
+          p2: m.p2,
+          mas15: m.over15,
+          mas25: m.over25,
+          mas35: m.over35,
+          ambosMarcan: m.btts,
+          base: m.base,
+        }
+      : null,
+  };
+}
+// Consulta los datos de hasta 5 partidos del cupón (uno tras otro, con un tope de tiempo). Si la fuente no cubre
+// un partido o se alcanza su límite de consultas, se sigue sin esos datos.
+export async function reunirDatosPartidos(partidos, datosDePartido, enviar, ahora = () => Date.now()) {
+  const out = [];
+  if (!datosDePartido || !Array.isArray(partidos) || !partidos.length) return out;
+  const inicio = ahora();
+  enviar({ t: "estado", v: "Consultando datos de los partidos…" });
+  for (const p of partidos.slice(0, 5)) {
+    if (!p.fecha || ahora() - inicio > 12000) continue;
+    try {
+      const d = await datosDePartido(p);
+      if (d?.limite) break;
+      const r = resumirDatosPartido(d);
+      if (r) out.push(r);
+    } catch {
+      // sin datos de este partido
+    }
+  }
+  return out;
+}
+
+export async function manejar(req, { env, crearCliente, datosDePartido }) {
   const p = await leerPeticion(req, env);
   if (p.error) return p.error;
-  const peticion = construirPeticion(p.modo, p.datos);
-  return respuestaEnStreaming((enviar) => analizar(crearCliente(env.ANTHROPIC_API_KEY), peticion, enviar));
+  return respuestaEnStreaming(async (enviar) => {
+    if (p.modo === "cupon") {
+      const datosPartidos = await reunirDatosPartidos(p.datos.partidos, datosDePartido, enviar);
+      if (datosPartidos.length) p.datos.datosPartidos = datosPartidos;
+      enviar({ t: "estado", v: "Analizando…" });
+    }
+    const peticion = construirPeticion(p.modo, p.datos);
+    await analizar(crearCliente(env.ANTHROPIC_API_KEY), peticion, enviar);
+  });
 }

@@ -81,8 +81,14 @@ function attachAnalysis(c, text) {
   c.fixtures.forEach((f) => f.markets.forEach((m) => delete m.ai));
   (Array.isArray(v?.selecciones) ? v.selecciones : []).forEach((it) => {
     const hit = findLeg(c, it),
-      nivel = nivelOf(it?.confianza);
-    if (hit && nivel) hit.m.ai = { ...(hit.m.ai || {}), nivel };
+      nivel = nivelOf(it?.confianza),
+      prob = Number(it?.p);
+    if (hit && nivel)
+      hit.m.ai = {
+        ...(hit.m.ai || {}),
+        nivel,
+        ...(prob > 0 && prob <= 1 ? { p: Math.round(prob * 100) / 100 } : {}),
+      };
   });
   (Array.isArray(v?.eslabonDebil) ? v.eslabonDebil : v?.eslabonDebil ? [v.eslabonDebil] : []).forEach(
     (it) => {
@@ -185,6 +191,9 @@ function couponAnalysisHtml(c) {
 function aiAccuracy() {
   const by = { Alta: { won: 0, lost: 0 }, Media: { won: 0, lost: 0 }, Baja: { won: 0, lost: 0 } };
   let analyzed = 0,
+    pSum = 0,
+    pN = 0,
+    pWon = 0,
     lostCoupons = 0,
     foreseen = 0,
     weakFlags = 0,
@@ -200,6 +209,11 @@ function aiAccuracy() {
         if (seen.has(k)) return;
         seen.add(k);
         if (m.ai.nivel && by[m.ai.nivel]) by[m.ai.nivel][m.settlement]++;
+        if (m.ai.p) {
+          pSum += m.ai.p;
+          pN++;
+          if (m.settlement === "won") pWon++;
+        }
         if (m.ai.debil) {
           weakFlags++;
           if (m.settlement === "lost") weakLost++;
@@ -216,7 +230,30 @@ function aiAccuracy() {
         foreseen++;
     }
   });
-  return { analyzed, by, lostCoupons, foreseen, weakFlags, weakLost };
+  // Calibración: probabilidad media que dio frente a lo que de verdad acertó.
+  const calibration = pN ? { n: pN, predicted: pSum / pN, actual: pWon / pN } : null;
+  return { analyzed, by, lostCoupons, foreseen, weakFlags, weakLost, calibration };
+}
+// Lo que se le envía al Analista sobre sus propios aciertos, para que se corrija.
+function aiPrecisionPayload() {
+  const a = aiAccuracy();
+  const n = NIVELES.reduce((s, k) => s + a.by[k].won + a.by[k].lost, 0);
+  if (!n) return undefined;
+  const lvl = (k) => ({ acertadas: a.by[k].won, falladas: a.by[k].lost });
+  return {
+    porConfianza: { Alta: lvl("Alta"), Media: lvl("Media"), Baja: lvl("Baja") },
+    cuponesPerdidos: a.lostCoupons,
+    perdidosQueSenalaste: a.foreseen,
+    ...(a.calibration
+      ? {
+          calibracion: {
+            selecciones: a.calibration.n,
+            probabilidadMediaQueDiste: Math.round(a.calibration.predicted * 100) / 100,
+            aciertoReal: Math.round(a.calibration.actual * 100) / 100,
+          },
+        }
+      : {}),
+  };
 }
 function aiAccuracyHtml() {
   const a = aiAccuracy();
@@ -249,6 +286,15 @@ function aiAccuracyHtml() {
         "</b> perdidos, el Analista había marcado como débil la selección que falló"
       : "") +
     (a.weakFlags ? " · de sus " + a.weakFlags + " eslabones débiles, fallaron " + a.weakLost : "") +
-    ".</p>"
+    ".</p>" +
+    (a.calibration && a.calibration.n >= 5
+      ? '<p class="small">Calibración: en ' +
+        a.calibration.n +
+        " selecciones dio de media un <b>" +
+        Math.round(a.calibration.predicted * 100) +
+        " %</b> de probabilidad y acertaron el <b>" +
+        Math.round(a.calibration.actual * 100) +
+        " %</b>.</p>"
+      : "")
   );
 }

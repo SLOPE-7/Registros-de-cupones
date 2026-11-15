@@ -68,6 +68,20 @@ async function api(nombre, request, env) {
     return analista(request, {
       env: { ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY, ANALISTA_CLAVE: env.ANALISTA_CLAVE },
       crearCliente: (apiKey) => new Anthropic({ apiKey, maxRetries: 2 }),
+      // Datos del partido (football-data.org) para que el análisis parta de números y gaste menos búsquedas.
+      datosDePartido: env.FOOTBALL_DATA_KEY
+        ? async ({ local, visitante, fecha }) => {
+            const r = await datosPartido(
+              new Request(
+                "https://kal.local/api/datos-partido?" +
+                  new URLSearchParams({ home: local, away: visitante, date: fecha }),
+              ),
+              { token: env.FOOTBALL_DATA_KEY, store: almacen(env) },
+            );
+            if (r.status === 429) return { limite: true };
+            return r.ok ? r.json() : null;
+          }
+        : null,
     });
   return null;
 }

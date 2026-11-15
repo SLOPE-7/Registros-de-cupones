@@ -427,3 +427,12 @@ V16.6 — BÚSQUEDA DE LOGOS EN VARIAS FUENTES, EN ESPAÑOL E INGLÉS (servidor/
 - Se usa al leer un cupón (🔎 Buscar logos: equipos y liga), en Logos → equipos y en Logos → ligas ("Buscar por nombre"). Se muestran juntas con su fuente.
 - El proxy de imágenes y la app aceptan esas fuentes nuevas (los SVG no pueden ejecutar nada).
 Pruebas: 246.
+
+V16.7 — ANALISTA MÁS PRECISO (servidor/analista.mjs)
+- Método: cada selección lleva una probabilidad en número (≈ NN %) y la confianza sale de ella (Alta ≥ 80 %, Media 65–80 %, Baja < 65 % o falta un dato clave). Mercados de jugador: primero titularidad y minutos; sin titularidad confirmada nunca es "Alta". Un BetBuilder se estima como un solo paquete (selecciones relacionadas), no multiplicando.
+- Datos antes de buscar: la app envía los partidos del cupón y el servidor consulta football-data.org (tabla, últimos 5, enfrentamientos y modelo de goles) para hasta 5 partidos; el Analista parte de esos números y gasta las búsquedas en alineaciones y bajas.
+- Búsquedas según el tamaño del cupón: una por partido + 2 (mínimo 4, máximo 12). Antes eran 6 fijas, aunque el cupón tuviera 11 partidos.
+- Más razonamiento en "Revisar cupón" y "Armar cupones" (esfuerzo alto). "Armar cupones": solo selecciones de 70 % o más, como mucho un mercado de jugador por cupón, y puede proponer menos cupones o ninguno.
+- Calibración: se guarda la probabilidad que dio a cada selección; Estadísticas muestra "dio de media X % y acertaron Y %", y el Analista recibe ese dato para corregirse.
+- Costo: cada revisión cuesta algo más (más razonamiento y, en cupones largos, más búsquedas).
+Pruebas: 257.

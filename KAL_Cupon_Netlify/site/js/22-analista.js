@@ -484,6 +484,10 @@ async function runAnalyst(modo, opts = {}) {
     if (budget) datos.presupuesto = { mensual: budget, gastadoEsteMes: r2(monthSpent()) };
     const riesgo = riskForText(cupon, pick?.id || null);
     if (riesgo) datos.riesgo = riesgo;
+    try {
+      datos.partidos = analystFixtureList(pick ? pick.fixtures : parseCoupon(cupon).fixtures);
+    } catch {}
+    datos.precisionAnalista = aiPrecisionPayload();
     if (bankrollAmount()) datos.banca = { unidad: unitStake(), maxSelecciones: bankrollCfg().maxSel };
   }
   analystBusy = true;
@@ -524,6 +528,20 @@ async function runAnalyst(modo, opts = {}) {
   }
 }
 
+// Partidos del cupón (equipos y fecha) para que el servidor consulte sus datos antes de analizar.
+function analystFixtureList(fixtures) {
+  const seen = new Set();
+  return (fixtures || [])
+    .map((f) => ({ local: f.home || "", visitante: f.away || "", fecha: scheduleISO(f) || "" }))
+    .filter(
+      (x) =>
+        x.local &&
+        x.visitante &&
+        !seen.has(x.local + "|" + x.visitante) &&
+        seen.add(x.local + "|" + x.visitante),
+    )
+    .slice(0, 12);
+}
 // Analiza el cupón leído en "Nuevo cupón" sin salir de esa pantalla: el resultado aparece debajo del freno.
 function draftAsText() {
   const extra = [];
@@ -544,6 +562,8 @@ function analyzeDraftHere() {
   }
   const cupon = draftAsText();
   const datos = { cupon: cupon.slice(0, 12000) };
+  datos.partidos = analystFixtureList(draftSelections);
+  datos.precisionAnalista = aiPrecisionPayload();
   const h = analystShortHistory();
   if (h) datos.historial = h;
   const budget = Number(db.settings?.budget) || 0;

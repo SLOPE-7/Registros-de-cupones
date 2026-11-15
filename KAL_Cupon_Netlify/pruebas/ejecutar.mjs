@@ -73,7 +73,7 @@ const server = http.createServer((req, res) => {
       if (body.modo === "cupon") { await wait(150); send({ t: "estado", v: "Buscando: Fenerbahce Liverpool lesiones" }); }
       const slow = /LENTO/.test(body.datos?.cupon || "");
       const chunks = ["## 📌 En resumen\n", "Te va **bien** en goles de *1.5*.\n", "- Punto uno\n- Punto <img src=x onerror=alert(1)>\n", "## 🎯 Recomendaciones\n1. Combinadas cortas\n"];
-      if (body.modo === "cupon") chunks.push('Orientativo.\n<kal-json>{"veredicto":"arriesgado","probabilidad":0.4,"selecciones":[{"partido":"Fenerbahce vs Liverpool","mercado":"Total de goles","seleccion":"Más de 1.5","confianza":"Alta"},', '{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí","confianza":"Baja"}],"eslabonDebil":[{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí"}]}</kal-json>');
+      if (body.modo === "cupon") chunks.push('Orientativo.\n<kal-json>{"veredicto":"arriesgado","probabilidad":0.4,"selecciones":[{"partido":"Fenerbahce vs Liverpool","mercado":"Total de goles","seleccion":"Más de 1.5","p":0.9,"confianza":"Alta"},', '{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí","p":0.55,"confianza":"Baja"}],"eslabonDebil":[{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí"}]}</kal-json>');
       for (const c of chunks) { await wait(slow ? 400 : 60); if (res.destroyed) return; send({ t: "texto", v: c }); }
       if (/FALLA/.test(body.datos?.cupon || "")) send({ t: "error", v: "Se alcanzó el límite de uso de la API." });
       else send({ t: "fin", uso: { entrada: 100, salida: 50, busquedas: 1 } });
@@ -763,7 +763,7 @@ section("20. Analista: mi semana, armar cupones y riesgo en la revisión");
   const pa = A.construirPeticion("armar", { partidos: "España vs Suiza\nAlemania vs Italia", banca: { unidad: 20, maxSelecciones: 4 } });
   const ps = A.construirPeticion("semana", { semana: { ultimos7dias: { cupones: 3 } } });
   const bad = await A.leerPeticion(new Request("https://x", { method: "POST", headers: { "x-kal-clave": "s" }, body: JSON.stringify({ modo: "armar", datos: { partidos: "" } }) }), { ANTHROPIC_API_KEY: "k", ANALISTA_CLAVE: "s" });
-  check("servidor: 'armar' busca en internet y recibe tu banca; 'semana' no busca; valida los datos", pa.tools[0].max_uses === 8 && /Ayúdame a armar cupones/.test(pa.messages[0].content) && /"maxSelecciones":4/.test(pa.messages[0].content) && /Un partido no se repite/.test(pa.system) && !ps.tools && /últimos 7 días/.test(ps.messages[0].content) && bad.error.status === 400);
+  check("servidor: 'armar' busca en internet y recibe tu banca; 'semana' no busca; valida los datos", pa.tools[0].max_uses === 10 && pa.output_config.effort === "high" && /Ayúdame a armar cupones/.test(pa.messages[0].content) && /"maxSelecciones":4/.test(pa.messages[0].content) && /Un partido no se repite/.test(pa.system) && !ps.tools && /últimos 7 días/.test(ps.messages[0].content) && bad.error.status === 400);
   const db0 = baseDb();
   db0.settings = { banca: { monto: 1000, unidadPct: 2, maxSel: 4, pausaTras: 3 } };
   db0.coupons.push({ id: "W1", name: "Semana 1", created: new Date(Date.now() - 2 * 86400e3).toISOString(), updated: new Date(Date.now() - 86400e3).toISOString(), stake: 50, odds: 3, payout: 150, fixtures: [{ id: "w1", home: "Ajax", away: "PSV", date: "09/11/2026", time: "12:00", markets: [{ market: "1x2", pick: "1", odd: "1.5", settlement: "won" }, { market: "Ambos equipos marcan", pick: "Sí", odd: "2", settlement: "won" }] }] });
@@ -919,6 +919,9 @@ section("24. El análisis se guarda en el cupón y se compara con el resultado")
   const shown = await page.$eval("#analystOut-cupon", (e) => e.innerText);
   const a = await page.evaluate(() => { const c = db.coupons.find((x) => x.id === "A"); return { has: !!c.analysis, ver: c.analysis?.veredicto, ai: c.fixtures[0].markets.map((m) => m.ai || null), cloud: JSON.stringify(db).includes("analysis") }; });
   check("revisión de un cupón pendiente: se guarda en el cupón (viaja con la nube) sin mostrar el bloque de datos", a.has && a.ver === "arriesgado" && a.cloud && !/kal-json/.test(shown), JSON.stringify(a));
+  const sent = analystPosts.at(-1).datos;
+  check("la app envía los partidos del cupón (equipos y fecha) para consultar sus datos", sent.partidos?.length === 2 && sent.partidos[0].local === "Fenerbahce" && /^\d{4}-\d{2}-\d{2}$/.test(sent.partidos[0].fecha), JSON.stringify(sent.partidos));
+  check("cada selección guarda también la probabilidad que dio el Analista", a.ai[0]?.p === 0.9 && a.ai[1]?.p === 0.55, JSON.stringify(a.ai));
   check("cada selección queda con su confianza y el eslabón débil marcado", a.ai[0]?.nivel === "Alta" && !a.ai[0]?.debil && a.ai[1]?.nivel === "Baja" && a.ai[1]?.debil === true, JSON.stringify(a.ai));
   await page.evaluate(() => { const f = db.coupons.find((x) => x.id === "A").fixtures[0]; setMarketStatus(marketKey(f, f.markets[1]), "lost"); });
   await page.waitForTimeout(400);
@@ -930,6 +933,8 @@ section("24. El análisis se guarda en el cupón y se compara con el resultado")
   await view(page, "stats");
   const stx = await page.$eval("#perfSection", (e) => e.innerText.replace(/\s+/g, " "));
   check("Estadísticas: el Analista frente a tus resultados", /El Analista frente a tus resultados/.test(stx) && /Confianza Baja 1 selecciones resueltas 0 % acertadas/.test(stx) && /1 de 1/.test(stx), stx.match(/El Analista frente[^]*?Según tu confianza/)?.[0]);
+  const prec = await page.evaluate(() => aiPrecisionPayload());
+  check("calibración: probabilidad media que dio frente al acierto real, y se le envía en la siguiente revisión", prec.calibracion?.selecciones === 1 && prec.calibracion.probabilidadMediaQueDiste === 0.55 && prec.calibracion.aciertoReal === 0 && prec.porConfianza.Baja.falladas === 1, JSON.stringify(prec));
   check("el Analista recibe su propia precisión", await page.evaluate(() => analystHistoryPayload().precisionAnalista?.perdidosQueVioVenir === 1));
   // Desde Nuevo cupón: analizar y después guardar
   await view(page, "new");
@@ -1042,19 +1047,38 @@ section("15. Función del Analista (Claude simulado)");
     (await status(new Request("https://x", { method: "GET" }))) === 405 && (await status(req({ modo: "historial", datos: { x: "a".repeat(130000) } }))) === 413);
   const pc = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2", historial: [{ tipo: "1X2" }], hoy: "2026-11-11" });
   const ph = A.construirPeticion("historial", { historial: { resumen: {} } });
+  // Método, búsquedas según el tamaño y datos de los partidos
+  const sys = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system;
+  check("método: probabilidad por selección, titularidad en mercados de jugador, BetBuilder como un solo paquete y calibración", /≈ NN %/.test(sys) && /titular/.test(sys) && /BetBuilder es una sola apuesta/.test(sys) && /precisionAnalista/.test(sys) && /"p":0.72/.test(sys));
+  const uses = (d) => A.construirPeticion("cupon", d).tools[0].max_uses;
+  const lista = (n) => Array.from({ length: n }, (_, i) => ({ local: "A" + i, visitante: "B" + i, fecha: "2026-11-22" }));
+  check("búsquedas según el número de partidos (mínimo 4, uno por partido + 2, máximo 12)", uses({ cupon: "A vs B 1x2", partidos: lista(1) }) === 4 && uses({ cupon: "x", partidos: lista(5) }) === 7 && uses({ cupon: "x", partidos: lista(12) }) === 12 && uses({ cupon: "A vs. B\nC vs D\nE vs F\nG vs H" }) === 6);
+  const dp = { encontrado: true, alReves: false, partido: { competicion: "Primera Division", fecha: "2026-11-22T20:00:00Z", estado: "TIMED", local: { nombre: "Barça" }, visitante: { nombre: "Real Madrid" } }, tabla: { local: { posicion: 1, puntos: 33, jugados: 12, golesFavor: 48, golesContra: 13 }, visitante: { posicion: 2, puntos: 30, jugados: 12, golesFavor: 30, golesContra: 10 }, equipos: 20 }, forma: { local: [{ resultado: "G", marcador: "3-0", enCasa: true }], visitante: [] }, h2h: { partidos: 10, goles: 35, local: { ganados: 5, empates: 1 }, visitante: { ganados: 4 } }, modelo: { lambdaLocal: 2.1, lambdaVisitante: 1.3, p1: 0.55, px: 0.2, p2: 0.25, over15: 0.85, over25: 0.66, over35: 0.44, btts: 0.65, base: "tabla general" } };
+  const estados = [];
+  let llamadas = 0;
+  const reunidos = await A.reunirDatosPartidos([{ local: "Barcelona", visitante: "Real Madrid", fecha: "2026-11-22" }, { local: "Sin", visitante: "Fecha", fecha: "" }, { local: "No", visitante: "Cubierto", fecha: "2026-11-22" }, { local: "Limite", visitante: "X", fecha: "2026-11-22" }, { local: "Despues", visitante: "Y", fecha: "2026-11-22" }], async (p) => { llamadas++; return p.local === "Barcelona" ? dp : p.local === "Limite" ? { limite: true } : { encontrado: false }; }, (e) => estados.push(e.v));
+  check("datos de partidos: resume el modelo y la tabla, salta los que no tienen fecha o no están cubiertos y se detiene en el límite", reunidos.length === 1 && reunidos[0].modelo.mas25 === 0.66 && reunidos[0].tabla.local.posicion === 1 && /G 3-0 \(casa\)/.test(reunidos[0].ultimos5.local) && llamadas === 3 && /Consultando datos/.test(estados[0]), JSON.stringify(reunidos).slice(0, 200) + " llamadas=" + llamadas);
+  const conDatos = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2", datosPartidos: reunidos, precisionAnalista: { porConfianza: { Alta: { acertadas: 3, falladas: 2 } } } }).messages[0].content;
+  check("la petición incluye los datos de los partidos y la precisión del Analista", /datosPartidos/.test(conDatos) && /"mas25":0.66/.test(conDatos) && /precisionAnalista/.test(conDatos) && /"falladas":2/.test(conDatos));
+  const val = await A.leerPeticion(req({ modo: "cupon", datos: { cupon: "Barcelona vs Real Madrid 1x2: 1", partidos: [{ local: "Barcelona", visitante: "Real Madrid", fecha: "22/11/2026" }, { local: 5 }, "x"] } }), env);
+  check("valida la lista de partidos (descarta entradas raras y fechas mal formadas)", val.datos.partidos.length === 1 && val.datos.partidos[0].fecha === "", JSON.stringify(val.datos?.partidos));
+  let pidio = null;
+  const respD = await A.manejar(req({ modo: "cupon", datos: { cupon: "Barcelona vs Real Madrid 1x2: 1", partidos: [{ local: "Barcelona", visitante: "Real Madrid", fecha: "2026-11-22" }] } }), { env, datosDePartido: async () => dp, crearCliente: () => { const c = fakeClient([{ stop: "end_turn", events: [["text", "ok"]] }]); pidio = c; return c; } });
+  const lineasD = (await respD.text()).trim().split("\n").map((l) => JSON.parse(l));
+  check("manejar: consulta los datos, los pasa a Claude y avisa de cada paso", /"mas25":0.66/.test(pidio.calls[0].messages[0].content) && lineasD.some((l) => l.v === "Consultando datos de los partidos…") && lineasD.some((l) => l.v === "Analizando…") && lineasD.at(-1).t === "fin", JSON.stringify(lineasD.map((l) => l.v || l.t)));
   check("revisión de cupón: pide el bloque de datos <kal-json> con confianza y eslabón débil", /<kal-json>/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system) && /eslabonDebil/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system));
   check("petición: modelo, respaldo ante rechazos, esfuerzo y búsqueda web solo al revisar cupones",
-    pc.model === "claude-opus-5-5" && pc.fallbacks === "default" && pc.betas.includes("server-side-fallback-2026-07-01") && pc.output_config.effort === "medium" &&
+    pc.model === "claude-opus-5-5" && pc.fallbacks === "default" && pc.betas.includes("server-side-fallback-2026-07-01") && pc.output_config.effort === "high" && ph.output_config.effort === "medium" &&
     pc.tools[0].type === "web_search_20260209" && !ph.tools && /2026-11-11/.test(pc.messages[0].content) && /<cupon>/.test(pc.messages[0].content) && !("thinking" in pc) && !("temperature" in pc));
   // Cliente simulado: cada llamada sigue un guion de eventos y devuelve un mensaje final.
-  const fakeClient = (scripts) => { const calls = []; return { calls, beta: { messages: { stream(params) {
+  function fakeClient(scripts) { const calls = []; return { calls, beta: { messages: { stream(params) {
     const sc = scripts[calls.length]; calls.push(JSON.parse(JSON.stringify(params))); const h = {};
     return { on(ev, fn) { (h[ev] = h[ev] || []).push(fn); return this; }, async finalMessage() {
       if (sc.throw) throw sc.throw;
       for (const [ev, ...args] of sc.events || []) (h[ev] || []).forEach((fn) => fn(...args));
       return { stop_reason: sc.stop, content: sc.content || [{ type: "text", text: "x" }], usage: { input_tokens: 10, output_tokens: 5, server_tool_use: { web_search_requests: sc.searches || 0 } } };
     } };
-  } } } }; };
+  } } } }; }
   const run = async (scripts) => { const client = fakeClient(scripts), out = []; await A.analizar(client, pc, (e) => out.push(e)); return { client, out }; };
   let r = await run([
     { stop: "pause_turn", searches: 2, content: [{ type: "server_tool_use", id: "s1", name: "web_search", input: { query: "Barcelona lesiones" } }],
