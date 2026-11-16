@@ -205,8 +205,19 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "17";
+const APP_VERSION = "18";
 const NOVEDADES = [
+  {
+    v: "18",
+    titulo: "Tus registros de equipos y jugadores",
+    items: [
+      "📒 Cada equipo o selección guarda lo que anotas: goles a favor y en contra, córners y tarjetas, con el promedio de sus últimos 5 partidos.",
+      "👤 Cada jugador se liga al equipo con el que jugó (club o selección) y a la competición, con su promedio de remates y remates a puerta.",
+      "⚽ En cada gol puedes anotar quién lo hizo; también cuenta como registro del jugador.",
+      "🤖 El Analista recibe tus registros de los equipos y jugadores de cada cupón y los combina con la actualidad.",
+      "Los verás en la ficha del partido → 📈 Datos y en Estadísticas.",
+    ],
+  },
   {
     v: "17",
     titulo: "El partido en vivo",

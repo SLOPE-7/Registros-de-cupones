@@ -447,3 +447,13 @@ VERSIÓN 17 — EL PARTIDO EN VIVO (site/js/30-partido-en-vivo.js, site/js/29-pa
 - Banderas automáticas cuando los dos equipos son selecciones (lista de países compartida con el servidor; se regenera con: node herramientas/generar-paises.mjs).
 - Correcciones: "Copa de Naciones Africanas,Cla" → "Copa de Naciones Africanas, Clasificación" (cupones guardados y nuevos).
 Pruebas: 271.
+
+VERSIÓN 18 — TUS REGISTROS DE EQUIPOS Y JUGADORES (site/js/31-registros.js)
+- Nada nuevo que llenar: se calcula con lo que ya anotas en el marcador de cada partido (goles, córners, tarjetas, remates, remates a puerta).
+- Equipos y selecciones: goles a favor y en contra, córners y tarjetas; promedio de los últimos 5 partidos registrados y detalle de cada uno.
+- Jugadores: remates, remates a puerta y goles, separados por el equipo con el que jugó (club o selección) y con su competición. El equipo sale del código del mercado ("(FRA)", "(RMD)") o de dónde se anotó su gol.
+- Goleadores: tras anotar un gol en el marcador aparece "＋ ¿Quién anotó?" (sugiere a los jugadores de tus mercados y de tus registros); tocar el nombre lo quita.
+- Solo cuentan partidos cerrados ("Terminó el partido" o de un día anterior).
+- Dónde se ven: ficha del partido → 📈 Datos → "📒 Tus registros" (los dos equipos y los jugadores de tus mercados), y Estadísticas → "📒 Registros de equipos y jugadores" (con buscador).
+- El Analista recibe "misRegistros" (promedios y últimos 5 partidos de los equipos y jugadores del cupón) y los combina con la actualidad; usa el registro del equipo con el que juega ese partido.
+Pruebas: 281.

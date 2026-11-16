@@ -485,7 +485,9 @@ async function runAnalyst(modo, opts = {}) {
     const riesgo = riskForText(cupon, pick?.id || null);
     if (riesgo) datos.riesgo = riesgo;
     try {
-      datos.partidos = analystFixtureList(pick ? pick.fixtures : parseCoupon(cupon).fixtures);
+      const fxs = pick ? pick.fixtures : parseCoupon(cupon).fixtures;
+      datos.partidos = analystFixtureList(fxs);
+      datos.registros = recordsPayload(fxs);
     } catch {}
     datos.precisionAnalista = aiPrecisionPayload();
     if (bankrollAmount()) datos.banca = { unidad: unitStake(), maxSelecciones: bankrollCfg().maxSel };
@@ -563,6 +565,7 @@ function analyzeDraftHere() {
   const cupon = draftAsText();
   const datos = { cupon: cupon.slice(0, 12000) };
   datos.partidos = analystFixtureList(draftSelections);
+  datos.registros = recordsPayload(draftSelections);
   datos.precisionAnalista = aiPrecisionPayload();
   const h = analystShortHistory();
   if (h) datos.historial = h;

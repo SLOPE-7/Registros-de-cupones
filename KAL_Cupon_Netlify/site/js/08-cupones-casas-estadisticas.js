@@ -578,6 +578,9 @@ function renderPerformance() {
     '<section class="perf-block"><h3>Valor frente al cierre (CLV)</h3><p class="small muted">Si tus cuotas son mejores que las del cierre, tus picks tienen valor real aunque pierdas una racha.</p>' +
     clvHtml() +
     "</section>" +
+    '<section class="perf-block"><h3>📒 Registros de equipos y jugadores</h3><p class="small muted">Promedios de los últimos 5 partidos que registraste en el marcador. El Analista los usa al revisar tus cupones.</p><div id="recordsSection">' +
+    recordsStatsHtml() +
+    "</div></section>" +
     '<section class="perf-block"><h3>🤖 El Analista frente a tus resultados</h3><p class="small muted">¿Aciertan las selecciones que el Analista veía con confianza Alta? ¿Señaló la que te hizo perder?</p>' +
     aiAccuracyHtml() +
     "</section>" +

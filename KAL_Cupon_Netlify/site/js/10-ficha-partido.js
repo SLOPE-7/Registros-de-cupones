@@ -335,7 +335,7 @@ function renderMatchMarkets(merged) {
   );
 }
 function renderMatchDataPanel(tab, f, merged) {
-  if (tab === "datos") return renderFormPanel(f, merged);
+  if (tab === "datos") return matchRecordsHtml(f, merged) + renderFormPanel(f, merged);
   const key = matchCacheKey(f),
     data = matchApiData[key]?.[tab];
   if (tab === "coupons") {

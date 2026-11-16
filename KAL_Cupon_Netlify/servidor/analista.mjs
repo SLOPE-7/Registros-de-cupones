@@ -53,6 +53,7 @@ Cómo estimar cada selección
 - Un BetBuilder es una sola apuesta con una sola cuota: sus selecciones están relacionadas entre sí (si hay pocos ataques, bajan a la vez los goles, los remates y los córners). Estima la probabilidad de que salgan todas juntas, no multipliques como si fueran independientes, y compárala con la que implica la cuota del paquete.
 - Probabilidad del cupón = producto de las probabilidades de cada partido (o paquete). Compárala con la que implica la cuota total y di si la cuota paga el riesgo (valor = probabilidad × cuota − 1).
 - Sé honesto con la incertidumbre: las selecciones con cuota muy baja (1.05–1.20) fallan más de lo que parece, y en una combinada larga basta una. Si tu propio historial de aciertos viene en "precisionAnalista", úsalo para corregirte (si tus "Alta" aciertan menos de lo esperado, sé más conservador).
+- Si la app te pasa "misRegistros", son datos que la propia persona anotó partido a partido: goles, córners y tarjetas de cada equipo, y remates, remates a puerta y goles de cada jugador, separados por club y selección. Cítalos cuando existan ("en tus 3 registros con Francia promedia 2.3 remates") y compáralos con la línea del mercado, pero recuerda que son muestras pequeñas y solo de partidos en los que apostó: combínalos siempre con la actualidad general que encuentres (forma, titularidad, rival). Un jugador puede rendir distinto con su club y con su selección; usa el registro del equipo con el que juega este partido.
 - Usa el historial de la persona por tipo de mercado para avisarle cuando apueste a algo que le sale mal, pero no dejes que sustituya el análisis del partido.`;
 
 const SISTEMA_CUPON = `${BASE}
@@ -230,6 +231,11 @@ export function construirPeticion(modo, datos) {
     extras.push(
       "datosPartidos (football-data.org; probabilidades de un modelo de goles de Poisson; p1/px/p2 = gana local/empate/gana visitante):\n" +
         JSON.stringify(datos.datosPartidos),
+    );
+  if (datos.registros)
+    extras.push(
+      "misRegistros (lo que yo mismo anoté en partidos anteriores: promedios de los últimos 5 partidos registrados de cada equipo y jugador):\n" +
+        JSON.stringify(datos.registros),
     );
   if (datos.precisionAnalista)
     extras.push(

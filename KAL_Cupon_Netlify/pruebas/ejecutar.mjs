@@ -100,7 +100,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
   await ctx.addInitScript(([d, extra]) => {
     if (!localStorage.getItem("kal_coupon_organizer_v2") && d) localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
     localStorage.setItem("kal_last_backup", String(Date.now()));
-    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "17");
+    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "18");
     if (extra === "push") {
       let perm = "default";
       Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -794,7 +794,7 @@ section("21. Copias automáticas, espejo, novedades y rutas /api");
 {
   const { ctx, page } = await open(baseDb(), { init: "news" });
   await page.waitForTimeout(1400);
-  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 17/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
+  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 18/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
   await tap(page, "[data-news-close]");
   await page.reload(); await page.waitForTimeout(1500);
   check("novedades: no se repiten al volver a abrir", (await page.$(".news-wrap")) === null);
@@ -1058,6 +1058,64 @@ section("26. Ficha del partido: marcador por equipo, resultado automático, IA y
   await ctx.close();
   const gen = await import(path.join(ROOT, "herramientas/generar-paises.mjs"));
   check("la lista de países de la app está al día con la del servidor", fs.readFileSync(path.join(ROOT, "site/js/29-paises.js"), "utf8") === gen.contenido());
+}
+
+section("27. Registros propios de equipos y jugadores (promedios y goleadores)");
+{
+  const day = (n) => isoDay(Date.now() - n * 86400e3);
+  const mk = (market, pick) => ({ market, pick, odd: "1.8", builder: false, settlement: "won" });
+  const fx = (id, home, away, comp, d, markets) => ({ id, home, away, competition: comp, league: comp, dateISO: day(d), time: "14:00", markets });
+  const db0 = { coupons: [
+    { id: "R1", name: "R1", created: new Date().toISOString(), stake: 5, odds: 2, payout: 10, fixtures: [
+      fx("a", "Real Madrid", "Sevilla", "LaLiga", 20, [mk("Remates a Puerta - Kylian Mbappe (RMD)", "Más de 0.5"), mk("Total de goles", "Más de 1.5")]),
+      fx("b", "Betis", "Real Madrid", "LaLiga", 12, [mk("Remates - Kylian Mbappe (RMD)", "Más de 1.5")]),
+      fx("c", "Francia", "Italia", "UEFA Nations League", 6, [mk("Remates a Puerta - Kylian Mbappe (FRA)", "Más de 0.5")]),
+      fx("d", "Real Madrid", "Barcelona", "LaLiga", -2, [{ market: "Remates a Puerta - Kylian Mbappe (RMD)", pick: "Más de 1.5", odd: "2.1", builder: false, settlement: "pending" }]),
+    ] }], houses: [], transactions: [], resultHistory: [], actionHistory: [], statsMigrated: true };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => {
+    const fk = (i) => fixtureKey(db.coupons[0].fixtures[i]), pk = crestNorm("Kylian Mbappe");
+    const put = (i, gh, ga, ch, ca, shots, onT, scorers) => { db.stats[fk(i)] = { goals: gh + ga, corners: ch + ca, cards: 0, final: true, teams: { home: { goals: gh, corners: ch, cards: 0 }, away: { goals: ga, corners: ca, cards: 0 } }, players: { [pk]: { shots, onTarget: onT } }, scorers, auto: {} }; };
+    db.stats = {};
+    put(0, 3, 1, 7, 2, 5, 3, [{ name: "Kylian Mbappe", side: "home" }, { name: "Kylian Mbappe", side: "home" }, { name: "Vinicius Junior", side: "home" }]);
+    put(1, 0, 2, 4, 6, 3, 1, [{ name: "Kylian Mbappe", side: "away" }]);
+    put(2, 1, 1, 5, 5, 2, 2, [{ name: "Kylian Mbappe", side: "home" }]);
+    save(); renderAll();
+  });
+  const rec = await page.evaluate(() => {
+    const t = teamSummary(teamRecord("Real Madrid")), p = playerSummary(playerRecord("Kylian Mbappe")), fr = teamRecord("Francia"), vini = playerRecord("Vinicius Junior");
+    return { t, club: p.porEquipo.find((g) => g.equipo === "Real Madrid"), sel: p.porEquipo.find((g) => g.equipo === "Francia"), goles: p.goles, n: p.partidosRegistrados, frTipo: fr.tipo, frGf: recAvg(fr.matches, "gf"), vini: vini && { goles: playerSummary(vini).goles, equipo: vini.matches[0].equipo }, barca: teamRecord("Barcelona") };
+  });
+  check("equipo: promedio de sus partidos registrados (Real Madrid: 2 partidos, 2.5 goles a favor, 0.5 en contra, 6.5 córners)", rec.t.partidosRegistrados === 2 && rec.t.golesFavor.prom === 2.5 && rec.t.golesContra.prom === 0.5 && rec.t.cornersFavor.prom === 6.5 && rec.t.tipo === "club" && rec.barca === null, JSON.stringify(rec.t));
+  check("jugador ligado a su club y a su selección por separado (Mbappé: Madrid 4 remates y 2 a puerta de media; Francia 2 y 2)", rec.club.tipo === "club" && rec.club.partidos === 2 && rec.club.remates.prom === 4 && rec.club.aPuerta.prom === 2 && rec.club.goles === 3 && rec.sel.tipo === "selección" && rec.sel.remates.prom === 2 && rec.sel.goles === 1 && rec.goles === 4 && rec.n === 3, JSON.stringify([rec.club, rec.sel]));
+  check("selección reconocida como tal y goleador sin mercado también queda registrado", rec.frTipo === "selección" && rec.frGf.prom === 1 && rec.vini?.goles === 1 && rec.vini.equipo === "Real Madrid", JSON.stringify(rec.vini));
+  const pay = await page.evaluate(() => recordsPayload([db.coupons[0].fixtures[3]]));
+  const mb = pay.jugadores[0];
+  check("al Analista le llegan los registros del cupón: Real Madrid y Mbappé con club y selección (Barcelona sin registros no aparece)", pay.equipos.length === 1 && pay.equipos[0].equipo === "Real Madrid" && /2.5 \(2 partidos\)/.test(pay.equipos[0].promedios.golesFavor) && pay.equipos[0].ultimos[0].marcador === "2-0" && mb.jugador === "Kylian Mbappe" && mb.porEquipo.length === 2 && /4 \(2 partidos\)/.test(mb.porEquipo.find((g) => g.equipo === "Real Madrid").rematesPromedio) && mb.ultimos.length === 3 && mb.ultimos[0].competicion === "UEFA Nations League", JSON.stringify(pay).slice(0, 400));
+  // Goleadores en la ficha
+  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Barcelona")).click()); await page.waitForTimeout(250);
+  const stBtn = (target) => `.live-board button[data-st-target="${target}"][data-st-step="1"]`;
+  await tap(page, stBtn("goals:home")); await page.waitForTimeout(150);
+  const ask = await page.$eval(".live-board", (e) => e.innerText);
+  page.promptAnswer = "1";
+  await tap(page, '[data-scorer-add="home"]'); await page.waitForTimeout(200);
+  const sc = await page.evaluate(() => ({ scorers: Object.values(db.stats).find((x) => x.scorers?.length === 1 && !x.final)?.scorers, chip: document.querySelector(".scorer-chip")?.innerText }));
+  check("en el partido: tras un gol aparece '¿Quién anotó?' y sugiere a los jugadores conocidos del equipo", /¿Quién anotó\?/.test(ask) && sc.scorers?.[0]?.name === "Kylian Mbappe" && sc.scorers[0].side === "home" && /Kylian Mbappe/.test(sc.chip), JSON.stringify(sc));
+  await tap(page, ".scorer-chip"); await page.waitForTimeout(150);
+  check("tocar un goleador lo quita", (await page.$$(".scorer-chip")).length === 0);
+  await tap(page, '[data-match-tab="datos"]'); await page.waitForTimeout(400);
+  const dt = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
+  check("ficha → 📈 Datos: 'Tus registros' con los dos equipos y los jugadores de tus mercados", /Tus registros/.test(dt) && /Real Madrid 2 partidos registrados/.test(dt) && /Barcelona Sin partidos registrados/.test(dt) && /Kylian Mbappe 3 partido\(s\) registrado\(s\) · 4 gol/.test(dt) && /Francia \(selección\)/.test(dt), dt.slice(0, 420));
+  await page.evaluate(() => closeMatchDetails());
+  await view(page, "stats");
+  const stt = await page.$eval("#recordsSection", (e) => e.innerText.replace(/\s+/g, " "));
+  check("Estadísticas: registros de todos los equipos y jugadores", /Equipos y selecciones \(5\)/.test(stt) && /Jugadores \(2\)/.test(stt), stt.slice(0, 200));
+  const A2 = await import(path.join(ROOT, "servidor/analista.mjs"));
+  const pr = A2.construirPeticion("cupon", { cupon: "Real Madrid vs Barcelona · Remates a puerta Mbappe +1.5", registros: pay });
+  check("el servidor pasa 'misRegistros' al Analista con la indicación de combinarlos con la actualidad", /misRegistros/.test(pr.messages[0].content) && /Kylian Mbappe/.test(pr.messages[0].content) && /misRegistros/.test(pr.system) && /club y selección/.test(pr.system));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

@@ -165,6 +165,7 @@ function teamRowHtml(fk, f, st, type, label) {
     side("home") +
     side("away") +
     "</div>" +
+    (type === "goals" ? scorersHtml(fk, f, st) : "") +
     (rest
       ? '<div class="small muted lb-rest">' +
         rest +
@@ -305,6 +306,7 @@ async function analyzeMatch(fk) {
       lines.join("\n"),
     partidos: analystFixtureList([f]),
     precisionAnalista: aiPrecisionPayload(),
+    registros: recordsPayload(db.coupons.flatMap((c) => c.fixtures.filter((g) => fixtureKey(g) === fk))),
   };
   const h = analystShortHistory();
   if (h) datos.historial = h;

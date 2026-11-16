@@ -597,3 +597,82 @@
     animation: none;
   }
 }
+/* Registros de equipos y jugadores, y goleadores (V18) */
+.lb-scorer-row {
+  margin-top: 6px;
+}
+.lb-scorers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+.scorer-chip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rec-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.rec-players {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.rec-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  min-width: 0;
+}
+.rec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.rec-grid span {
+  display: grid;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.rec-grid i {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+}
+.rec-last {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  font-size: 11px;
+  display: grid;
+  gap: 2px;
+}
+.rec-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
+  font-size: 12px;
+}
+.rec-fold {
+  margin-top: 8px;
+}
+.rec-fold summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 6px 0;
+}
