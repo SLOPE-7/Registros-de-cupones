@@ -676,3 +676,12 @@
   font-weight: 700;
   padding: 6px 0;
 }
+.lb-track {
+  margin-top: 4px;
+}
+.lb-track .btn {
+  white-space: normal;
+}
+.lb-player-head small.muted {
+  font-weight: 500;
+}

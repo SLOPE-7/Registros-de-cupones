@@ -77,6 +77,10 @@ function buildRecords() {
     // Jugadores: remates del marcador y goles anotados.
     const scorers = Array.isArray(st.scorers) ? st.scorers : [];
     const inMatch = new Map(bets.get(fk) || []);
+    (st.tracked || []).forEach((t) => {
+      const k = crestNorm(t.name);
+      if (k) inMatch.set(k, { name: t.name, side: t.side, tracked: true });
+    });
     scorers.forEach((s) => {
       const k = crestNorm(s.name);
       if (k && !inMatch.has(k)) inMatch.set(k, { name: s.name, side: s.side });
@@ -86,9 +90,9 @@ function buildRecords() {
       const shots = p ? shotsOf(p) : 0,
         onT = p ? Number(p.onTarget) || 0 : 0;
       const hasBet = bets.get(fk)?.has(k);
-      const shotsKnown = shots > 0 || (!!st.final && hasBet && !!p);
+      const shotsKnown = shots > 0 || (!!st.final && (hasBet || info.tracked) && !!p);
       const goles = scorers.filter((s) => crestNorm(s.name) === k).length;
-      const side = info.side || scorers.find((s) => crestNorm(s.name) === k)?.side || "";
+      const side = st.sides?.[k] || info.side || scorers.find((s) => crestNorm(s.name) === k)?.side || "";
       if (!shotsKnown && !goles) continue;
       const equipo = side ? f[side] : "";
       addPlayer(info.name, {
@@ -242,6 +246,23 @@ function scorerNamesFor(fk, f, side) {
   });
   return [...names.values()].slice(0, 9);
 }
+// Anota un gol de un jugador. Si el equipo aún no tenía ese gol contado, también lo suma al marcador.
+function registerGoal(fk, side, name) {
+  const f = fixtureByKey(fk);
+  if (!f || !SIDES.includes(side)) return;
+  db.stats = db.stats || {};
+  const st = JSON.parse(
+    JSON.stringify(db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} }),
+  );
+  st.scorers = Array.isArray(st.scorers) ? st.scorers : [];
+  st.sides = { ...(st.sides || {}), [playerKeyOf(name)]: side };
+  const add = st.scorers.filter((x) => x.side === side).length >= teamStat(st, side, "goals");
+  st.scorers.push({ name: String(name).slice(0, 60), side, ...(add ? { add: true } : {}) });
+  if (add) teamStatStep(st, "goals", side, 1, f);
+  st.updatedAt = new Date().toISOString();
+  db.stats[fk] = st;
+  applyStatsToLines(fk);
+}
 function addScorer(fk, side) {
   const f = fixtureByKey(fk);
   if (!f) return;
@@ -259,20 +280,80 @@ function addScorer(fk, side) {
   if (!a) return;
   const name = /^\d$/.test(a) && options[Number(a) - 1] ? options[Number(a) - 1] : a;
   if (name.length < 3) return toast("Escribe al menos 3 letras.");
-  db.stats = db.stats || {};
-  const st = (db.stats[fk] = db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} });
-  st.scorers = [...(Array.isArray(st.scorers) ? st.scorers : []), { name: name.slice(0, 60), side }];
-  st.updatedAt = new Date().toISOString();
-  save();
-  renderAll();
+  registerGoal(fk, side, name);
 }
 function removeScorer(fk, index) {
   const st = db.stats?.[fk];
-  if (!st?.scorers?.[index]) return;
+  const sc = st?.scorers?.[index];
+  if (!sc) return;
   st.scorers = st.scorers.filter((_, i) => i !== index);
+  // Si ese gol se sumó al marcador al anotar al jugador, también se quita del marcador.
+  if (sc.add) teamStatStep(st, "goals", sc.side, -1, null);
+  st.updatedAt = new Date().toISOString();
+  applyStatsToLines(fk);
+}
+// ＋/− goles en la ficha de un jugador. Si no se sabe de qué equipo es, se pregunta una vez.
+function playerGoal(fk, pk, delta) {
+  const f = fixtureByKey(fk),
+    pl = statsPlayers(fk).get(pk);
+  if (!f || !pl) return;
+  if (delta < 0) {
+    const list = db.stats?.[fk]?.scorers || [];
+    for (let i = list.length - 1; i >= 0; i--)
+      if (playerKeyOf(list[i].name) === pk) return removeScorer(fk, i);
+    return;
+  }
+  let side = playerSide(fk, pk, pl);
+  if (!side) {
+    const a = prompt(
+      "¿De qué equipo es " + pl.name + "?\n1. " + f.home + "\n2. " + f.away + "\nEscribe 1 o 2:",
+    );
+    side = a === "1" ? "home" : a === "2" ? "away" : "";
+    if (!side) return;
+  }
+  registerGoal(fk, side, pl.name);
+}
+// Seguir a un jugador (aunque no tengas ningún mercado suyo): contadores de remates, a puerta y goles.
+function trackPlayer(fk, side) {
+  const f = fixtureByKey(fk);
+  if (!f) return;
+  const options = scorerNamesFor(fk, f, side);
+  const a = (
+    prompt(
+      "¿A qué jugador de " +
+        f[side] +
+        " quieres seguir?" +
+        (options.length
+          ? "\nEscribe el número o el nombre:\n" + options.map((n, i) => i + 1 + ". " + n).join("\n")
+          : "\nEscribe el nombre del jugador:"),
+    ) || ""
+  ).trim();
+  if (!a) return;
+  const name = /^\d$/.test(a) && options[Number(a) - 1] ? options[Number(a) - 1] : a;
+  if (name.length < 3) return toast("Escribe al menos 3 letras.");
+  db.stats = db.stats || {};
+  const st = (db.stats[fk] = db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} });
+  st.tracked = Array.isArray(st.tracked) ? st.tracked : [];
+  const k = playerKeyOf(name);
+  if (!st.tracked.some((t) => playerKeyOf(t.name) === k)) st.tracked.push({ name: name.slice(0, 60), side });
+  st.sides = { ...(st.sides || {}), [k]: side };
+  st.players = st.players || {};
+  st.players[k] = st.players[k] || { onTarget: 0, shots: 0 };
   st.updatedAt = new Date().toISOString();
   save();
   renderAll();
+  toast("Siguiendo a " + name + ". Anota sus remates y goles en el marcador.");
+}
+function untrackPlayer(fk, pk) {
+  const st = db.stats?.[fk];
+  const t = st?.tracked?.find((x) => playerKeyOf(x.name) === pk);
+  if (!t || !confirm("¿Quitar a " + t.name + " de este partido? Se borran sus conteos de aquí.")) return;
+  st.tracked = st.tracked.filter((x) => playerKeyOf(x.name) !== pk);
+  delete st.players?.[pk];
+  st.scorers = (st.scorers || []).filter((x) => playerKeyOf(x.name) !== pk);
+  delete st.sides?.[pk];
+  st.updatedAt = new Date().toISOString();
+  applyStatsToLines(fk);
 }
 // Bloque bajo los goles del marcador: quién anotó.
 function scorersHtml(fk, f, st) {
@@ -294,19 +375,16 @@ function scorersHtml(fk, f, st) {
             " ×</button>",
         )
         .join("") +
-      (missing > 0
-        ? '<button type="button" class="btn sm" data-scorer-add="' +
-          side +
-          '" data-st-fk="' +
-          esc(fk) +
-          '">＋ ¿Quién anotó?' +
-          (missing > 1 ? " (" + missing + ")" : "") +
-          "</button>"
-        : "") +
+      '<button type="button" class="btn sm" data-scorer-add="' +
+      side +
+      '" data-st-fk="' +
+      esc(fk) +
+      '">＋ ' +
+      (missing > 0 ? "¿Quién anotó?" + (missing > 1 ? " (" + missing + ")" : "") : "Goleador") +
+      "</button>" +
       "</div>"
     );
   };
-  if (!teamStat(st, "home", "goals") && !teamStat(st, "away", "goals") && !list.length) return "";
   return '<div class="lb-sides lb-scorer-row">' + col("home") + col("away") + "</div>";
 }
 
@@ -446,6 +524,12 @@ function recordsStatsHtml() {
 }
 
 document.addEventListener("click", (e) => {
+  const pg = e.target.closest("[data-player-goal]");
+  if (pg) return playerGoal(pg.dataset.stFk, pg.dataset.stPk, Number(pg.dataset.playerGoal));
+  const ta = e.target.closest("[data-track-add]");
+  if (ta) return trackPlayer(ta.dataset.stFk, ta.dataset.trackAdd);
+  const tr = e.target.closest("[data-track-remove]");
+  if (tr) return untrackPlayer(tr.dataset.stFk, tr.dataset.stPk);
   const a = e.target.closest("[data-scorer-add]");
   if (a) return addScorer(a.dataset.stFk, a.dataset.scorerAdd);
   const r = e.target.closest("[data-scorer-remove]");

@@ -457,3 +457,10 @@ VERSIÓN 18 — TUS REGISTROS DE EQUIPOS Y JUGADORES (site/js/31-registros.js)
 - Dónde se ven: ficha del partido → 📈 Datos → "📒 Tus registros" (los dos equipos y los jugadores de tus mercados), y Estadísticas → "📒 Registros de equipos y jugadores" (con buscador).
 - El Analista recibe "misRegistros" (promedios y últimos 5 partidos de los equipos y jugadores del cupón) y los combina con la actualidad; usa el registro del equipo con el que juega ese partido.
 Pruebas: 281.
+
+VERSIÓN 18.1 — GOLEADORES Y JUGADORES EN EL MARCADOR EN VIVO
+- En el marcador en vivo (ficha del partido): "＋ Seguir jugador de {equipo}" añade a cualquier jugador, tenga o no mercado, con contadores de Remates (tiros totales), Remates a puerta y ⚽ Goles.
+- ＋ Gol en un jugador: lo anota como goleador y sube el gol de su equipo (si aún no estaba contado); − lo revierte.
+- "＋ Goleador" siempre visible; si faltan goleadores por asignar aparece "＋ ¿Quién anotó? (n)".
+- Los jugadores seguidos y los goleadores entran en los registros (promedios por club/selección y competición) y en lo que recibe el Analista.
+Pruebas: 289.

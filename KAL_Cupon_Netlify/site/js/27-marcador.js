@@ -197,13 +197,35 @@ function statsPlayers(fk) {
           stats: new Set(),
         };
         e.incl = e.incl || kind.incl;
+        e.lines = true;
         e.stats.add(kind.stat);
         if (!e.photo) e.photo = savedPlayerPhoto(marketKey(f, m), f, m);
         out.set(kind.playerKey, e);
       });
     }),
   );
+  // Jugadores que sigues a mano ("＋ Seguir jugador") y goleadores anotados: tienen todos los contadores.
+  const st = db.stats?.[fk];
+  const follow = (name, side, tracked) => {
+    const k = playerKeyOf(name);
+    if (!k) return;
+    const e = out.get(k) || { name, code: "", photo: "", incl: true, stats: new Set() };
+    e.stats.add("shots");
+    e.stats.add("onTarget");
+    e.incl = true;
+    e.tracked = e.tracked || tracked;
+    if (!e.side && side) e.side = side;
+    out.set(k, e);
+  };
+  (st?.tracked || []).forEach((t) => follow(t.name, t.side, true));
+  (st?.scorers || []).forEach((s) => follow(s.name, s.side, false));
   return out;
+}
+// Equipo de un jugador en este partido: el que anotaste, el que sale del código del mercado "(FRA)" o null.
+function playerSide(fk, pk, pl) {
+  const st = db.stats?.[fk];
+  const f = fixtureByKey(fk);
+  return st?.sides?.[pk] || pl?.side || (f && pl?.code ? playerClubForCode(pl.code, f).side : "") || "";
 }
 const statsPlayerName = (fk, pk) => statsPlayers(fk).get(pk)?.name || "el jugador";
 const statsPlayerCode = (fk, pk) => statsPlayers(fk).get(pk)?.code || "";
@@ -389,13 +411,39 @@ function liveBoardHtml(f) {
               .toUpperCase(),
           ) +
           "</span>";
+    const pside = playerSide(fk, pk, pl),
+      pgoals = (Array.isArray(st.scorers) ? st.scorers : []).filter((s) => playerKeyOf(s.name) === pk).length;
     html +=
       '<div class="lb-player"><div class="lb-player-head">' +
       face(photo, pl.name) +
       "<b>" +
       esc(pl.name) +
-      "</b></div>" +
+      (pside ? '<small class="muted"> · ' + esc(f[pside]) + "</small>" : "") +
+      "</b>" +
+      (pl.tracked && !pl.lines
+        ? '<button type="button" class="pg-mini-btn" data-track-remove data-st-fk="' +
+          esc(fk) +
+          '" data-st-pk="' +
+          esc(pk) +
+          '" aria-label="Quitar jugador">🗑</button>'
+        : "") +
+      "</div>" +
       shotCounters(p, "main") +
+      '<div class="lb-counter"><span>⚽ Goles</span><button type="button" class="pg-btn" data-player-goal="-1" data-st-fk="' +
+      esc(fk) +
+      '" data-st-pk="' +
+      esc(pk) +
+      '" aria-label="Quitar un gol de ' +
+      esc(pl.name) +
+      '">－</button><b class="pg-num">' +
+      pgoals +
+      '</b><button type="button" class="pg-btn plus" data-player-goal="1" data-st-fk="' +
+      esc(fk) +
+      '" data-st-pk="' +
+      esc(pk) +
+      '" aria-label="Sumar un gol a ' +
+      esc(pl.name) +
+      '">＋</button></div>' +
       (pl.incl
         ? p.sub
           ? '<div class="lb-sub"><div class="lb-player-head">' +
@@ -421,6 +469,19 @@ function liveBoardHtml(f) {
       linesFor(fk, (k) => k.type === "player" && k.playerKey === pk) +
       "</div></div>";
   }
+  html +=
+    '<div class="lb-sides lb-track">' +
+    SIDES.map(
+      (s) =>
+        '<button type="button" class="btn sm" data-track-add="' +
+        s +
+        '" data-st-fk="' +
+        esc(fk) +
+        '">＋ Seguir jugador de ' +
+        esc(f[s]) +
+        "</button>",
+    ).join("") +
+    "</div>";
   return html + "</section>";
 }
 

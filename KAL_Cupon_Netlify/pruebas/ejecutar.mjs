@@ -17,65 +17,213 @@ const { chromium } = require("playwright");
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = path.join(ROOT, "site");
 
-let ok = 0, fail = 0;
-const check = (name, cond, detail = "") => { if (cond) { ok++; console.log("  ✓ " + name); } else { fail++; console.log("  ✗ " + name + (detail ? "  →  " + detail : "")); } };
+let ok = 0,
+  fail = 0;
+const check = (name, cond, detail = "") => {
+  if (cond) {
+    ok++;
+    console.log("  ✓ " + name);
+  } else {
+    fail++;
+    console.log("  ✗ " + name + (detail ? "  →  " + detail : ""));
+  }
+};
 const section = (t) => console.log("\n" + t);
 
 // ---------- servidor local ----------
 const posts = [];
 const analystPosts = [];
 const seen = [];
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+const TYPES = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".png": "image/png",
+  ".webmanifest": "application/manifest+json",
+};
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
   // API-Football (escudos y jugadores), TheSportsDB (imagenes) y el proxy de imágenes, simulados.
-  const sendJson = (obj, status = 200) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+  const sendJson = (obj, status = 200) => {
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(JSON.stringify(obj));
+  };
   if (url.pathname === "/api/escudos") {
     seen.push("escudos:" + url.searchParams.get("home"));
-    return sendJson({ home: { options: [{ name: url.searchParams.get("home"), country: "Turkey", logo: "https://media.api-sports.io/football/teams/611.png" }] }, away: { options: [] }, league: { options: [] } });
+    return sendJson({
+      home: {
+        options: [
+          {
+            name: url.searchParams.get("home"),
+            country: "Turkey",
+            logo: "https://media.api-sports.io/football/teams/611.png",
+          },
+        ],
+      },
+      away: { options: [] },
+      league: { options: [] },
+    });
   }
   if (url.pathname === "/api/jugadores") return sendJson({ players: [] });
   if (url.pathname === "/api/imagenes") {
     seen.push("imagenes:" + url.searchParams.get("tipo") + ":" + url.searchParams.get("q"));
-    return sendJson({ options: url.searchParams.get("tipo") === "equipo"
-      ? [{ id: "1", name: url.searchParams.get("q") + " (TSDB)", country: "Turkey", logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png", source: "TheSportsDB" }]
-      : /nico|paz/i.test(url.searchParams.get("q")) ? [{ id: "9", name: "Nico Paz", team: "Como", photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png", source: "TheSportsDB" }] : [] });
+    return sendJson({
+      options:
+        url.searchParams.get("tipo") === "equipo"
+          ? [
+              {
+                id: "1",
+                name: url.searchParams.get("q") + " (TSDB)",
+                country: "Turkey",
+                logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png",
+                source: "TheSportsDB",
+              },
+            ]
+          : /nico|paz/i.test(url.searchParams.get("q"))
+            ? [
+                {
+                  id: "9",
+                  name: "Nico Paz",
+                  team: "Como",
+                  photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png",
+                  source: "TheSportsDB",
+                },
+              ]
+            : [],
+    });
   }
   if (url.pathname === "/api/buscar-logo") {
-    const tipo = url.searchParams.get("tipo"), q = url.searchParams.get("q");
+    const tipo = url.searchParams.get("tipo"),
+      q = url.searchParams.get("q");
     seen.push("buscar:" + tipo + ":" + q);
-    return sendJson({ options: tipo === "equipo" ? [{ name: q + " (TSDB)", country: "Turquía", logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png", source: "TheSportsDB" }] : tipo === "liga" ? [{ name: "UEFA Champions League", country: "", logo: "https://crests.football-data.org/CL.png", source: "football-data.org" }] : [] });
+    return sendJson({
+      options:
+        tipo === "equipo"
+          ? [
+              {
+                name: q + " (TSDB)",
+                country: "Turquía",
+                logo: "https://r2.thesportsdb.com/images/media/team/badge/abc.png",
+                source: "TheSportsDB",
+              },
+            ]
+          : tipo === "liga"
+            ? [
+                {
+                  name: "UEFA Champions League",
+                  country: "",
+                  logo: "https://crests.football-data.org/CL.png",
+                  source: "football-data.org",
+                },
+              ]
+            : [],
+    });
   }
-  if (url.pathname === "/api/logo") { res.writeHead(200, { "content-type": "image/png" }); return fs.createReadStream(path.join(ROOT, "pruebas/escudo-prueba.png")).pipe(res); }
+  if (url.pathname === "/api/logo") {
+    res.writeHead(200, { "content-type": "image/png" });
+    return fs.createReadStream(path.join(ROOT, "pruebas/escudo-prueba.png")).pipe(res);
+  }
   if (url.pathname === "/api/avisos") {
-    if (req.method === "GET") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ publicKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U" })); }
-    let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { posts.push(JSON.parse(b)); res.writeHead(200, { "content-type": "application/json" }); res.end('{"ok":true}'); });
+    if (req.method === "GET") {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(
+        JSON.stringify({
+          publicKey:
+            "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U",
+        }),
+      );
+    }
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", () => {
+      posts.push(JSON.parse(b));
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end('{"ok":true}');
+    });
     return;
   }
   if (url.pathname === "/api/datos-partido") {
     seen.push("datos:" + url.searchParams.get("home") + "|" + url.searchParams.get("date"));
-    return sendJson({ encontrado: true, alReves: false, fuente: "football-data.org",
-      partido: { competicion: "UEFA Champions League", local: { nombre: "Fenerbahçe" }, visitante: { nombre: "Liverpool" } },
-      modelo: { lambdaLocal: 1.2, lambdaVisitante: 1.6, p1: 0.3, px: 0.25, p2: 0.45, over05: 0.94, over15: 0.77, over25: 0.53, over35: 0.31, btts: 0.52, base: "tabla de local y visitante" },
-      tabla: { local: { posicion: 12, puntos: 7, golesFavor: 6, golesContra: 7 }, visitante: { posicion: 3, puntos: 10, golesFavor: 9, golesContra: 3 }, localEnCasa: { ganados: 1, empates: 1, perdidos: 0 }, visitanteFuera: { ganados: 2, empates: 0, perdidos: 0 }, equipos: 36 },
-      forma: { local: [{ fecha: "2026-11-01", rival: "Galatasaray", enCasa: true, marcador: "2-1", resultado: "G" }], visitante: [{ fecha: "2026-11-02", rival: "Arsenal", enCasa: false, marcador: "0-0", resultado: "E" }] },
-      h2h: { partidos: 2, goles: 5, local: { ganados: 0, empates: 1, perdidos: 1 }, visitante: { ganados: 1, empates: 1, perdidos: 0 }, ultimos: [{ fecha: "2020-02-01", local: "Liverpool", visitante: "Fenerbahçe", marcador: "2-1" }] } });
+    return sendJson({
+      encontrado: true,
+      alReves: false,
+      fuente: "football-data.org",
+      partido: {
+        competicion: "UEFA Champions League",
+        local: { nombre: "Fenerbahçe" },
+        visitante: { nombre: "Liverpool" },
+      },
+      modelo: {
+        lambdaLocal: 1.2,
+        lambdaVisitante: 1.6,
+        p1: 0.3,
+        px: 0.25,
+        p2: 0.45,
+        over05: 0.94,
+        over15: 0.77,
+        over25: 0.53,
+        over35: 0.31,
+        btts: 0.52,
+        base: "tabla de local y visitante",
+      },
+      tabla: {
+        local: { posicion: 12, puntos: 7, golesFavor: 6, golesContra: 7 },
+        visitante: { posicion: 3, puntos: 10, golesFavor: 9, golesContra: 3 },
+        localEnCasa: { ganados: 1, empates: 1, perdidos: 0 },
+        visitanteFuera: { ganados: 2, empates: 0, perdidos: 0 },
+        equipos: 36,
+      },
+      forma: {
+        local: [{ fecha: "2026-11-01", rival: "Galatasaray", enCasa: true, marcador: "2-1", resultado: "G" }],
+        visitante: [
+          { fecha: "2026-11-02", rival: "Arsenal", enCasa: false, marcador: "0-0", resultado: "E" },
+        ],
+      },
+      h2h: {
+        partidos: 2,
+        goles: 5,
+        local: { ganados: 0, empates: 1, perdidos: 1 },
+        visitante: { ganados: 1, empates: 1, perdidos: 0 },
+        ultimos: [{ fecha: "2020-02-01", local: "Liverpool", visitante: "Fenerbahçe", marcador: "2-1" }],
+      },
+    });
   }
   // Analista (función de borde simulada): responde en streaming, una línea JSON por evento.
   if (url.pathname === "/api/analista") {
-    let b = ""; req.on("data", (c) => (b += c)); req.on("end", async () => {
-      if (req.headers["x-kal-clave"] !== "secreto") return sendJson({ error: "El código de acceso del Analista no es correcto.", codigo: "codigo" }, 401);
-      const body = JSON.parse(b); analystPosts.push(body);
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", async () => {
+      if (req.headers["x-kal-clave"] !== "secreto")
+        return sendJson({ error: "El código de acceso del Analista no es correcto.", codigo: "codigo" }, 401);
+      const body = JSON.parse(b);
+      analystPosts.push(body);
       res.writeHead(200, { "content-type": "application/x-ndjson" });
       const send = (o) => res.write(JSON.stringify(o) + "\n");
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       send({ t: "estado", v: "Pensando…" });
-      if (body.modo === "cupon") { await wait(150); send({ t: "estado", v: "Buscando: Fenerbahce Liverpool lesiones" }); }
+      if (body.modo === "cupon") {
+        await wait(150);
+        send({ t: "estado", v: "Buscando: Fenerbahce Liverpool lesiones" });
+      }
       const slow = /LENTO/.test(body.datos?.cupon || "");
-      const chunks = ["## 📌 En resumen\n", "Te va **bien** en goles de *1.5*.\n", "- Punto uno\n- Punto <img src=x onerror=alert(1)>\n", "## 🎯 Recomendaciones\n1. Combinadas cortas\n"];
-      if (body.modo === "cupon") chunks.push('Orientativo.\n<kal-json>{"veredicto":"arriesgado","probabilidad":0.4,"selecciones":[{"partido":"Fenerbahce vs Liverpool","mercado":"Total de goles","seleccion":"Más de 1.5","p":0.9,"confianza":"Alta"},', '{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí","p":0.55,"confianza":"Baja"}],"eslabonDebil":[{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí"}]}</kal-json>');
-      for (const c of chunks) { await wait(slow ? 400 : 60); if (res.destroyed) return; send({ t: "texto", v: c }); }
-      if (/FALLA/.test(body.datos?.cupon || "")) send({ t: "error", v: "Se alcanzó el límite de uso de la API." });
+      const chunks = [
+        "## 📌 En resumen\n",
+        "Te va **bien** en goles de *1.5*.\n",
+        "- Punto uno\n- Punto <img src=x onerror=alert(1)>\n",
+        "## 🎯 Recomendaciones\n1. Combinadas cortas\n",
+      ];
+      if (body.modo === "cupon")
+        chunks.push(
+          'Orientativo.\n<kal-json>{"veredicto":"arriesgado","probabilidad":0.4,"selecciones":[{"partido":"Fenerbahce vs Liverpool","mercado":"Total de goles","seleccion":"Más de 1.5","p":0.9,"confianza":"Alta"},',
+          '{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí","p":0.55,"confianza":"Baja"}],"eslabonDebil":[{"partido":"Fenerbahce vs Liverpool","mercado":"Ambos equipos marcan","seleccion":"Sí"}]}</kal-json>',
+        );
+      for (const c of chunks) {
+        await wait(slow ? 400 : 60);
+        if (res.destroyed) return;
+        send({ t: "texto", v: c });
+      }
+      if (/FALLA/.test(body.datos?.cupon || ""))
+        send({ t: "error", v: "Se alcanzó el límite de uso de la API." });
       else send({ t: "fin", uso: { entrada: 100, salida: 50, busquedas: 1 } });
       res.end();
     });
@@ -83,7 +231,10 @@ const server = http.createServer((req, res) => {
   }
   let f = path.join(SITE, decodeURIComponent(url.pathname));
   if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, "index.html");
-  if (!f.startsWith(SITE) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+  if (!f.startsWith(SITE) || !fs.existsSync(f)) {
+    res.writeHead(404);
+    return res.end();
+  }
   res.writeHead(200, { "content-type": TYPES[path.extname(f)] || "application/octet-stream" });
   fs.createReadStream(f).pipe(res);
 });
@@ -96,61 +247,145 @@ async function open(db, { ctxOpts = {}, init } = {}) {
   const page = await ctx.newPage();
   page.errors = [];
   page.on("pageerror", (e) => page.errors.push(e.message));
-  page.on("dialog", (d) => d.accept(d.type() === "prompt" ? page.promptAnswer ?? d.defaultValue() : undefined));
-  await ctx.addInitScript(([d, extra]) => {
-    if (!localStorage.getItem("kal_coupon_organizer_v2") && d) localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
-    localStorage.setItem("kal_last_backup", String(Date.now()));
-    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "18");
-    if (extra === "push") {
-      let perm = "default";
-      Object.defineProperty(Notification, "permission", { get: () => perm });
-      Notification.requestPermission = async () => (perm = "granted");
-      PushManager.prototype.getSubscription = async () => window.__sub || null;
-      PushManager.prototype.subscribe = async () => (window.__sub = { endpoint: "https://push.example/abc", toJSON() { return { endpoint: this.endpoint, keys: { p256dh: "k", auth: "a" } }; }, unsubscribe: async () => true });
-    }
-  }, [db, init]);
+  page.on("dialog", (d) =>
+    d.accept(d.type() === "prompt" ? (page.promptAnswer ?? d.defaultValue()) : undefined),
+  );
+  await ctx.addInitScript(
+    ([d, extra]) => {
+      if (!localStorage.getItem("kal_coupon_organizer_v2") && d)
+        localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
+      localStorage.setItem("kal_last_backup", String(Date.now()));
+      if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
+        localStorage.setItem("kal_version_vista", "18");
+      if (extra === "push") {
+        let perm = "default";
+        Object.defineProperty(Notification, "permission", { get: () => perm });
+        Notification.requestPermission = async () => (perm = "granted");
+        PushManager.prototype.getSubscription = async () => window.__sub || null;
+        PushManager.prototype.subscribe = async () =>
+          (window.__sub = {
+            endpoint: "https://push.example/abc",
+            toJSON() {
+              return { endpoint: this.endpoint, keys: { p256dh: "k", auth: "a" } };
+            },
+            unsubscribe: async () => true,
+          });
+      }
+    },
+    [db, init],
+  );
   await page.goto(BASE);
   await page.waitForTimeout(600);
   return { ctx, page };
 }
 // Cambia de pantalla y espera un instante a que el navegador dibuje (las listas usan content-visibility).
-const view = async (page, v) => { await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`).click(), v); await page.waitForTimeout(120); };
+const view = async (page, v) => {
+  await page.evaluate((v) => document.querySelector(`button[data-view="${v}"]`).click(), v);
+  await page.waitForTimeout(120);
+};
 // Toca un botón aunque la barra fija o el menú inferior lo tapen en la pantalla del teléfono.
 const tap = (page, sel) => page.evaluate((sel) => document.querySelector(sel).click(), sel);
-const texts = async (page, sel) => { await page.waitForTimeout(100); return page.$$eval(sel, (x) => x.map((e) => e.innerText.replace(/\s+/g, " ").trim())); };
+const texts = async (page, sel) => {
+  await page.waitForTimeout(100);
+  return page.$$eval(sel, (x) => x.map((e) => e.innerText.replace(/\s+/g, " ").trim()));
+};
 
 // ---------- 1. Lector y detección de jugadores (funciones puras) ----------
 section("1. Lector de cupones y detección de jugadores");
 {
   const { ctx, page } = await open(null);
   const r = await page.evaluate(() => {
-    const p = parseCoupon("Italia, Serie A\nInter Milan\nvs.\nFiorentina\n25/10/2026 • 05:30\n1x2: 1 • pago anticipado\nCuotas: 1.36\nEspaña, La Liga\nBarcelona\nvs.\nReal Madrid\n25/10/2026 • 08:00\nMás de 2.5 goles\nCuotas: 1.85\nVALOR APOSTADO L 120.00\nCUOTAS: 2.20\nGANANCIA TOTAL: L 264.00");
+    const p = parseCoupon(
+      "Italia, Serie A\nInter Milan\nvs.\nFiorentina\n25/10/2026 • 05:30\n1x2: 1 • pago anticipado\nCuotas: 1.36\nEspaña, La Liga\nBarcelona\nvs.\nReal Madrid\n25/10/2026 • 08:00\nMás de 2.5 goles\nCuotas: 1.85\nVALOR APOSTADO L 120.00\nCUOTAS: 2.20\nGANANCIA TOTAL: L 264.00",
+    );
     const f = { home: "Como", away: "Napoli" };
     const pb = (market, pick) => parsePlayerBet({ market, pick }, f);
-    return { n: p.fixtures.length, teams: p.fixtures.map((x) => x.home + "-" + x.away), stake: p.meta.stake, payout: p.meta.payout,
-      paz: pb("Remates a puerta", "COM Nico Paz Más de 0.5"), nested: pb("Remates del jugador (incl. suplente)", "(Nico Paz (COM)) Más de 1.5"),
-      hoj: pb("Primer goleador", "Rasmus Hojlund (NAP)"), team1: pb("Total de remates - Como", "Más de 4.5"), team2: pb("Marcador correcto", "Como 2-1"),
-      club: playerClubForCode("NAP", f) };
+    return {
+      n: p.fixtures.length,
+      teams: p.fixtures.map((x) => x.home + "-" + x.away),
+      stake: p.meta.stake,
+      payout: p.meta.payout,
+      paz: pb("Remates a puerta", "COM Nico Paz Más de 0.5"),
+      nested: pb("Remates del jugador (incl. suplente)", "(Nico Paz (COM)) Más de 1.5"),
+      hoj: pb("Primer goleador", "Rasmus Hojlund (NAP)"),
+      team1: pb("Total de remates - Como", "Más de 4.5"),
+      team2: pb("Marcador correcto", "Como 2-1"),
+      club: playerClubForCode("NAP", f),
+    };
   });
-  check("lee 2 partidos con sus equipos", r.n === 2 && r.teams.join() === "Inter Milan-Fiorentina,Barcelona-Real Madrid", r.teams.join());
+  check(
+    "lee 2 partidos con sus equipos",
+    r.n === 2 && r.teams.join() === "Inter Milan-Fiorentina,Barcelona-Real Madrid",
+    r.teams.join(),
+  );
   check("lee importe y ganancia total", r.stake === 120 && r.payout === 264, `${r.stake} / ${r.payout}`);
-  check("jugador sin el código del club en el nombre", r.paz?.name === "Nico Paz" && r.paz?.code === "COM", JSON.stringify(r.paz));
+  check(
+    "jugador sin el código del club en el nombre",
+    r.paz?.name === "Nico Paz" && r.paz?.code === "COM",
+    JSON.stringify(r.paz),
+  );
   check("jugador en formato anidado", r.nested?.name === "Nico Paz", JSON.stringify(r.nested));
   check("club correcto por código (NAP → Napoli)", r.club.club === "Napoli" && r.hoj?.code === "NAP");
   check("mercados de equipo no son jugadores", r.team1 === null && r.team2 === null);
   const v = await page.evaluate(() => {
-    const p = parseCoupon("Europa, UEFA Europa League\nReal Sociedad\nvs.\nOlympique Lyonnais\n05/11/2026 • 11:45\nAmbos equipos marcan: Sí\n1.47\nEuropa, UEFA Liga Campeones\nBayer Leverkusen\nvs.\nMarseille\n05/11/2026 • 14:00\n1x2: 1 • pago anticipado\n@1.75\nTotal de goles: Más de 2.5 @1.80");
+    const p = parseCoupon(
+      "Europa, UEFA Europa League\nReal Sociedad\nvs.\nOlympique Lyonnais\n05/11/2026 • 11:45\nAmbos equipos marcan: Sí\n1.47\nEuropa, UEFA Liga Campeones\nBayer Leverkusen\nvs.\nMarseille\n05/11/2026 • 14:00\n1x2: 1 • pago anticipado\n@1.75\nTotal de goles: Más de 2.5 @1.80",
+    );
     const [a, b] = p.fixtures;
-    return { comp: a.competition, country: a.country, odd1: a.markets[0].odd, comp2: b.competition, pick: b.markets[0].pick, early: b.markets[0].earlyPayout, odd2: b.markets[0].odd, odd3: b.markets[1]?.odd };
+    return {
+      comp: a.competition,
+      country: a.country,
+      odd1: a.markets[0].odd,
+      comp2: b.competition,
+      pick: b.markets[0].pick,
+      early: b.markets[0].earlyPayout,
+      odd2: b.markets[0].odd,
+      odd3: b.markets[1]?.odd,
+    };
   });
-  check("lee la línea 'Europa, competición'", v.comp === "UEFA Europa League" && v.country === "Europa" && v.comp2 === "UEFA Liga Campeones", JSON.stringify(v));
-  check("lee la cuota sola en su línea (1.47 y @1.75)", v.odd1 === "1.47" && v.odd2 === "1.75", JSON.stringify(v));
+  check(
+    "lee la línea 'Europa, competición'",
+    v.comp === "UEFA Europa League" && v.country === "Europa" && v.comp2 === "UEFA Liga Campeones",
+    JSON.stringify(v),
+  );
+  check(
+    "lee la cuota sola en su línea (1.47 y @1.75)",
+    v.odd1 === "1.47" && v.odd2 === "1.75",
+    JSON.stringify(v),
+  );
   check("lee la cuota al final de la selección (@1.80)", v.odd3 === "1.80", JSON.stringify(v));
   check("separa '• pago anticipado' de la selección", v.pick === "1" && v.early === true, JSON.stringify(v));
   const mig = await page.evaluate(() => {
-    db = { coupons: [{ id: "x", name: "x", created: "2026-11-01", fixtures: [{ home: "A", away: "B", dateISO: "2026-11-05", time: "10:00", markets: [{ market: "1x2", pick: "1 • pago anticipado", settlement: "pending" }] }] }], houses: [], transactions: [], resultHistory: [], actionHistory: [] };
+    db = {
+      coupons: [
+        {
+          id: "x",
+          name: "x",
+          created: "2026-11-01",
+          fixtures: [
+            {
+              home: "A",
+              away: "B",
+              dateISO: "2026-11-05",
+              time: "10:00",
+              markets: [{ market: "1x2", pick: "1 • pago anticipado", settlement: "pending" }],
+            },
+          ],
+        },
+      ],
+      houses: [],
+      transactions: [],
+      resultHistory: [],
+      actionHistory: [],
+    };
     const changed = migrateEarlyPayout();
-    return changed + ":" + db.coupons[0].fixtures[0].markets[0].pick + ":" + db.coupons[0].fixtures[0].markets[0].earlyPayout;
+    return (
+      changed +
+      ":" +
+      db.coupons[0].fixtures[0].markets[0].pick +
+      ":" +
+      db.coupons[0].fixtures[0].markets[0].earlyPayout
+    );
   });
   check("limpia cupones ya guardados con 'pago anticipado'", mig === "true:1:true", mig);
   // Cupón real (Europa League + Conference League, 16 partidos) pegado tal cual desde la casa de apuestas.
@@ -161,54 +396,142 @@ section("1. Lector de cupones y detección de jugadores");
       n: p.fixtures.length,
       sinMercado: p.fixtures.filter((f) => !f.markets.length).map((f) => f.home),
       sinCuota: p.fixtures.filter((f) => f.markets.some((m) => !m.odd)).map((f) => f.home),
-      sinCompeticion: p.fixtures.filter((f) => !/europa league|conference league/i.test(f.competition)).map((f) => f.home),
+      sinCompeticion: p.fixtures
+        .filter((f) => !/europa league|conference league/i.test(f.competition))
+        .map((f) => f.home),
       anderlecht: p.fixtures.find((f) => /anderlecht/i.test(f.home))?.markets[0],
       celtic: p.fixtures.find((f) => /celtic/i.test(f.home))?.markets[0],
       early: p.fixtures.filter((f) => f.markets[0]?.earlyPayout).length,
       meta: p.meta,
     };
   }, realRaw);
-  check("cupón real: 16 partidos, todos con mercado", real.n === 16 && !real.sinMercado.length, JSON.stringify(real.sinMercado));
+  check(
+    "cupón real: 16 partidos, todos con mercado",
+    real.n === 16 && !real.sinMercado.length,
+    JSON.stringify(real.sinMercado),
+  );
   check("cupón real: todas las cuotas leídas", !real.sinCuota.length, JSON.stringify(real.sinCuota));
-  check("cupón real: competición en todos (Europa / Conference League)", !real.sinCompeticion.length, JSON.stringify(real.sinCompeticion));
-  check("cupón real: 'Apuesta sin empate' es un mercado, no el importe", real.anderlecht?.market === "Apuesta sin empate" && real.anderlecht?.odd === "1.45", JSON.stringify(real.anderlecht));
-  check("cupón real: hándicap con su línea '2 (0:2)'", real.celtic?.market === "Hándicap 1x2" && real.celtic?.pick === "2 (0:2)", JSON.stringify(real.celtic));
+  check(
+    "cupón real: competición en todos (Europa / Conference League)",
+    !real.sinCompeticion.length,
+    JSON.stringify(real.sinCompeticion),
+  );
+  check(
+    "cupón real: 'Apuesta sin empate' es un mercado, no el importe",
+    real.anderlecht?.market === "Apuesta sin empate" && real.anderlecht?.odd === "1.45",
+    JSON.stringify(real.anderlecht),
+  );
+  check(
+    "cupón real: hándicap con su línea '2 (0:2)'",
+    real.celtic?.market === "Hándicap 1x2" && real.celtic?.pick === "2 (0:2)",
+    JSON.stringify(real.celtic),
+  );
   check("cupón real: 8 selecciones con pago anticipado", real.early === 8, String(real.early));
-  check("cupón real: importe, cuota total, bono y ganancia", real.meta.stake === 10 && real.meta.odds === 37.48 && real.meta.bonus === 21.88 && real.meta.payout === 396.7, JSON.stringify(real.meta));
+  check(
+    "cupón real: importe, cuota total, bono y ganancia",
+    real.meta.stake === 10 &&
+      real.meta.odds === 37.48 &&
+      real.meta.bonus === 21.88 &&
+      real.meta.payout === 396.7,
+    JSON.stringify(real.meta),
+  );
   // Cupón real 2: BetBuilder, jugador dentro del BetBuilder y copas nacionales.
-  const real2 = await page.evaluate((raw) => {
-    const p = parseCoupon(raw);
-    const roma = p.fixtures[0], torino = p.fixtures[1], mg = p.fixtures[3];
-    const player = torino.markets.find((m) => /Douvikas/.test(m.market));
-    return {
-      n: p.fixtures.length,
-      romaMarkets: roma.markets.map((m) => m.market + "=" + m.pick + "@" + m.builderOdd + (m.earlyPayout ? "⚡" : "")).join(" | "),
-      torinoN: torino.markets.length,
-      player: parsePlayerBet(player, torino),
-      playerLine: parseLine(player, torino),
-      homeGoals: parseLine(mg.markets[1], mg)?.goal,
-      themes: p.fixtures.map((f) => competitionTheme(f).id).join(","),
-      meta: p.meta,
-    };
-  }, fs.readFileSync(path.join(ROOT, "pruebas/cupon-real-2.txt"), "utf8"));
-  check("cupón real 2: BetBuilder separado en selecciones con su cuota", real2.n === 10 && real2.romaMarkets === "1x2=1@1.40 | Total Tiros De Esquina=Más de 5.5@1.40⚡" && real2.torinoN === 3, real2.romaMarkets);
-  check("cupón real 2: jugador dentro del BetBuilder con '( COM)'", real2.player?.name === "Anastasios Douvikas" && real2.player?.code === "COM" && real2.playerLine?.incl === true && real2.playerLine?.goal === 1, JSON.stringify(real2.player));
+  const real2 = await page.evaluate(
+    (raw) => {
+      const p = parseCoupon(raw);
+      const roma = p.fixtures[0],
+        torino = p.fixtures[1],
+        mg = p.fixtures[3];
+      const player = torino.markets.find((m) => /Douvikas/.test(m.market));
+      return {
+        n: p.fixtures.length,
+        romaMarkets: roma.markets
+          .map((m) => m.market + "=" + m.pick + "@" + m.builderOdd + (m.earlyPayout ? "⚡" : ""))
+          .join(" | "),
+        torinoN: torino.markets.length,
+        player: parsePlayerBet(player, torino),
+        playerLine: parseLine(player, torino),
+        homeGoals: parseLine(mg.markets[1], mg)?.goal,
+        themes: p.fixtures.map((f) => competitionTheme(f).id).join(","),
+        meta: p.meta,
+      };
+    },
+    fs.readFileSync(path.join(ROOT, "pruebas/cupon-real-2.txt"), "utf8"),
+  );
+  check(
+    "cupón real 2: BetBuilder separado en selecciones con su cuota",
+    real2.n === 10 &&
+      real2.romaMarkets === "1x2=1@1.40 | Total Tiros De Esquina=Más de 5.5@1.40⚡" &&
+      real2.torinoN === 3,
+    real2.romaMarkets,
+  );
+  check(
+    "cupón real 2: jugador dentro del BetBuilder con '( COM)'",
+    real2.player?.name === "Anastasios Douvikas" &&
+      real2.player?.code === "COM" &&
+      real2.playerLine?.incl === true &&
+      real2.playerLine?.goal === 1,
+    JSON.stringify(real2.player),
+  );
   check("cupón real 2: '1 total de goles: Más de 0.5' tiene barra (meta 1)", real2.homeGoals === 1);
-  check("cupón real 2: temas de Serie A, Copa de Alemania, EFL Cup y Copa del Rey", real2.themes === "serie-a,serie-a,dfb-pokal,dfb-pokal,dfb-pokal,league-cup,copa-del-rey,copa-del-rey,copa-del-rey,pais", real2.themes);
-  check("cupón real 2: importe 15 y cuota 7.45 (ganancia vacía sin error)", real2.meta.stake === 15 && real2.meta.odds === 7.45 && real2.meta.payout === null, JSON.stringify(real2.meta));
+  check(
+    "cupón real 2: temas de Serie A, Copa de Alemania, EFL Cup y Copa del Rey",
+    real2.themes ===
+      "serie-a,serie-a,dfb-pokal,dfb-pokal,dfb-pokal,league-cup,copa-del-rey,copa-del-rey,copa-del-rey,pais",
+    real2.themes,
+  );
+  check(
+    "cupón real 2: importe 15 y cuota 7.45 (ganancia vacía sin error)",
+    real2.meta.stake === 15 && real2.meta.odds === 7.45 && real2.meta.payout === null,
+    JSON.stringify(real2.meta),
+  );
   // Tres cupones reales de Doradobet (ligas, Europa/Conference League y Champions, con jugadores).
-  const dorado = await page.evaluate((raws) => raws.map((raw) => {
-    const p = parseCoupon(raw);
-    return {
-      n: p.fixtures.length, sel: p.fixtures.reduce((s, f) => s + f.markets.length, 0), meta: p.meta,
-      faltan: p.fixtures.flatMap((f) => [!f.markets.length && f.home + " sin mercado", !f.competition && f.home + " sin competición", ...f.markets.filter((m) => !(m.odd || m.builderOdd)).map((m) => f.home + " sin cuota")]).filter(Boolean),
-      jugadores: p.fixtures.flatMap((f) => f.markets.map((m) => { const b = parsePlayerBet(m, f); return b ? b.name + "=" + playerClubForCode(b.code, f).club : null; }).filter(Boolean)),
-    };
-  }), [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/doradobet-${n}.txt`), "utf8")));
-  check("Doradobet: 42 partidos y 75 selecciones sin datos faltantes", dorado.map((d) => d.n).join() === "23,11,8" && dorado.map((d) => d.sel).join() === "45,16,14" && dorado.every((d) => !d.faltan.length), JSON.stringify(dorado.map((d) => [d.n, d.sel, d.faltan])));
-  check("Doradobet: importes y cuotas totales", dorado.map((d) => d.meta.stake + "@" + d.meta.odds).join() === "4.4@184.28,50@11.94,50@5.77", dorado.map((d) => d.meta.stake + "@" + d.meta.odds).join());
+  const dorado = await page.evaluate(
+    (raws) =>
+      raws.map((raw) => {
+        const p = parseCoupon(raw);
+        return {
+          n: p.fixtures.length,
+          sel: p.fixtures.reduce((s, f) => s + f.markets.length, 0),
+          meta: p.meta,
+          faltan: p.fixtures
+            .flatMap((f) => [
+              !f.markets.length && f.home + " sin mercado",
+              !f.competition && f.home + " sin competición",
+              ...f.markets.filter((m) => !(m.odd || m.builderOdd)).map((m) => f.home + " sin cuota"),
+            ])
+            .filter(Boolean),
+          jugadores: p.fixtures.flatMap((f) =>
+            f.markets
+              .map((m) => {
+                const b = parsePlayerBet(m, f);
+                return b ? b.name + "=" + playerClubForCode(b.code, f).club : null;
+              })
+              .filter(Boolean),
+          ),
+        };
+      }),
+    [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/doradobet-${n}.txt`), "utf8")),
+  );
+  check(
+    "Doradobet: 42 partidos y 75 selecciones sin datos faltantes",
+    dorado.map((d) => d.n).join() === "23,11,8" &&
+      dorado.map((d) => d.sel).join() === "45,16,14" &&
+      dorado.every((d) => !d.faltan.length),
+    JSON.stringify(dorado.map((d) => [d.n, d.sel, d.faltan])),
+  );
+  check(
+    "Doradobet: importes y cuotas totales",
+    dorado.map((d) => d.meta.stake + "@" + d.meta.odds).join() === "4.4@184.28,50@11.94,50@5.77",
+    dorado.map((d) => d.meta.stake + "@" + d.meta.odds).join(),
+  );
   const jug = dorado.flatMap((d) => d.jugadores).join(" | ");
-  check("Doradobet: 8 jugadores con su club (BET, SCP, BEN, MNU, GAL, BRU, BAY, COM)", jug === "Nicolo Tresoldi=Club Brugge KV | Abdessamad Ezzalzouli=Real Betis | Harry Kane=Bayern Munich | Luis Suárez=Sporting Lisboa | Gianluca Prestianni=SL Benfica | Victor Osimhen=Galatasaray SK | Anastasios Douvikas=Como | Bryan Mbeumo=Manchester United", jug);
+  check(
+    "Doradobet: 8 jugadores con su club (BET, SCP, BEN, MNU, GAL, BRU, BAY, COM)",
+    jug ===
+      "Nicolo Tresoldi=Club Brugge KV | Abdessamad Ezzalzouli=Real Betis | Harry Kane=Bayern Munich | Luis Suárez=Sporting Lisboa | Gianluca Prestianni=SL Benfica | Victor Osimhen=Galatasaray SK | Anastasios Douvikas=Como | Bryan Mbeumo=Manchester United",
+    jug,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -218,31 +541,72 @@ section("2. Regla del cupón perdido, Mercados, Agenda y Mis cupones");
 {
   const { ctx, page } = await open(baseDb());
   await view(page, "saved");
-  check("Mis cupones muestra solo pendientes", (await texts(page, "#couponList .saved-coupon > .couponhead strong")).join() === "Combinada A,Combinada B");
-  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  check(
+    "Mis cupones muestra solo pendientes",
+    (await texts(page, "#couponList .saved-coupon > .couponhead strong")).join() ===
+      "Combinada A,Combinada B",
+  );
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
   check("Agenda muestra 3 partidos vivos", (await page.$$("#agendaList .agenda-match")).length === 3);
   // perder un mercado de la Combinada A desde la ficha
-  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Fenerbahce")).click());
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#agendaList .agenda-match")]
+      .find((e) => e.innerText.includes("Fenerbahce"))
+      .click(),
+  );
   await page.waitForTimeout(150);
-  await page.evaluate(() => [...document.querySelectorAll(".match-tab-content > .mk-card")].find((e) => e.innerText.includes("Ambos")).querySelector(".mk-btn.lost").click());
+  await page.evaluate(() =>
+    [...document.querySelectorAll(".match-tab-content > .mk-card")]
+      .find((e) => e.innerText.includes("Ambos"))
+      .querySelector(".mk-btn.lost")
+      .click(),
+  );
   await page.waitForTimeout(150);
-  check("la ficha no deja pendientes del cupón perdido", (await page.$$(".match-tab-content > .mk-card")).length === 0);
-  check("resumen 'Ya marcados' indica cupón perdido", /cupón perdido/.test(await page.$eval(".marked-summary", (e) => e.innerText)));
+  check(
+    "la ficha no deja pendientes del cupón perdido",
+    (await page.$$(".match-tab-content > .mk-card")).length === 0,
+  );
+  check(
+    "resumen 'Ya marcados' indica cupón perdido",
+    /cupón perdido/.test(await page.$eval(".marked-summary", (e) => e.innerText)),
+  );
   await page.click(".match-close");
   await page.click('[data-agenda-range="all"]');
   const ag = await texts(page, "#agendaList .agenda-match .agenda-teams");
-  check("Agenda quita el partido del cupón perdido", !ag.some((t) => t.includes("Fenerbahce")) && ag.some((t) => t.includes("AEK")), ag.join(" / "));
+  check(
+    "Agenda quita el partido del cupón perdido",
+    !ag.some((t) => t.includes("Fenerbahce")) && ag.some((t) => t.includes("AEK")),
+    ag.join(" / "),
+  );
   await view(page, "markets");
   const mk = await page.$$eval("[data-market-card]:not(.hidden)", (x) => x.map((e) => e.dataset.team));
-  check("Mercados (Pendiente) quita el partido perdido y mantiene AEK (sigue vivo en B)", !mk.some((t) => t.includes("Fenerbahce")) && mk.some((t) => t.includes("AEK")), mk.join(" / "));
+  check(
+    "Mercados (Pendiente) quita el partido perdido y mantiene AEK (sigue vivo en B)",
+    !mk.some((t) => t.includes("Fenerbahce")) && mk.some((t) => t.includes("AEK")),
+    mk.join(" / "),
+  );
   await view(page, "saved");
-  check("el cupón A pasa a Perdidos", (await texts(page, "#couponList .saved-coupon > .couponhead strong")).join() === "Combinada B");
+  check(
+    "el cupón A pasa a Perdidos",
+    (await texts(page, "#couponList .saved-coupon > .couponhead strong")).join() === "Combinada B",
+  );
   await page.click('[data-coupon-filter="lost"]');
-  check("pestaña Perdidos contiene A", (await texts(page, "#couponList .saved-coupon > .couponhead strong")).join() === "Combinada A");
+  check(
+    "pestaña Perdidos contiene A",
+    (await texts(page, "#couponList .saved-coupon > .couponhead strong")).join() === "Combinada A",
+  );
   // deshacer
-  await view(page, "markets"); await page.click('[data-fold="history"] .fold-head'); await page.click("#undoResultBtn"); await page.waitForTimeout(100);
-  await view(page, "saved"); await page.click('[data-coupon-filter="pending"]');
-  check("deshacer devuelve A a pendientes", (await texts(page, "#couponList .saved-coupon > .couponhead strong")).length === 2);
+  await view(page, "markets");
+  await page.click('[data-fold="history"] .fold-head');
+  await page.click("#undoResultBtn");
+  await page.waitForTimeout(100);
+  await view(page, "saved");
+  await page.click('[data-coupon-filter="pending"]');
+  check(
+    "deshacer devuelve A a pendientes",
+    (await texts(page, "#couponList .saved-coupon > .couponhead strong")).length === 2,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -251,11 +615,18 @@ section("2. Regla del cupón perdido, Mercados, Agenda y Mis cupones");
 section("3. Eliminar cupón, balance y deshacer");
 {
   const { ctx, page } = await open(baseDb());
-  const bal = async () => { await view(page, "houses"); return page.$eval("#houseList .listitem", (e) => e.innerText.replace(/\s+/g, " ")); };
+  const bal = async () => {
+    await view(page, "houses");
+    return page.$eval("#houseList .listitem", (e) => e.innerText.replace(/\s+/g, " "));
+  };
   check("balance inicial con la apuesta de B", /-70\.00/.test(await bal()));
-  await view(page, "saved"); await page.click('[data-remove="B"]'); await page.waitForTimeout(100);
+  await view(page, "saved");
+  await page.click('[data-remove="B"]');
+  await page.waitForTimeout(100);
   check("eliminar B quita su apuesta del balance", /Movimientos netos L 0\.00/.test(await bal()));
-  await view(page, "saved"); await page.click("#undoCouponActionBtn"); await page.waitForTimeout(100);
+  await view(page, "saved");
+  await page.click("#undoCouponActionBtn");
+  await page.waitForTimeout(100);
   check("deshacer la recupera", /-70\.00/.test(await bal()));
   await ctx.close();
 }
@@ -266,17 +637,41 @@ section("4. Guardar cupones más rápido");
   const { ctx, page } = await open(baseDb());
   await view(page, "new");
   const today = isoDay(Date.now()).split("-").reverse().join("/");
-  await page.fill("#raw", `Europa, UEFA Liga Campeones\nPSV\nvs.\nAjax\n${today} • 23:59\nTotal de goles: Más de 2.5\nCuotas: 1.80\nVALOR APOSTADO L 50.00`);
-  await page.click("#readBtn"); await page.waitForTimeout(150);
-  check("detecta la casa por el formato o el historial", (await page.$eval("#couponHouse", (e) => e.value)) === "h1", await page.$eval("#houseHint", (e) => e.textContent));
-  check("explica por qué eligió la casa", /Hondubet/.test(await page.$eval("#houseHint", (e) => e.textContent)));
-  check("ofrece importes habituales", (await texts(page, "#stakeChips .chip")).length >= 2, (await texts(page, "#stakeChips .chip")).join());
+  await page.fill(
+    "#raw",
+    `Europa, UEFA Liga Campeones\nPSV\nvs.\nAjax\n${today} • 23:59\nTotal de goles: Más de 2.5\nCuotas: 1.80\nVALOR APOSTADO L 50.00`,
+  );
+  await page.click("#readBtn");
+  await page.waitForTimeout(150);
+  check(
+    "detecta la casa por el formato o el historial",
+    (await page.$eval("#couponHouse", (e) => e.value)) === "h1",
+    await page.$eval("#houseHint", (e) => e.textContent),
+  );
+  check(
+    "explica por qué eligió la casa",
+    /Hondubet/.test(await page.$eval("#houseHint", (e) => e.textContent)),
+  );
+  check(
+    "ofrece importes habituales",
+    (await texts(page, "#stakeChips .chip")).length >= 2,
+    (await texts(page, "#stakeChips .chip")).join(),
+  );
   check("barra fija de guardar visible", await page.isVisible("#saveBar"));
-  await page.click('#stakeChips .chip >> text="L 70.00"'); await page.waitForTimeout(50);
+  await page.click('#stakeChips .chip >> text="L 70.00"');
+  await page.waitForTimeout(50);
   check("tocar un importe lo aplica", (await page.$eval("#stake", (e) => e.value)) === "70");
-  check("la barra resume selecciones, importe y casa", /1 selección[\s\S]*L 70\.00[\s\S]*Hondubet/.test(await page.$eval("#saveBar", (e) => e.innerText)), await page.$eval("#saveBar", (e) => e.innerText));
-  await page.click("[data-save-bar]"); await page.waitForTimeout(200);
-  check("guarda desde la barra y va a Mis cupones", (await page.$eval("#viewTitle", (e) => e.textContent)) === "Mis cupones");
+  check(
+    "la barra resume selecciones, importe y casa",
+    /1 selección[\s\S]*L 70\.00[\s\S]*Hondubet/.test(await page.$eval("#saveBar", (e) => e.innerText)),
+    await page.$eval("#saveBar", (e) => e.innerText),
+  );
+  await page.click("[data-save-bar]");
+  await page.waitForTimeout(200);
+  check(
+    "guarda desde la barra y va a Mis cupones",
+    (await page.$eval("#viewTitle", (e) => e.textContent)) === "Mis cupones",
+  );
   check("barra oculta tras guardar", !(await page.isVisible("#saveBar")));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
@@ -286,14 +681,29 @@ section("4. Guardar cupones más rápido");
 section("5. Buscador global");
 {
   const { ctx, page } = await open(baseDb());
-  await page.click("#searchBtn"); await page.fill("#globalSearch", "aek"); await page.waitForTimeout(300);
-  check("encuentra el equipo AEK con su partido", /AEK/.test(await page.$eval("#searchResults", (e) => e.innerText)));
-  await page.fill("#globalSearch", "nico paz"); await page.waitForTimeout(300);
+  await page.click("#searchBtn");
+  await page.fill("#globalSearch", "aek");
+  await page.waitForTimeout(300);
+  check(
+    "encuentra el equipo AEK con su partido",
+    /AEK/.test(await page.$eval("#searchResults", (e) => e.innerText)),
+  );
+  await page.fill("#globalSearch", "nico paz");
+  await page.waitForTimeout(300);
   const res = await page.$eval("#searchResults", (e) => e.innerText);
-  check("encuentra al jugador Nico Paz con su club", /Nico Paz/.test(res) && /Como/.test(res), res.slice(0, 120));
-  await page.fill("#globalSearch", "ganado"); await page.waitForTimeout(300);
-  await page.click("[data-search-coupon]"); await page.waitForTimeout(400);
-  check("al tocar un cupón archivado abre su pestaña", (await page.$eval("#couponFilter .chip.active", (e) => e.innerText)).startsWith("Ganados"));
+  check(
+    "encuentra al jugador Nico Paz con su club",
+    /Nico Paz/.test(res) && /Como/.test(res),
+    res.slice(0, 120),
+  );
+  await page.fill("#globalSearch", "ganado");
+  await page.waitForTimeout(300);
+  await page.click("[data-search-coupon]");
+  await page.waitForTimeout(400);
+  check(
+    "al tocar un cupón archivado abre su pestaña",
+    (await page.$eval("#couponFilter .chip.active", (e) => e.innerText)).startsWith("Ganados"),
+  );
   check("buscador cerrado", !(await page.isVisible("#searchSheet")));
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
@@ -304,19 +714,63 @@ section("6. Avisos de partidos, presupuesto y rachas");
 {
   const db = baseDb();
   // "Ganado viejo" (hace 9 días) entraría en el mes actual a partir del día 10: se pasa al mes anterior para que el gasto del mes sea siempre 120.
-  db.coupons.find((c) => c.id === "C").created = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString();
-  for (let i = 0; i < 3; i++) db.coupons.push({ id: "L" + i, name: "Perdido " + i, created: new Date(Date.now() - (5 - i) * 86400e3).toISOString(), stake: 0, odds: 2, payout: 20, fixtures: [{ id: "x" + i, home: "X" + i, away: "Y" + i, dateISO: isoDay(Date.now() - (5 - i) * 86400e3), time: "10:00", markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "lost" }] }] });
+  db.coupons.find((c) => c.id === "C").created = new Date(
+    new Date().getFullYear(),
+    new Date().getMonth() - 1,
+    15,
+  ).toISOString();
+  for (let i = 0; i < 3; i++)
+    db.coupons.push({
+      id: "L" + i,
+      name: "Perdido " + i,
+      created: new Date(Date.now() - (5 - i) * 86400e3).toISOString(),
+      stake: 0,
+      odds: 2,
+      payout: 20,
+      fixtures: [
+        {
+          id: "x" + i,
+          home: "X" + i,
+          away: "Y" + i,
+          dateISO: isoDay(Date.now() - (5 - i) * 86400e3),
+          time: "10:00",
+          markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "lost" }],
+        },
+      ],
+    });
   const { ctx, page } = await open(db, { init: "push" });
-  check("aviso dentro de la app antes del partido", /Fenerbahce vs Liverpool<\/b> empieza en \d+ min/.test(await page.$eval("#liveAlert", (e) => e.innerHTML)));
-  check("aviso de 3 cupones perdidos seguidos", (await texts(page, ".home-notice b")).some((t) => /3 cupones perdidos seguidos/.test(t)));
+  check(
+    "aviso dentro de la app antes del partido",
+    /Fenerbahce vs Liverpool<\/b> empieza en \d+ min/.test(
+      await page.$eval("#liveAlert", (e) => e.innerHTML),
+    ),
+  );
+  check(
+    "aviso de 3 cupones perdidos seguidos",
+    (await texts(page, ".home-notice b")).some((t) => /3 cupones perdidos seguidos/.test(t)),
+  );
   page.promptAnswer = "130";
-  await page.click("[data-budget-edit]"); await page.waitForTimeout(100);
-  check("presupuesto cerca del límite (120 de 130)", /Cerca del límite/.test(await page.$eval("#budgetCard", (e) => e.innerText)));
-  await view(page, "settings"); await page.click("[data-alert-on]"); await page.waitForTimeout(600);
+  await page.click("[data-budget-edit]");
+  await page.waitForTimeout(100);
+  check(
+    "presupuesto cerca del límite (120 de 130)",
+    /Cerca del límite/.test(await page.$eval("#budgetCard", (e) => e.innerText)),
+  );
+  await view(page, "settings");
+  await page.click("[data-alert-on]");
+  await page.waitForTimeout(600);
   const last = posts.at(-1);
-  check("envía al servidor los partidos vivos", last?.accion === "guardar" && last.matches.length === 3, JSON.stringify(last?.matches?.map((m) => m.title)));
-  check("la notificación lista los mercados pendientes", last?.matches?.some((m) => /Nico Paz: Más de 0\.5/.test(m.body)));
-  await page.click("[data-alert-off]"); await page.waitForTimeout(300);
+  check(
+    "envía al servidor los partidos vivos",
+    last?.accion === "guardar" && last.matches.length === 3,
+    JSON.stringify(last?.matches?.map((m) => m.title)),
+  );
+  check(
+    "la notificación lista los mercados pendientes",
+    last?.matches?.some((m) => /Nico Paz: Más de 0\.5/.test(m.body)),
+  );
+  await page.click("[data-alert-off]");
+  await page.waitForTimeout(300);
   check("desactivar avisa al servidor", posts.at(-1)?.accion === "borrar");
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
@@ -326,11 +780,18 @@ section("6. Avisos de partidos, presupuesto y rachas");
 section("7. App instalable y sin conexión");
 {
   const { ctx, page } = await open(baseDb());
-  const m = await page.evaluate(async () => (await fetch(document.querySelector("link[rel=manifest]").href)).json());
+  const m = await page.evaluate(async () =>
+    (await fetch(document.querySelector("link[rel=manifest]").href)).json(),
+  );
   check("manifest de app instalable", m.display === "standalone" && m.icons.length >= 3);
-  check("service worker activo", await page.evaluate(async () => !!(await navigator.serviceWorker.ready).active));
+  check(
+    "service worker activo",
+    await page.evaluate(async () => !!(await navigator.serviceWorker.ready).active),
+  );
   await page.waitForTimeout(500);
-  await ctx.setOffline(true); await page.reload(); await page.waitForTimeout(600);
+  await ctx.setOffline(true);
+  await page.reload();
+  await page.waitForTimeout(600);
   check("abre sin conexión con los cupones", (await page.$eval("#sCoupons", (e) => e.textContent)) === "3");
   await ctx.close();
 }
@@ -338,63 +799,223 @@ section("7. App instalable y sin conexión");
 // ---------- 9. Barra de progreso de mercados ----------
 section("9. Barra de progreso de mercados");
 {
-  const now = Date.now(), day = isoDay(now), time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
-  const db = { coupons: [{ id: "P", name: "Progreso", created: new Date(now).toISOString(), houseId: "", type: "parlay", stake: 10, odds: 5, payout: 50,
-    fixtures: [{ id: "f", home: "Real Madrid", away: "Juventus", competition: "UEFA Liga Campeones", dateISO: day, time, markets: [
-      { market: "Total de goles", pick: "Más de 2.5", odd: "1.8", settlement: "pending" },
-      { market: "Total Tiros De Esquina", pick: "Menos de 2.5", odd: "2.1", settlement: "pending" },
-      { market: "Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente", pick: "Más de 1.5", odd: "1.9", settlement: "pending" },
-      { market: "Total de tarjetas", pick: "Más de 4.5", odd: "1.7", settlement: "pending" },
-      { market: "1x2", pick: "1", odd: "1.5", settlement: "pending" }] }] }], houses: [], transactions: [], resultHistory: [], actionHistory: [] };
+  const now = Date.now(),
+    day = isoDay(now),
+    time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
+  const db = {
+    coupons: [
+      {
+        id: "P",
+        name: "Progreso",
+        created: new Date(now).toISOString(),
+        houseId: "",
+        type: "parlay",
+        stake: 10,
+        odds: 5,
+        payout: 50,
+        fixtures: [
+          {
+            id: "f",
+            home: "Real Madrid",
+            away: "Juventus",
+            competition: "UEFA Liga Campeones",
+            dateISO: day,
+            time,
+            markets: [
+              { market: "Total de goles", pick: "Más de 2.5", odd: "1.8", settlement: "pending" },
+              { market: "Total Tiros De Esquina", pick: "Menos de 2.5", odd: "2.1", settlement: "pending" },
+              {
+                market: "Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente",
+                pick: "Más de 1.5",
+                odd: "1.9",
+                settlement: "pending",
+              },
+              { market: "Total de tarjetas", pick: "Más de 4.5", odd: "1.7", settlement: "pending" },
+              { market: "1x2", pick: "1", odd: "1.5", settlement: "pending" },
+            ],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+  };
   const { ctx, page } = await open(db);
   const u = await page.evaluate(() => {
-    const L = (market, pick) => { const r = parseLine({ market, pick }, { home: "Real Madrid", away: "Juventus" }); return r ? r.dir + ":" + r.goal + ":" + r.cat + (r.incl ? ":suplente" : "") : null; };
-    return [L("Total de goles", "Más de 2.5"), L("Total Tiros De Esquina", "Menos de 9.5"), L("Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"),
-            L("Remates (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"), L("Tarjetas", "+3.5"), L("Jugador remates a puerta", "Mbappe 2+"), L("1x2", "1"), L("Ambos equipos marcan", "Sí")];
+    const L = (market, pick) => {
+      const r = parseLine({ market, pick }, { home: "Real Madrid", away: "Juventus" });
+      return r ? r.dir + ":" + r.goal + ":" + r.cat + (r.incl ? ":suplente" : "") : null;
+    };
+    return [
+      L("Total de goles", "Más de 2.5"),
+      L("Total Tiros De Esquina", "Menos de 9.5"),
+      L("Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"),
+      L("Remates (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"),
+      L("Tarjetas", "+3.5"),
+      L("Jugador remates a puerta", "Mbappe 2+"),
+      L("1x2", "1"),
+      L("Ambos equipos marcan", "Sí"),
+    ];
   });
-  check("entiende las líneas (goles, córners, remates, tarjetas, 2+)", u.map(String).join("|") === "over:3:goles|under:10:córners|over:2:a puerta:suplente|over:2:remates:suplente|over:4:tarjetas|over:2:a puerta|null|null", u.map(String).join("|"));
-  await page.evaluate(() => document.querySelector("#todayList .agenda-match").click()); await page.waitForTimeout(150);
+  check(
+    "entiende las líneas (goles, córners, remates, tarjetas, 2+)",
+    u.map(String).join("|") ===
+      "over:3:goles|under:10:córners|over:2:a puerta:suplente|over:2:remates:suplente|over:4:tarjetas|over:2:a puerta|null|null",
+    u.map(String).join("|"),
+  );
+  await page.evaluate(() => document.querySelector("#todayList .agenda-match").click());
+  await page.waitForTimeout(150);
   const card = (txt) => `.mk-card:has-text("${txt}")`;
   check("muestra barra solo en mercados de línea", (await page.$$(".match-tab-content .pg")).length === 4);
-  check("cabecera con el tema de la competición (Champions → estrellas)", (await page.$eval(".match-stadium", (e) => e.dataset.pattern)) === "stars");
-  const themes = await page.evaluate(() => [
-    ["UEFA Liga Campeones", "Europa"], ["UEFA Europa League", ""], ["UEFA Conference League", ""], ["Supercopa de la UEFA", ""],
-    ["Premier League", "Inglaterra"], ["Championship", "Inglaterra"], ["FA Cup", "Inglaterra"], ["Carabao Cup", "Inglaterra"],
-    ["LaLiga", "España"], ["LaLiga Hypermotion", "España"], ["Copa del Rey", "España"], ["Supercopa de España", "España"],
-    ["Serie A", "Italia"], ["Coppa Italia", "Italia"], ["Bundesliga", "Alemania"], ["DFB Pokal", "Alemania"], ["Bundesliga", "Austria"],
-    ["Ligue 1", "Francia"], ["Eredivisie", "Países Bajos"], ["Liga Portugal", "Portugal"], ["Premiership", "Escocia"], ["Super Lig", "Turquía"],
-    ["Serie A", "Brasil"], ["Superliga", "Dinamarca"], ["Liga Nacional", "Honduras"],
-    ["UEFA Nations League", ""], ["Eliminatorias UEFA Mundial", ""], ["Eliminatorias CONMEBOL", ""], ["Amistosos Internacionales", ""],
-    ["Copa Mundial de la FIFA", ""], ["Eurocopa", ""], ["Copa América", ""], ["CONCACAF Liga de Naciones", ""], ["Copa Oro", ""],
-  ].map(([competition, country]) => competitionTheme({ competition, country }).id).join(","));
-  check("temas de ligas, copas, competiciones europeas y selecciones", themes === "champions,europa-league,conference,uefa-super-cup,premier-league,english-football-league,fa-cup,league-cup,laliga,laliga-2,copa-del-rey,supercopa-espana,serie-a,coppa-italia,bundesliga,dfb-pokal,pais,ligue-1,eredivisie,primeira-liga,scottish-premiership,super-lig,pais,pais,liga-nacional,nations-league,qualifiers,qualifiers,friendlies,world-cup,euro,copa-america,concacaf-nations,gold-cup", themes);
-  const flags = await page.evaluate(() => ["España", "Inglaterra", "Países Bajos", "Estados Unidos", "Honduras", "Costa de Marfil", "Brasil Sub 20", "Real Madrid"].map(nationFlag).join(" "));
-  check("banderas de selecciones (y ninguna para clubes)", flags.split(" ").filter(Boolean).length === 7 && !flags.trim().endsWith("🇪🇸 "), flags);
-  const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
-  for (let i = 0; i < 3; i++) { await tap(page, stBtn("goals:home")); await page.waitForTimeout(80); }
-  check("Más de 2.5 goles: con 3 en el marcador se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
-  check("avisa con un mensaje de línea superada", /superada/.test(await page.$eval("#toast", (e) => e.textContent)), await page.$eval("#toast", (e) => e.textContent));
-  await tap(page, stBtn("goals:home", -1)); await page.waitForTimeout(100);
-  check("si restas, vuelve a pendiente", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "pending");
-  for (let i = 0; i < 3; i++) { await tap(page, stBtn("corners:away")); await page.waitForTimeout(80); }
-  check("Menos de 2.5 córners: con 3 se marca perdido solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[1].settlement)) === "lost");
-  await page.evaluate(() => { db.coupons[0].fixtures[0].markets[1].settlement = "pending"; db.stats = {}; db.progress = {}; save(); renderAll(); });
+  check(
+    "cabecera con el tema de la competición (Champions → estrellas)",
+    (await page.$eval(".match-stadium", (e) => e.dataset.pattern)) === "stars",
+  );
+  const themes = await page.evaluate(() =>
+    [
+      ["UEFA Liga Campeones", "Europa"],
+      ["UEFA Europa League", ""],
+      ["UEFA Conference League", ""],
+      ["Supercopa de la UEFA", ""],
+      ["Premier League", "Inglaterra"],
+      ["Championship", "Inglaterra"],
+      ["FA Cup", "Inglaterra"],
+      ["Carabao Cup", "Inglaterra"],
+      ["LaLiga", "España"],
+      ["LaLiga Hypermotion", "España"],
+      ["Copa del Rey", "España"],
+      ["Supercopa de España", "España"],
+      ["Serie A", "Italia"],
+      ["Coppa Italia", "Italia"],
+      ["Bundesliga", "Alemania"],
+      ["DFB Pokal", "Alemania"],
+      ["Bundesliga", "Austria"],
+      ["Ligue 1", "Francia"],
+      ["Eredivisie", "Países Bajos"],
+      ["Liga Portugal", "Portugal"],
+      ["Premiership", "Escocia"],
+      ["Super Lig", "Turquía"],
+      ["Serie A", "Brasil"],
+      ["Superliga", "Dinamarca"],
+      ["Liga Nacional", "Honduras"],
+      ["UEFA Nations League", ""],
+      ["Eliminatorias UEFA Mundial", ""],
+      ["Eliminatorias CONMEBOL", ""],
+      ["Amistosos Internacionales", ""],
+      ["Copa Mundial de la FIFA", ""],
+      ["Eurocopa", ""],
+      ["Copa América", ""],
+      ["CONCACAF Liga de Naciones", ""],
+      ["Copa Oro", ""],
+    ]
+      .map(([competition, country]) => competitionTheme({ competition, country }).id)
+      .join(","),
+  );
+  check(
+    "temas de ligas, copas, competiciones europeas y selecciones",
+    themes ===
+      "champions,europa-league,conference,uefa-super-cup,premier-league,english-football-league,fa-cup,league-cup,laliga,laliga-2,copa-del-rey,supercopa-espana,serie-a,coppa-italia,bundesliga,dfb-pokal,pais,ligue-1,eredivisie,primeira-liga,scottish-premiership,super-lig,pais,pais,liga-nacional,nations-league,qualifiers,qualifiers,friendlies,world-cup,euro,copa-america,concacaf-nations,gold-cup",
+    themes,
+  );
+  const flags = await page.evaluate(() =>
+    [
+      "España",
+      "Inglaterra",
+      "Países Bajos",
+      "Estados Unidos",
+      "Honduras",
+      "Costa de Marfil",
+      "Brasil Sub 20",
+      "Real Madrid",
+    ]
+      .map(nationFlag)
+      .join(" "),
+  );
+  check(
+    "banderas de selecciones (y ninguna para clubes)",
+    flags.split(" ").filter(Boolean).length === 7 && !flags.trim().endsWith("🇪🇸 "),
+    flags,
+  );
+  const stBtn = (target, step = 1) =>
+    `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
+  for (let i = 0; i < 3; i++) {
+    await tap(page, stBtn("goals:home"));
+    await page.waitForTimeout(80);
+  }
+  check(
+    "Más de 2.5 goles: con 3 en el marcador se marca ganado solo",
+    (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won",
+  );
+  check(
+    "avisa con un mensaje de línea superada",
+    /superada/.test(await page.$eval("#toast", (e) => e.textContent)),
+    await page.$eval("#toast", (e) => e.textContent),
+  );
+  await tap(page, stBtn("goals:home", -1));
+  await page.waitForTimeout(100);
+  check(
+    "si restas, vuelve a pendiente",
+    (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "pending",
+  );
+  for (let i = 0; i < 3; i++) {
+    await tap(page, stBtn("corners:away"));
+    await page.waitForTimeout(80);
+  }
+  check(
+    "Menos de 2.5 córners: con 3 se marca perdido solo",
+    (await page.evaluate(() => db.coupons[0].fixtures[0].markets[1].settlement)) === "lost",
+  );
+  await page.evaluate(() => {
+    db.coupons[0].fixtures[0].markets[1].settlement = "pending";
+    db.stats = {};
+    db.progress = {};
+    save();
+    renderAll();
+  });
   await page.waitForTimeout(100);
   const pk = await page.evaluate(() => crestNorm("Kylian Mbappe"));
-  check("jugador con solo líneas a puerta: el marcador muestra solo 'Remates a puerta'", !/tiros totales/.test(await page.$eval(".live-board", (e) => e.innerText)) && /Remates a puerta/.test(await page.$eval(".live-board", (e) => e.innerText)));
-  await tap(page, stBtn(`player:${pk}:main:onTarget`)); await page.waitForTimeout(80);
+  check(
+    "jugador con solo líneas a puerta: el marcador muestra solo 'Remates a puerta'",
+    !/tiros totales/.test(await page.$eval(".live-board", (e) => e.innerText)) &&
+      /Remates a puerta/.test(await page.$eval(".live-board", (e) => e.innerText)),
+  );
+  await tap(page, stBtn(`player:${pk}:main:onTarget`));
+  await page.waitForTimeout(80);
   page.promptAnswer = "Endrick";
-  await tap(page, ".live-board [data-st-sub-add]"); await page.waitForTimeout(400);
-  check("agrega al suplente con su nombre", (await page.$eval(".live-board", (e) => e.innerText)).includes("Endrick"));
-  await tap(page, stBtn(`player:${pk}:sub:onTarget`)); await page.waitForTimeout(150);
-  check("Mbappé 1 + suplente 1 = 2: remates a puerta (incl. suplente) ganado", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[2].settlement)) === "won");
-  await page.click(".match-close"); await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
-  check("la Agenda muestra el progreso en miniatura", /Goles 0\/3/.test(await page.$eval("#agendaList", (e) => e.innerText)), await page.$eval("#agendaList", (e) => e.innerText.replace(/\s+/g, " ")));
-  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(150);
-  await tap(page, stBtn("cards:home")); await page.waitForTimeout(80);
-  await page.click("[data-pg-finish]"); await page.waitForTimeout(200);
+  await tap(page, ".live-board [data-st-sub-add]");
+  await page.waitForTimeout(400);
+  check(
+    "agrega al suplente con su nombre",
+    (await page.$eval(".live-board", (e) => e.innerText)).includes("Endrick"),
+  );
+  await tap(page, stBtn(`player:${pk}:sub:onTarget`));
+  await page.waitForTimeout(150);
+  check(
+    "Mbappé 1 + suplente 1 = 2: remates a puerta (incl. suplente) ganado",
+    (await page.evaluate(() => db.coupons[0].fixtures[0].markets[2].settlement)) === "won",
+  );
+  await page.click(".match-close");
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
+  check(
+    "la Agenda muestra el progreso en miniatura",
+    /Goles 0\/3/.test(await page.$eval("#agendaList", (e) => e.innerText)),
+    await page.$eval("#agendaList", (e) => e.innerText.replace(/\s+/g, " ")),
+  );
+  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click());
+  await page.waitForTimeout(150);
+  await tap(page, stBtn("cards:home"));
+  await page.waitForTimeout(80);
+  await page.click("[data-pg-finish]");
+  await page.waitForTimeout(200);
   const st = await page.evaluate(() => db.coupons[0].fixtures[0].markets.map((m) => m.settlement).join(","));
-  check("Terminó el partido: Más de sin llegar → perdido, Menos de → ganado", st === "lost,won,won,lost,pending", st);
+  check(
+    "Terminó el partido: Más de sin llegar → perdido, Menos de → ganado",
+    st === "lost,won,won,lost,pending",
+    st,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -406,35 +1027,116 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
   await view(page, "logos");
   const idx = (name) => page.evaluate((n) => logoManagerTeams.findIndex((t) => t.name === n), name);
   const fb = await idx("Fenerbahce");
-  await page.click(`[data-logo-lookup="${fb}"]`); await page.waitForTimeout(300);
+  await page.click(`[data-logo-lookup="${fb}"]`);
+  await page.waitForTimeout(300);
   const opts = await texts(page, `#logo-options-${fb} .img-opt`);
-  check("busca a la vez en varias fuentes (API-Football, TheSportsDB…)", opts.length === 2 && opts.some((o) => /API-Football/.test(o)) && opts.some((o) => /TheSportsDB/.test(o)), opts.join(" / "));
-  await page.evaluate((fb) => [...document.querySelectorAll(`#logo-options-${fb} .img-opt`)].find((b) => /TheSportsDB/.test(b.innerText)).click(), fb); await page.waitForTimeout(200);
-  check("tocar un resultado de TheSportsDB guarda el escudo", (await page.evaluate(() => readCrestDirectory()["team:fenerbahce"]?.url || "")).includes("thesportsdb.com"));
-  check("el escudo se aplica a sus partidos", (await page.evaluate(() => db.coupons[0].fixtures[0].homeCrest)).includes("thesportsdb.com"));
+  check(
+    "busca a la vez en varias fuentes (API-Football, TheSportsDB…)",
+    opts.length === 2 && opts.some((o) => /API-Football/.test(o)) && opts.some((o) => /TheSportsDB/.test(o)),
+    opts.join(" / "),
+  );
+  await page.evaluate(
+    (fb) =>
+      [...document.querySelectorAll(`#logo-options-${fb} .img-opt`)]
+        .find((b) => /TheSportsDB/.test(b.innerText))
+        .click(),
+    fb,
+  );
+  await page.waitForTimeout(200);
+  check(
+    "tocar un resultado de TheSportsDB guarda el escudo",
+    (await page.evaluate(() => readCrestDirectory()["team:fenerbahce"]?.url || "")).includes(
+      "thesportsdb.com",
+    ),
+  );
+  check(
+    "el escudo se aplica a sus partidos",
+    (await page.evaluate(() => db.coupons[0].fixtures[0].homeCrest)).includes("thesportsdb.com"),
+  );
   const lv = await idx("Liverpool");
-  await page.click(`[data-logo-lookup="${lv}"]`); await page.waitForTimeout(300);
-  await page.fill(`#logo-q-${lv}`, "Liverpool FC"); await page.click(`[data-logo-requery="${lv}"]`); await page.waitForTimeout(300);
-  check("se puede buscar con otro nombre", seen.includes("buscar:equipo:Liverpool FC") && seen.includes("escudos:Liverpool FC"), seen.slice(-4).join(" | "));
+  await page.click(`[data-logo-lookup="${lv}"]`);
+  await page.waitForTimeout(300);
+  await page.fill(`#logo-q-${lv}`, "Liverpool FC");
+  await page.click(`[data-logo-requery="${lv}"]`);
+  await page.waitForTimeout(300);
+  check(
+    "se puede buscar con otro nombre",
+    seen.includes("buscar:equipo:Liverpool FC") && seen.includes("escudos:Liverpool FC"),
+    seen.slice(-4).join(" | "),
+  );
   const aek = await idx("AEK");
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click(`[data-logo-upload="${aek}"]`)]);
-  await chooser.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
+  const [chooser] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.click(`[data-logo-upload="${aek}"]`),
+  ]);
+  await chooser.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png"));
+  await page.waitForTimeout(500);
   const aekUrl = await page.evaluate(() => readCrestDirectory()["team:aek"]?.url || "");
   const aekImg = await page.evaluate((u) => resolveImage(u), aekUrl);
-  check("subir imagen del teléfono guarda el escudo (recortado y pequeño)", /^data:image\/(webp|png);base64,/.test(aekImg) && aekImg.length < 60000, aekImg.slice(0, 30) + " · " + aekImg.length + " caracteres");
-  const stored = await page.evaluate(() => ({ ref: readCrestDirectory()["team:aek"].url, enPartido: db.coupons.flatMap((c) => c.fixtures).find((f) => f.home === "AEK").homeCrest, copias: (JSON.stringify(db).match(/data:image/g) || []).length }));
-  check("la imagen se guarda una sola vez; los partidos llevan solo la referencia", stored.ref.startsWith("kalimg:") && stored.enPartido === stored.ref && stored.copias === 0, JSON.stringify(stored).slice(0, 120));
-  check("el escudo subido se ve en su tarjeta", await page.evaluate(() => [...document.querySelectorAll("#logoArchive .logo-card")].some((c) => c.innerText.includes("AEK") && /^(data:image|blob:)/.test(c.querySelector("img.team-crest:not([hidden])")?.src || ""))));
+  check(
+    "subir imagen del teléfono guarda el escudo (recortado y pequeño)",
+    /^data:image\/(webp|png);base64,/.test(aekImg) && aekImg.length < 60000,
+    aekImg.slice(0, 30) + " · " + aekImg.length + " caracteres",
+  );
+  const stored = await page.evaluate(() => ({
+    ref: readCrestDirectory()["team:aek"].url,
+    enPartido: db.coupons.flatMap((c) => c.fixtures).find((f) => f.home === "AEK").homeCrest,
+    copias: (JSON.stringify(db).match(/data:image/g) || []).length,
+  }));
+  check(
+    "la imagen se guarda una sola vez; los partidos llevan solo la referencia",
+    stored.ref.startsWith("kalimg:") && stored.enPartido === stored.ref && stored.copias === 0,
+    JSON.stringify(stored).slice(0, 120),
+  );
+  check(
+    "el escudo subido se ve en su tarjeta",
+    await page.evaluate(() =>
+      [...document.querySelectorAll("#logoArchive .logo-card")].some(
+        (c) =>
+          c.innerText.includes("AEK") &&
+          /^(data:image|blob:)/.test(c.querySelector("img.team-crest:not([hidden])")?.src || ""),
+      ),
+    ),
+  );
   // Fotos de jugadores: búsqueda combinada y subida
-  await page.evaluate(() => { const el = document.querySelector('[data-fold="players"]'); if (!el.classList.contains("is-open")) el.querySelector(".fold-head").click(); });
-  await page.click('#playerPhotoArchive [data-player-photo]'); await page.waitForTimeout(400);
-  const nico = () => page.evaluate(() => Object.values(readCrestDirectory()).find((x) => x?.kind === "player" && /Nico Paz/.test(x.name))?.photo || "");
-  check("la foto del jugador se encuentra en TheSportsDB si API-Football no la tiene", (await nico()).includes("thesportsdb.com"), await nico());
-  const [ch2] = await Promise.all([page.waitForEvent("filechooser"), page.click('#playerPhotoArchive [data-player-upload]')]);
-  await ch2.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png")); await page.waitForTimeout(500);
-  check("subir la foto de un jugador desde el teléfono", (await nico()).startsWith("kalimg:") && (await page.evaluate(() => !!document.querySelector('#playerPhotoArchive img.player-logo-thumb[src^="data:image"]'))), (await nico()).slice(0, 30));
+  await page.evaluate(() => {
+    const el = document.querySelector('[data-fold="players"]');
+    if (!el.classList.contains("is-open")) el.querySelector(".fold-head").click();
+  });
+  await page.click("#playerPhotoArchive [data-player-photo]");
+  await page.waitForTimeout(400);
+  const nico = () =>
+    page.evaluate(
+      () =>
+        Object.values(readCrestDirectory()).find((x) => x?.kind === "player" && /Nico Paz/.test(x.name))
+          ?.photo || "",
+    );
+  check(
+    "la foto del jugador se encuentra en TheSportsDB si API-Football no la tiene",
+    (await nico()).includes("thesportsdb.com"),
+    await nico(),
+  );
+  const [ch2] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    page.click("#playerPhotoArchive [data-player-upload]"),
+  ]);
+  await ch2.setFiles(path.join(ROOT, "pruebas/escudo-prueba.png"));
+  await page.waitForTimeout(500);
+  check(
+    "subir la foto de un jugador desde el teléfono",
+    (await nico()).startsWith("kalimg:") &&
+      (await page.evaluate(
+        () => !!document.querySelector('#playerPhotoArchive img.player-logo-thumb[src^="data:image"]'),
+      )),
+    (await nico()).slice(0, 30),
+  );
   // Una imagen guardada entera por la versión anterior pasa a referencia al abrir la app.
-  const mig = await page.evaluate(() => { const data = resolveImage(readCrestDirectory()["team:aek"].url); db.coupons[0].fixtures[0].awayCrest = data; const changed = migrateInlineImages(); return changed + ":" + db.coupons[0].fixtures[0].awayCrest.slice(0, 7); });
+  const mig = await page.evaluate(() => {
+    const data = resolveImage(readCrestDirectory()["team:aek"].url);
+    db.coupons[0].fixtures[0].awayCrest = data;
+    const changed = migrateInlineImages();
+    return changed + ":" + db.coupons[0].fixtures[0].awayCrest.slice(0, 7);
+  });
   check("migra imágenes guardadas enteras a referencias", mig === "true:kalimg:", mig);
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
@@ -448,11 +1150,31 @@ section("11. Rendimiento con muchos datos (150 cupones, ~2.100 partidos)");
   const r = await page.evaluate((raws) => {
     const now = Date.now();
     for (let i = 0; i < 150; i++) {
-      const x = parseCoupon(raws[i % 3]), d = new Date(now - ((i - 5) * 86400000) / 2);
-      x.fixtures.forEach((f, j) => { f.dateISO = d.toISOString().slice(0, 10); f.home += i > 10 ? " " + (i % 7) : ""; f.markets.forEach((m, k) => { m.settlement = i < 6 ? "pending" : (i * 7 + j * 3 + k) % 10 < 7 ? "won" : "lost"; }); });
-      db.coupons.push({ id: "c" + i, name: "Cupón " + i, created: d.toISOString(), type: "parlay", stake: 10, odds: 2, payout: 20, fixtures: x.fixtures });
+      const x = parseCoupon(raws[i % 3]),
+        d = new Date(now - ((i - 5) * 86400000) / 2);
+      x.fixtures.forEach((f, j) => {
+        f.dateISO = d.toISOString().slice(0, 10);
+        f.home += i > 10 ? " " + (i % 7) : "";
+        f.markets.forEach((m, k) => {
+          m.settlement = i < 6 ? "pending" : (i * 7 + j * 3 + k) % 10 < 7 ? "won" : "lost";
+        });
+      });
+      db.coupons.push({
+        id: "c" + i,
+        name: "Cupón " + i,
+        created: d.toISOString(),
+        type: "parlay",
+        stake: 10,
+        odds: 2,
+        payout: 20,
+        fixtures: x.fixtures,
+      });
     }
-    const time = (fn) => { const a = performance.now(); fn(); return performance.now() - a; };
+    const time = (fn) => {
+      const a = performance.now();
+      fn();
+      return performance.now() - a;
+    };
     const out = { all: time(renderAll) };
     for (const v of ["calendar", "markets", "saved", "stats", "logos"]) out[v] = time(() => go(v));
     out.nodes = document.querySelectorAll("*").length;
@@ -460,15 +1182,32 @@ section("11. Rendimiento con muchos datos (150 cupones, ~2.100 partidos)");
     return out;
   }, raws);
   const slowest = Math.max(r.all, r.calendar, r.markets, r.saved, r.stats, r.logos);
-  check("ninguna pantalla tarda más de 400 ms en dibujarse", slowest < 400, JSON.stringify(Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)]))));
+  check(
+    "ninguna pantalla tarda más de 400 ms en dibujarse",
+    slowest < 400,
+    JSON.stringify(Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)]))),
+  );
   check("la página se mantiene ligera (menos de 25.000 elementos)", r.nodes < 25000, String(r.nodes));
-  check("Mercados dibuja por páginas (40 partidos) con botón 'Mostrar más'", r.marketCards === 40 && (await page.$("[data-market-more]")) !== null, String(r.marketCards));
-  await view(page, "markets"); await page.click("[data-market-more]"); await page.waitForTimeout(100);
+  check(
+    "Mercados dibuja por páginas (40 partidos) con botón 'Mostrar más'",
+    r.marketCards === 40 && (await page.$("[data-market-more]")) !== null,
+    String(r.marketCards),
+  );
+  await view(page, "markets");
+  await page.click("[data-market-more]");
+  await page.waitForTimeout(100);
   check("'Mostrar más' agrega otros 40", (await page.$$("[data-market-card]")).length === 80);
-  await page.selectOption("#marketStatusFilter", ""); await page.waitForTimeout(150);
+  await page.selectOption("#marketStatusFilter", "");
+  await page.waitForTimeout(150);
   check("el filtro 'Todos' también va por páginas", (await page.$$("[data-market-card]")).length === 40);
-  await view(page, "saved"); await page.click('[data-coupon-filter="all"]'); await page.waitForTimeout(100);
-  check("Mis cupones → Todos muestra 30 y ofrece 'Mostrar más'", (await page.$$("#couponList .saved-coupon")).length === 30 && (await page.$("[data-coupon-more]")) !== null);
+  await view(page, "saved");
+  await page.click('[data-coupon-filter="all"]');
+  await page.waitForTimeout(100);
+  check(
+    "Mis cupones → Todos muestra 30 y ofrece 'Mostrar más'",
+    (await page.$$("#couponList .saved-coupon")).length === 30 &&
+      (await page.$("[data-coupon-more]")) !== null,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -479,28 +1218,62 @@ section("12. Animaciones y pantalla de entrada");
   const { ctx, page } = await open(baseDb());
   await page.waitForTimeout(700);
   check("la pantalla de entrada se quita sola al cargar", (await page.$("#splash")) === null);
-  const key = (ci, fi, mi) => page.evaluate(([ci, fi, mi]) => marketKey(db.coupons[ci].fixtures[fi], db.coupons[ci].fixtures[fi].markets[mi]), [ci, fi, mi]);
+  const key = (ci, fi, mi) =>
+    page.evaluate(
+      ([ci, fi, mi]) => marketKey(db.coupons[ci].fixtures[fi], db.coupons[ci].fixtures[fi].markets[mi]),
+      [ci, fi, mi],
+    );
   // Combinada B: AEK (1 mercado) + Como (2 mercados). Ganar uno → confeti corto, sin tarjeta.
-  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 0, 0)); await page.waitForTimeout(300);
-  check("mercado ganado: confeti, sin tarjeta de cupón", (await page.$("canvas.confetti")) !== null && (await page.$(".result-card")) === null);
+  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 0, 0));
+  await page.waitForTimeout(300);
+  check(
+    "mercado ganado: confeti, sin tarjeta de cupón",
+    (await page.$("canvas.confetti")) !== null && (await page.$(".result-card")) === null,
+  );
   // Ganar el resto → cupón B ganado: tarjeta con la ganancia (210 − 70 = 140).
   await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 1, 0));
-  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 1, 1)); await page.waitForTimeout(350);
-  const card = await page.$eval(".result-card-wrap", (e) => e.className + " | " + e.innerText.replace(/\s+/g, " "));
-  check("cupón ganado: tarjeta con el nombre y la ganancia", /is-won/.test(card) && /¡Cupón ganado!/.test(card) && /Combinada B/.test(card) && /\+L 140\.00/.test(card), card);
-  await page.click(".result-card-wrap"); await page.waitForTimeout(350);
+  await page.evaluate((k) => setMarketStatus(k, "won"), await key(1, 1, 1));
+  await page.waitForTimeout(350);
+  const card = await page.$eval(
+    ".result-card-wrap",
+    (e) => e.className + " | " + e.innerText.replace(/\s+/g, " "),
+  );
+  check(
+    "cupón ganado: tarjeta con el nombre y la ganancia",
+    /is-won/.test(card) &&
+      /¡Cupón ganado!/.test(card) &&
+      /Combinada B/.test(card) &&
+      /\+L 140\.00/.test(card),
+    card,
+  );
+  await page.click(".result-card-wrap");
+  await page.waitForTimeout(350);
   check("la tarjeta se cierra al tocarla", (await page.$(".result-card-wrap")) === null);
   // Perder un mercado de la Combinada A → tarjeta de cupón perdido con lo apostado.
-  await page.evaluate((k) => setMarketStatus(k, "lost"), await key(0, 0, 0)); await page.waitForTimeout(350);
-  const lostCard = await page.$eval(".result-card-wrap", (e) => e.className + " | " + e.innerText.replace(/\s+/g, " "));
-  check("cupón perdido: tarjeta con lo apostado", /is-lost/.test(lostCard) && /Cupón perdido/.test(lostCard) && /−L 50\.00/.test(lostCard), lostCard);
+  await page.evaluate((k) => setMarketStatus(k, "lost"), await key(0, 0, 0));
+  await page.waitForTimeout(350);
+  const lostCard = await page.$eval(
+    ".result-card-wrap",
+    (e) => e.className + " | " + e.innerText.replace(/\s+/g, " "),
+  );
+  check(
+    "cupón perdido: tarjeta con lo apostado",
+    /is-lost/.test(lostCard) && /Cupón perdido/.test(lostCard) && /−L 50\.00/.test(lostCard),
+    lostCard,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
   // Con "reducir movimiento" no hay confeti, pero la tarjeta sí aparece.
   const calm = await open(baseDb(), { ctxOpts: { reducedMotion: "reduce" } });
-  await calm.page.evaluate(() => { const f = db.coupons[1].fixtures; f.forEach((x) => x.markets.forEach((m) => setMarketStatus(marketKey(x, m), "won"))); });
+  await calm.page.evaluate(() => {
+    const f = db.coupons[1].fixtures;
+    f.forEach((x) => x.markets.forEach((m) => setMarketStatus(marketKey(x, m), "won")));
+  });
   await calm.page.waitForTimeout(350);
-  check("con 'reducir movimiento': tarjeta sí, confeti no", (await calm.page.$(".result-card")) !== null && (await calm.page.$("canvas.confetti")) === null);
+  check(
+    "con 'reducir movimiento': tarjeta sí, confeti no",
+    (await calm.page.$(".result-card")) !== null && (await calm.page.$("canvas.confetti")) === null,
+  );
   await calm.ctx.close();
 }
 
@@ -512,29 +1285,77 @@ section("13. Limpieza automática de espacio");
   const r = await page.evaluate((raws) => {
     for (let i = 0; i < 100; i++) {
       const x = parseCoupon(raws[i % 3]);
-      x.fixtures.forEach((f) => f.markets.forEach((m) => { m.settlement = i % 10 === 9 ? "pending" : "won"; }));
-      db.coupons.push({ id: "c" + i, name: "Cupón " + i, created: new Date(Date.now() - i * 3600e3).toISOString(), stake: 10, odds: 2, payout: 20, raw: raws[i % 3], fixtures: x.fixtures });
+      x.fixtures.forEach((f) =>
+        f.markets.forEach((m) => {
+          m.settlement = i % 10 === 9 ? "pending" : "won";
+        }),
+      );
+      db.coupons.push({
+        id: "c" + i,
+        name: "Cupón " + i,
+        created: new Date(Date.now() - i * 3600e3).toISOString(),
+        stake: 10,
+        odds: 2,
+        payout: 20,
+        raw: raws[i % 3],
+        fixtures: x.fixtures,
+      });
     }
     db.actionHistory = Array.from({ length: 60 }, (_, i) => ({ type: "create", couponId: "c" + i, at: "x" }));
     db.progress = { "clave-que-ya-no-existe": { count: 3 } };
-    localStorage.setItem("kal_images_v1", JSON.stringify({ huerfana: "data:image/png;base64," + "A".repeat(20000) }));
+    localStorage.setItem(
+      "kal_images_v1",
+      JSON.stringify({ huerfana: "data:image/png;base64," + "A".repeat(20000) }),
+    );
     save();
-    const before = storageUsage(), markets = db.coupons.reduce((s, c) => s + c.fixtures.reduce((n, f) => n + f.markets.length, 0), 0);
+    const before = storageUsage(),
+      markets = db.coupons.reduce((s, c) => s + c.fixtures.reduce((n, f) => n + f.markets.length, 0), 0);
     const freed = compactData(true);
     const saved = JSON.parse(localStorage.getItem("kal_coupon_organizer_v2"));
     return {
-      freed, before: before.bytes, after: storageUsage().bytes, coupons: saved.coupons.length,
-      marketsSame: saved.coupons.reduce((s, c) => s + c.fixtures.reduce((n, f) => n + f.markets.length, 0), 0) === markets,
-      rawNewest: saved.coupons.slice(0, 40).every((c) => c.raw), rawOldSettled: saved.coupons.slice(40).filter((c) => c.raw).map((c) => c.id),
-      pendingOldKeepRaw: saved.coupons.slice(40).filter((c) => c.fixtures[0].markets[0].settlement === "pending").every((c) => c.raw),
-      history: saved.actionHistory.length, progress: Object.keys(saved.progress).length, images: Object.keys(JSON.parse(localStorage.getItem("kal_images_v1"))).length,
+      freed,
+      before: before.bytes,
+      after: storageUsage().bytes,
+      coupons: saved.coupons.length,
+      marketsSame:
+        saved.coupons.reduce((s, c) => s + c.fixtures.reduce((n, f) => n + f.markets.length, 0), 0) ===
+        markets,
+      rawNewest: saved.coupons.slice(0, 40).every((c) => c.raw),
+      rawOldSettled: saved.coupons
+        .slice(40)
+        .filter((c) => c.raw)
+        .map((c) => c.id),
+      pendingOldKeepRaw: saved.coupons
+        .slice(40)
+        .filter((c) => c.fixtures[0].markets[0].settlement === "pending")
+        .every((c) => c.raw),
+      history: saved.actionHistory.length,
+      progress: Object.keys(saved.progress).length,
+      images: Object.keys(JSON.parse(localStorage.getItem("kal_images_v1"))).length,
     };
   }, raws);
-  check("libera espacio sin borrar cupones ni mercados", r.freed > 100000 && r.coupons === 100 && r.marketsSame, `liberó ${Math.round(r.freed / 1024)} KB de ${Math.round(r.before / 1024)} KB`);
-  check("conserva el texto original en los 40 más recientes y en los pendientes", r.rawNewest && r.pendingOldKeepRaw && r.rawOldSettled.every((id) => Number(id.slice(1)) % 10 === 9), JSON.stringify(r.rawOldSettled.slice(0, 5)));
-  check("recorta el historial de deshacer y quita progreso e imágenes sin uso", r.history === 20 && r.progress === 0 && r.images === 0, `${r.history}/${r.progress}/${r.images}`);
+  check(
+    "libera espacio sin borrar cupones ni mercados",
+    r.freed > 100000 && r.coupons === 100 && r.marketsSame,
+    `liberó ${Math.round(r.freed / 1024)} KB de ${Math.round(r.before / 1024)} KB`,
+  );
+  check(
+    "conserva el texto original en los 40 más recientes y en los pendientes",
+    r.rawNewest && r.pendingOldKeepRaw && r.rawOldSettled.every((id) => Number(id.slice(1)) % 10 === 9),
+    JSON.stringify(r.rawOldSettled.slice(0, 5)),
+  );
+  check(
+    "recorta el historial de deshacer y quita progreso e imágenes sin uso",
+    r.history === 20 && r.progress === 0 && r.images === 0,
+    `${r.history}/${r.progress}/${r.images}`,
+  );
   await view(page, "settings");
-  check("Ajustes muestra el espacio usado y el botón de liberar", /de ~5 MB · 100 cupones/.test(await page.$eval("#storageBox", (e) => e.innerText)) && (await page.$("[data-compact]")) !== null, await page.$eval("#storageBox", (e) => e.innerText.replace(/\s+/g, " ").slice(0, 80)));
+  check(
+    "Ajustes muestra el espacio usado y el botón de liberar",
+    /de ~5 MB · 100 cupones/.test(await page.$eval("#storageBox", (e) => e.innerText)) &&
+      (await page.$("[data-compact]")) !== null,
+    await page.$eval("#storageBox", (e) => e.innerText.replace(/\s+/g, " ").slice(0, 80)),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -546,87 +1367,306 @@ section("14. Analista con IA (pantalla y datos que se envían)");
   await page.evaluate(() => {
     for (let i = 0; i < 6; i++) {
       const won = i < 3;
-      db.coupons.push({ id: "H" + i, name: "Hist " + i, created: new Date(Date.now() - (i + 2) * 86400e3).toISOString(), houseId: "h2", stake: 10, odds: won ? 1.8 : 5, payout: won ? 18 : 50,
-        fixtures: (won ? [0] : [0, 1, 2]).map((k) => ({ id: "h" + i + k, home: "Equipo " + i + k, away: "Rival " + k, competition: "LaLiga", date: "01/11/2026", time: "12:00",
-          markets: [{ market: "Total de goles", pick: "Más de 1.5", odd: "1.80", settlement: won ? "won" : k === 2 ? "lost" : "won" }] })) });
+      db.coupons.push({
+        id: "H" + i,
+        name: "Hist " + i,
+        created: new Date(Date.now() - (i + 2) * 86400e3).toISOString(),
+        houseId: "h2",
+        stake: 10,
+        odds: won ? 1.8 : 5,
+        payout: won ? 18 : 50,
+        fixtures: (won ? [0] : [0, 1, 2]).map((k) => ({
+          id: "h" + i + k,
+          home: "Equipo " + i + k,
+          away: "Rival " + k,
+          competition: "LaLiga",
+          date: "01/11/2026",
+          time: "12:00",
+          markets: [
+            {
+              market: "Total de goles",
+              pick: "Más de 1.5",
+              odd: "1.80",
+              settlement: won ? "won" : k === 2 ? "lost" : "won",
+            },
+          ],
+        })),
+      });
     }
-    save(); renderAll();
+    save();
+    renderAll();
   });
   await view(page, "analyst");
-  let info = await page.evaluate(() => ({ title: $("viewTitle").textContent, open: document.querySelector(".analyst-config").classList.contains("is-open"), disabled: document.querySelector('[data-analyst-run="historial"]').disabled, inMore: !!document.querySelector('#moreMenu [data-view="analyst"]') }));
-  check("pantalla Analista en el menú Más, con la configuración abierta si falta el código", info.title === "Analista" && info.open && info.inMore && !info.disabled, JSON.stringify(info));
+  let info = await page.evaluate(() => ({
+    title: $("viewTitle").textContent,
+    open: document.querySelector(".analyst-config").classList.contains("is-open"),
+    disabled: document.querySelector('[data-analyst-run="historial"]').disabled,
+    inMore: !!document.querySelector('#moreMenu [data-view="analyst"]'),
+  }));
+  check(
+    "pantalla Analista en el menú Más, con la configuración abierta si falta el código",
+    info.title === "Analista" && info.open && info.inMore && !info.disabled,
+    JSON.stringify(info),
+  );
   await page.click('[data-analyst-run="historial"]');
   await page.waitForTimeout(150);
-  check("sin código avisa en vez de llamar al servidor", /código de acceso/i.test(await page.$eval("#analystOut-historial", (e) => e.innerText)) && analystPosts.length === 0);
-  await page.fill("#analystKey", "malo"); await page.click("[data-analyst-key]");
-  await page.click('[data-analyst-run="historial"]'); await page.waitForTimeout(250);
-  check("código incorrecto muestra el error del servidor", /no es correcto/.test(await page.$eval("#analystOut-historial", (e) => e.innerText)));
-  await page.click(".analyst-config [data-fold-toggle]"); await page.fill("#analystKey", "secreto"); await page.click("[data-analyst-key]");
+  check(
+    "sin código avisa en vez de llamar al servidor",
+    /código de acceso/i.test(await page.$eval("#analystOut-historial", (e) => e.innerText)) &&
+      analystPosts.length === 0,
+  );
+  await page.fill("#analystKey", "malo");
+  await page.click("[data-analyst-key]");
+  await page.click('[data-analyst-run="historial"]');
+  await page.waitForTimeout(250);
+  check(
+    "código incorrecto muestra el error del servidor",
+    /no es correcto/.test(await page.$eval("#analystOut-historial", (e) => e.innerText)),
+  );
+  await page.click(".analyst-config [data-fold-toggle]");
+  await page.fill("#analystKey", "secreto");
+  await page.click("[data-analyst-key]");
   await page.click('[data-analyst-run="historial"]');
   await page.waitForTimeout(140);
-  const live = await page.$eval("#analystOut-historial", (e) => ({ busy: !!e.querySelector(".analyst-live"), btn: document.querySelector('[data-analyst-run="historial"]').disabled }));
+  const live = await page.$eval("#analystOut-historial", (e) => ({
+    busy: !!e.querySelector(".analyst-live"),
+    btn: document.querySelector('[data-analyst-run="historial"]').disabled,
+  }));
   await page.waitForTimeout(600);
   const e2 = (o) => o.i === "1.5";
-  const out = await page.$eval("#analystOut-historial", (e) => ({ i: e.querySelector("i")?.textContent, h: [...e.querySelectorAll("h4")].map((x) => x.textContent), li: e.querySelectorAll("li").length, b: e.querySelector("b")?.textContent, img: e.querySelectorAll("img").length, text: e.innerText }));
+  const out = await page.$eval("#analystOut-historial", (e) => ({
+    i: e.querySelector("i")?.textContent,
+    h: [...e.querySelectorAll("h4")].map((x) => x.textContent),
+    li: e.querySelectorAll("li").length,
+    b: e.querySelector("b")?.textContent,
+    img: e.querySelectorAll("img").length,
+    text: e.innerText,
+  }));
   check("muestra el análisis mientras llega y bloquea el botón", live.busy && live.btn, JSON.stringify(live));
-  check("da formato (títulos, listas, negritas) sin ejecutar HTML", out.h.length === 2 && out.li === 3 && out.b === "bien" && e2(out) && out.img === 0 && out.text.includes("<img"), JSON.stringify(out).slice(0, 200));
+  check(
+    "da formato (títulos, listas, negritas) sin ejecutar HTML",
+    out.h.length === 2 &&
+      out.li === 3 &&
+      out.b === "bien" &&
+      e2(out) &&
+      out.img === 0 &&
+      out.text.includes("<img"),
+    JSON.stringify(out).slice(0, 200),
+  );
   const hp = analystPosts.at(-1);
   const h = hp?.datos?.historial;
-  check("envía un resumen: por mercado, cuota, tamaño de combinada y últimos cupones", hp?.modo === "historial" && h.porMercado.some((r) => r.tipo === "Goles (más / menos)" && r.ganados === 9 && r.perdidos === 3) && h.porTamano.some((r) => r.selecciones === "3" && r.cupones === 3 && r.ganados === 0) && h.ultimosCupones.length >= 6 && /^\d{4}-\d{2}-\d{2}$/.test(hp.datos.hoy), JSON.stringify(h?.porTamano));
-  check("no envía datos de la cuenta ni el código", !/cloud|password|supabase|secreto|kal_/i.test(JSON.stringify(hp)));
-  await view(page, "home"); await view(page, "analyst");
-  check("el último análisis se guarda y se ve al volver", /Último análisis/.test(await page.$eval("#analystOut-historial", (e) => e.innerText)));
+  check(
+    "envía un resumen: por mercado, cuota, tamaño de combinada y últimos cupones",
+    hp?.modo === "historial" &&
+      h.porMercado.some((r) => r.tipo === "Goles (más / menos)" && r.ganados === 9 && r.perdidos === 3) &&
+      h.porTamano.some((r) => r.selecciones === "3" && r.cupones === 3 && r.ganados === 0) &&
+      h.ultimosCupones.length >= 6 &&
+      /^\d{4}-\d{2}-\d{2}$/.test(hp.datos.hoy),
+    JSON.stringify(h?.porTamano),
+  );
+  check(
+    "no envía datos de la cuenta ni el código",
+    !/cloud|password|supabase|secreto|kal_/i.test(JSON.stringify(hp)),
+  );
+  await view(page, "home");
+  await view(page, "analyst");
+  check(
+    "el último análisis se guarda y se ve al volver",
+    /Último análisis/.test(await page.$eval("#analystOut-historial", (e) => e.innerText)),
+  );
   // Revisar un cupón pendiente
   await page.selectOption("#analystCouponPick", "A");
-  check("elegir un cupón pendiente carga su texto", /Fenerbahce/.test(await page.$eval("#analystCouponText", (e) => e.value)));
+  check(
+    "elegir un cupón pendiente carga su texto",
+    /Fenerbahce/.test(await page.$eval("#analystCouponText", (e) => e.value)),
+  );
   await page.click('[data-analyst-run="cupon"]');
   await page.waitForTimeout(100);
   const st = await page.$eval("#analystOut-cupon [data-status]", (e) => e.textContent).catch(() => "");
   await page.waitForTimeout(800);
   const cp = analystPosts.at(-1);
-  check("revisión de cupón: envía el cupón, el historial por mercado y el presupuesto", cp.modo === "cupon" && /Fenerbahce/.test(cp.datos.cupon) && Array.isArray(cp.datos.historial) && cp.datos.historial.length > 0, JSON.stringify(cp).slice(0, 160));
+  check(
+    "revisión de cupón: envía el cupón, el historial por mercado y el presupuesto",
+    cp.modo === "cupon" &&
+      /Fenerbahce/.test(cp.datos.cupon) &&
+      Array.isArray(cp.datos.historial) &&
+      cp.datos.historial.length > 0,
+    JSON.stringify(cp).slice(0, 160),
+  );
   check("muestra lo que está haciendo (búsquedas)", /Pensando|Buscando|Conectando/.test(st), st);
-  check("revisión de cupón terminada", /Recomendaciones/.test(await page.$eval("#analystOut-cupon", (e) => e.innerText)));
+  check(
+    "revisión de cupón terminada",
+    /Recomendaciones/.test(await page.$eval("#analystOut-cupon", (e) => e.innerText)),
+  );
   // Error a mitad del análisis y cancelar
   await page.fill("#analystCouponText", "Cupón que FALLA en el servidor");
-  await page.click('[data-analyst-run="cupon"]'); await page.waitForTimeout(700);
-  check("un error a mitad conserva lo recibido y explica el problema", await page.$eval("#analystOut-cupon", (e) => /límite de uso/.test(e.innerText) && e.querySelectorAll("li").length > 0));
+  await page.click('[data-analyst-run="cupon"]');
+  await page.waitForTimeout(700);
+  check(
+    "un error a mitad conserva lo recibido y explica el problema",
+    await page.$eval(
+      "#analystOut-cupon",
+      (e) => /límite de uso/.test(e.innerText) && e.querySelectorAll("li").length > 0,
+    ),
+  );
   await page.fill("#analystCouponText", "Cupón LENTO de prueba para cancelar");
-  await page.click('[data-analyst-run="cupon"]'); await page.waitForTimeout(250);
-  await page.click("[data-analyst-cancel]"); await page.waitForTimeout(200);
-  check("se puede cancelar un análisis", /cancelado/.test(await page.$eval("#analystOut-cupon", (e) => e.innerText)) && !(await page.$eval('[data-analyst-run="cupon"]', (b) => b.disabled)));
+  await page.click('[data-analyst-run="cupon"]');
+  await page.waitForTimeout(250);
+  await page.click("[data-analyst-cancel]");
+  await page.waitForTimeout(200);
+  check(
+    "se puede cancelar un análisis",
+    /cancelado/.test(await page.$eval("#analystOut-cupon", (e) => e.innerText)) &&
+      !(await page.$eval('[data-analyst-run="cupon"]', (b) => b.disabled)),
+  );
   // Desde Nuevo cupón
   await view(page, "new");
-  check("el botón del Analista no aparece sin cupón leído", !(await page.isVisible("[data-analyst-preview]")));
-  await page.fill("#raw", "España, La Liga\nBarcelona\nvs.\nReal Madrid\n25/10/2026 • 08:00\nMás de 2.5 goles\nCuotas: 1.85\nVALOR APOSTADO L 120.00");
-  await page.click("#readBtn"); await page.waitForTimeout(200);
+  check(
+    "el botón del Analista no aparece sin cupón leído",
+    !(await page.isVisible("[data-analyst-preview]")),
+  );
+  await page.fill(
+    "#raw",
+    "España, La Liga\nBarcelona\nvs.\nReal Madrid\n25/10/2026 • 08:00\nMás de 2.5 goles\nCuotas: 1.85\nVALOR APOSTADO L 120.00",
+  );
+  await page.click("#readBtn");
+  await page.waitForTimeout(200);
   const nPosts = analystPosts.length;
-  await tap(page, "[data-analyst-preview]"); await page.waitForTimeout(900);
+  await tap(page, "[data-analyst-preview]");
+  await page.waitForTimeout(900);
   const inl = await page.evaluate(() => ({ view: activeView, out: $("previewAnalystOut").innerText }));
   const ip = analystPosts.at(-1);
-  check("'Analizar este cupón ahora' analiza ahí mismo, sin salir de Nuevo cupón", inl.view === "new" && /Recomendaciones/.test(inl.out) && analystPosts.length === nPosts + 1 && ip.modo === "cupon" && /Barcelona vs Real Madrid/.test(ip.datos.cupon) && /Valor apostado: L 120/.test(ip.datos.cupon) && ip.datos.riesgo?.selecciones === 1, JSON.stringify(inl).slice(0, 200));
-  await page.fill("#raw", "España, La Liga\nBetis\nvs.\nSevilla\n26/10/2026 • 08:00\nMás de 1.5 goles\nCuotas: 1.30"); await tap(page, "#readBtn"); await page.waitForTimeout(200);
-  check("al leer otro cupón se borra el análisis anterior", (await page.$eval("#previewAnalystOut", (e) => e.innerText.trim())) === "");
-  await page.evaluate(() => { analystSave({ clave: "" }); });
-  await tap(page, "[data-analyst-preview]"); await page.waitForTimeout(150);
-  check("sin código del Analista explica cómo configurarlo", /primero escribe tu código/.test(await page.$eval("#previewAnalystOut", (e) => e.innerText)) && !!(await page.$("[data-analyst-open-config]")));
-  await page.evaluate(() => { analystSave({ clave: "secreto" }); });
+  check(
+    "'Analizar este cupón ahora' analiza ahí mismo, sin salir de Nuevo cupón",
+    inl.view === "new" &&
+      /Recomendaciones/.test(inl.out) &&
+      analystPosts.length === nPosts + 1 &&
+      ip.modo === "cupon" &&
+      /Barcelona vs Real Madrid/.test(ip.datos.cupon) &&
+      /Valor apostado: L 120/.test(ip.datos.cupon) &&
+      ip.datos.riesgo?.selecciones === 1,
+    JSON.stringify(inl).slice(0, 200),
+  );
+  await page.fill(
+    "#raw",
+    "España, La Liga\nBetis\nvs.\nSevilla\n26/10/2026 • 08:00\nMás de 1.5 goles\nCuotas: 1.30",
+  );
+  await tap(page, "#readBtn");
+  await page.waitForTimeout(200);
+  check(
+    "al leer otro cupón se borra el análisis anterior",
+    (await page.$eval("#previewAnalystOut", (e) => e.innerText.trim())) === "",
+  );
+  await page.evaluate(() => {
+    analystSave({ clave: "" });
+  });
+  await tap(page, "[data-analyst-preview]");
+  await page.waitForTimeout(150);
+  check(
+    "sin código del Analista explica cómo configurarlo",
+    /primero escribe tu código/.test(await page.$eval("#previewAnalystOut", (e) => e.innerText)) &&
+      !!(await page.$("[data-analyst-open-config]")),
+  );
+  await page.evaluate(() => {
+    analystSave({ clave: "secreto" });
+  });
   const comp = await page.evaluate(() => ({
-    names: ["UEFA Liga Campeones", "UEFA Champions League", "Liga de Campeones de la UEFA", "UEFA Liga Europa", "UEFA Europa League", "UEFA Conference League", "AFC Champions League", "CONCACAF Liga de Campeones", "Championship", "LaLiga", "Liga de Naciones de la UEFA", "UEFA Nations League", "CONCACAF Liga de Naciones"].map(canonicalCompetition),
+    names: [
+      "UEFA Liga Campeones",
+      "UEFA Champions League",
+      "Liga de Campeones de la UEFA",
+      "UEFA Liga Europa",
+      "UEFA Europa League",
+      "UEFA Conference League",
+      "AFC Champions League",
+      "CONCACAF Liga de Campeones",
+      "Championship",
+      "LaLiga",
+      "Liga de Naciones de la UEFA",
+      "UEFA Nations League",
+      "CONCACAF Liga de Naciones",
+    ].map(canonicalCompetition),
     builder: (() => {
-      db.coupons.push({ id: "BB", name: "BB", created: new Date().toISOString(), stake: 10, odds: 3.25, payout: 32.5, fixtures: [{ id: "bb1", home: "PSG", away: "Lyon", competition: "Ligue 1", date: "02/11/2026", time: "12:00",
-        markets: [{ market: "Remates Kang-in Lee", pick: "Más de 0.5", odd: "", builder: true, builderOdd: "3.25", settlement: "won" }, { market: "Total de goles", pick: "Más de 1.5", odd: "", builder: true, builderOdd: "3.25", settlement: "won" }] }] });
-      const p = analystMarketHistory(), row = p.byOdds.find((r) => r.name.startsWith("3.00"));
+      db.coupons.push({
+        id: "BB",
+        name: "BB",
+        created: new Date().toISOString(),
+        stake: 10,
+        odds: 3.25,
+        payout: 32.5,
+        fixtures: [
+          {
+            id: "bb1",
+            home: "PSG",
+            away: "Lyon",
+            competition: "Ligue 1",
+            date: "02/11/2026",
+            time: "12:00",
+            markets: [
+              {
+                market: "Remates Kang-in Lee",
+                pick: "Más de 0.5",
+                odd: "",
+                builder: true,
+                builderOdd: "3.25",
+                settlement: "won",
+              },
+              {
+                market: "Total de goles",
+                pick: "Más de 1.5",
+                odd: "",
+                builder: true,
+                builderOdd: "3.25",
+                settlement: "won",
+              },
+            ],
+          },
+        ],
+      });
+      const p = analystMarketHistory(),
+        row = p.byOdds.find((r) => r.name.startsWith("3.00"));
       const line = legLine(db.coupons.at(-1).fixtures[0], db.coupons.at(-1).fixtures[0].markets[0], true);
       db.coupons.pop();
       return { inflated: !!row && row.won >= 2, line };
     })(),
   }));
-  check("estadísticas: una sola Champions/Europa/Conference, sin tocar otras confederaciones ni la Championship", comp.names.join("|") === "UEFA Champions League|UEFA Champions League|UEFA Champions League|UEFA Europa League|UEFA Europa League|UEFA Conference League|AFC Champions League|CONCACAF Liga de Campeones|Championship|LaLiga|UEFA Nations League|UEFA Nations League|CONCACAF Liga de Naciones", comp.names.join("|"));
-  check("estadísticas: la cuota de un BetBuilder no se cuenta como cuota de cada selección", !comp.builder.inflated && /cuota del paquete 3.25/.test(comp.builder.line) && !/@ 3.25/.test(comp.builder.line), JSON.stringify(comp.builder));
-  const nube = await page.evaluate(() => ["tutujwepbvlxfmizehkf.supabase.co", " https://tutujwepbvlxfmizehkf.supabase.co/rest/v1/ ", "tutujwepbvlxfmizehkf", "http://x.supabase.co", "no es url", ""].map(normalizeCloudUrl));
-  check("nube: acepta la dirección de Supabase sin https://, con rutas o solo el proyecto", nube.join("|") === "https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://x.supabase.co||", nube.join("|"));
-  check("el código queda solo en este teléfono (no entra en los datos sincronizados)", await page.evaluate(() => !JSON.stringify(db).includes("secreto") && JSON.parse(localStorage.getItem("kal_analista_v1")).clave === "secreto"));
+  check(
+    "estadísticas: una sola Champions/Europa/Conference, sin tocar otras confederaciones ni la Championship",
+    comp.names.join("|") ===
+      "UEFA Champions League|UEFA Champions League|UEFA Champions League|UEFA Europa League|UEFA Europa League|UEFA Conference League|AFC Champions League|CONCACAF Liga de Campeones|Championship|LaLiga|UEFA Nations League|UEFA Nations League|CONCACAF Liga de Naciones",
+    comp.names.join("|"),
+  );
+  check(
+    "estadísticas: la cuota de un BetBuilder no se cuenta como cuota de cada selección",
+    !comp.builder.inflated &&
+      /cuota del paquete 3.25/.test(comp.builder.line) &&
+      !/@ 3.25/.test(comp.builder.line),
+    JSON.stringify(comp.builder),
+  );
+  const nube = await page.evaluate(() =>
+    [
+      "tutujwepbvlxfmizehkf.supabase.co",
+      " https://tutujwepbvlxfmizehkf.supabase.co/rest/v1/ ",
+      "tutujwepbvlxfmizehkf",
+      "http://x.supabase.co",
+      "no es url",
+      "",
+    ].map(normalizeCloudUrl),
+  );
+  check(
+    "nube: acepta la dirección de Supabase sin https://, con rutas o solo el proyecto",
+    nube.join("|") ===
+      "https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://tutujwepbvlxfmizehkf.supabase.co|https://x.supabase.co||",
+    nube.join("|"),
+  );
+  check(
+    "el código queda solo en este teléfono (no entra en los datos sincronizados)",
+    await page.evaluate(
+      () =>
+        !JSON.stringify(db).includes("secreto") &&
+        JSON.parse(localStorage.getItem("kal_analista_v1")).clave === "secreto",
+    ),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -635,39 +1675,145 @@ section("17. Control de apuestas: freno al guardar, banca y diario");
 {
   const db0 = baseDb();
   // 3 perdidos seguidos para probar la pausa
-  for (let i = 0; i < 3; i++) db0.coupons.push({ id: "P" + i, name: "Perdido " + i, created: new Date(Date.now() - (5 - i) * 86400e3).toISOString(), updated: new Date(Date.now() - (5 - i) * 86400e3).toISOString(), stake: 10, odds: 2, payout: 20, fixtures: [{ id: "p" + i, home: "X" + i, away: "Y" + i, date: "01/11/2026", time: "10:00", markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "lost" }] }] });
+  for (let i = 0; i < 3; i++)
+    db0.coupons.push({
+      id: "P" + i,
+      name: "Perdido " + i,
+      created: new Date(Date.now() - (5 - i) * 86400e3).toISOString(),
+      updated: new Date(Date.now() - (5 - i) * 86400e3).toISOString(),
+      stake: 10,
+      odds: 2,
+      payout: 20,
+      fixtures: [
+        {
+          id: "p" + i,
+          home: "X" + i,
+          away: "Y" + i,
+          date: "01/11/2026",
+          time: "10:00",
+          markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "lost" }],
+        },
+      ],
+    });
   const { ctx, page } = await open(db0);
   await view(page, "settings");
-  await page.fill("#brAmount", "1000"); await page.fill("#brUnit", "2"); await page.fill("#brMax", "5"); await page.fill("#brPause", "3");
+  await page.fill("#brAmount", "1000");
+  await page.fill("#brUnit", "2");
+  await page.fill("#brMax", "5");
+  await page.fill("#brPause", "3");
   await tap(page, "[data-bankroll-save]");
-  const bank = await page.evaluate(() => ({ unit: unitStake(), cfg: bankrollCfg(), txt: $("bankrollBox").innerText }));
-  check("banca: 1 unidad = 2 % de L 1,000 y se guarda en los datos (viaja con la nube)", bank.unit === 20 && bank.cfg.maxSel === 5 && /L 20.00/.test(bank.txt), JSON.stringify(bank));
+  const bank = await page.evaluate(() => ({
+    unit: unitStake(),
+    cfg: bankrollCfg(),
+    txt: $("bankrollBox").innerText,
+  }));
+  check(
+    "banca: 1 unidad = 2 % de L 1,000 y se guarda en los datos (viaja con la nube)",
+    bank.unit === 20 && bank.cfg.maxSel === 5 && /L 20.00/.test(bank.txt),
+    JSON.stringify(bank),
+  );
   await view(page, "new");
-  const legs = [["Fenerbahce", "Liverpool", "1x2: 2", "1.40"], ["Celtic", "Rangers", "Total de goles: Más de 1.5", "1.05"], ["Ajax", "PSV", "1x2: 1", "2.10"], ["Porto", "Benfica", "Ambos equipos marcan: Sí", "1.70"], ["Roma", "Lazio", "1x2: X", "3.20"], ["Lyon", "Lille", "1x2: 1", "1.90"], ["Sevilla", "Betis", "1x2: 1", "2.00"]];
-  const raw = legs.map(([h, a, mk, o]) => `Europa, Liga\n${h}\nvs.\n${a}\n20/11/2026 • 14:00\n${mk}\nCuotas: ${o}`).join("\n") + "\nVALOR APOSTADO L 50.00";
-  await page.fill("#raw", raw); await tap(page, "#readBtn"); await page.waitForTimeout(250);
-  const risk = await page.$eval("#riskBox", (e) => ({ cls: e.querySelector(".risk-card")?.className, text: e.innerText.replace(/\s+/g, " ") }));
-  check("freno: cupón de 7 selecciones marcado como riesgo alto, con su probabilidad", /is-high/.test(risk.cls) && /7 selecciones/.test(risk.text) && /tu límite es 5/.test(risk.text) && /Probabilidad (según tu historial|estimada)/.test(risk.text), risk.text.slice(0, 200));
-  check("lector: sin línea de CUOTAS total no toma la cuota del último partido como total", (await page.$eval("#totalOdds", (e) => e.value)) === "" && /Según la cuota/.test(risk.text) && !/ 50 % Según/.test(risk.text), risk.text.slice(0, 160));
-  check("freno: avisa del partido repetido en otros cupones y de la selección de relleno", /Fenerbahce vs Liverpool.*ya está en 1 cupón/.test(risk.text) && /relleno.*Celtic.*1.05/.test(risk.text), risk.text);
-  check("freno: con 3 perdidos seguidos sugiere pausa y media unidad", /3 cupones perdidos seguidos/.test(risk.text) && /Monto sugerido: L 10.00/.test(risk.text), risk.text.match(/Monto sugerido[^)]*\)/)?.[0]);
-  await tap(page, '[data-confidence="5"]'); await page.waitForTimeout(80);
-  const sug5 = await page.$eval("#riskBox", (e) => e.innerText.match(/Monto sugerido[^:]*: (L [\d.,]+)/)?.[1]);
+  const legs = [
+    ["Fenerbahce", "Liverpool", "1x2: 2", "1.40"],
+    ["Celtic", "Rangers", "Total de goles: Más de 1.5", "1.05"],
+    ["Ajax", "PSV", "1x2: 1", "2.10"],
+    ["Porto", "Benfica", "Ambos equipos marcan: Sí", "1.70"],
+    ["Roma", "Lazio", "1x2: X", "3.20"],
+    ["Lyon", "Lille", "1x2: 1", "1.90"],
+    ["Sevilla", "Betis", "1x2: 1", "2.00"],
+  ];
+  const raw =
+    legs
+      .map(([h, a, mk, o]) => `Europa, Liga\n${h}\nvs.\n${a}\n20/11/2026 • 14:00\n${mk}\nCuotas: ${o}`)
+      .join("\n") + "\nVALOR APOSTADO L 50.00";
+  await page.fill("#raw", raw);
+  await tap(page, "#readBtn");
+  await page.waitForTimeout(250);
+  const risk = await page.$eval("#riskBox", (e) => ({
+    cls: e.querySelector(".risk-card")?.className,
+    text: e.innerText.replace(/\s+/g, " "),
+  }));
+  check(
+    "freno: cupón de 7 selecciones marcado como riesgo alto, con su probabilidad",
+    /is-high/.test(risk.cls) &&
+      /7 selecciones/.test(risk.text) &&
+      /tu límite es 5/.test(risk.text) &&
+      /Probabilidad (según tu historial|estimada)/.test(risk.text),
+    risk.text.slice(0, 200),
+  );
+  check(
+    "lector: sin línea de CUOTAS total no toma la cuota del último partido como total",
+    (await page.$eval("#totalOdds", (e) => e.value)) === "" &&
+      /Según la cuota/.test(risk.text) &&
+      !/ 50 % Según/.test(risk.text),
+    risk.text.slice(0, 160),
+  );
+  check(
+    "freno: avisa del partido repetido en otros cupones y de la selección de relleno",
+    /Fenerbahce vs Liverpool.*ya está en 1 cupón/.test(risk.text) && /relleno.*Celtic.*1.05/.test(risk.text),
+    risk.text,
+  );
+  check(
+    "freno: con 3 perdidos seguidos sugiere pausa y media unidad",
+    /3 cupones perdidos seguidos/.test(risk.text) && /Monto sugerido: L 10.00/.test(risk.text),
+    risk.text.match(/Monto sugerido[^)]*\)/)?.[0],
+  );
+  await tap(page, '[data-confidence="5"]');
+  await page.waitForTimeout(80);
+  const sug5 = await page.$eval(
+    "#riskBox",
+    (e) => e.innerText.match(/Monto sugerido[^:]*: (L [\d.,]+)/)?.[1],
+  );
   await tap(page, "[data-use-stake]");
-  check("freno: confianza 5 = 2 unidades (a la mitad por la racha) y 'Usar' pone el importe", sug5 === "L 20.00" && (await page.$eval("#stake", (e) => e.value)) === "20", sug5);
+  check(
+    "freno: confianza 5 = 2 unidades (a la mitad por la racha) y 'Usar' pone el importe",
+    sug5 === "L 20.00" && (await page.$eval("#stake", (e) => e.value)) === "20",
+    sug5,
+  );
   await page.fill("#couponReason", "Local fuerte");
-  await tap(page, "#saveBtn"); await page.waitForTimeout(300);
-  const saved = await page.evaluate(() => { const c = db.coupons[0]; return { conf: c.confidence, reason: c.reason, pickerReset: !$("couponConfidence").value }; });
-  check("diario: guarda la confianza y el motivo, y limpia el formulario", saved.conf === 5 && saved.reason === "Local fuerte" && saved.pickerReset, JSON.stringify(saved));
-  await page.evaluate(() => { db.coupons[0].fixtures.forEach((f) => f.markets.forEach((m) => (m.settlement = "won"))); db.coupons[0].payout = 400; save(); });
+  await tap(page, "#saveBtn");
+  await page.waitForTimeout(300);
+  const saved = await page.evaluate(() => {
+    const c = db.coupons[0];
+    return { conf: c.confidence, reason: c.reason, pickerReset: !$("couponConfidence").value };
+  });
+  check(
+    "diario: guarda la confianza y el motivo, y limpia el formulario",
+    saved.conf === 5 && saved.reason === "Local fuerte" && saved.pickerReset,
+    JSON.stringify(saved),
+  );
+  await page.evaluate(() => {
+    db.coupons[0].fixtures.forEach((f) => f.markets.forEach((m) => (m.settlement = "won")));
+    db.coupons[0].payout = 400;
+    save();
+  });
   await view(page, "stats");
-  check("estadísticas: sección 'Según tu confianza'", /Confianza 5 · Muy alta/.test(await page.$eval("#perfSection", (e) => e.innerText)));
+  check(
+    "estadísticas: sección 'Según tu confianza'",
+    /Confianza 5 · Muy alta/.test(await page.$eval("#perfSection", (e) => e.innerText)),
+  );
   const pay = await page.evaluate(() => analystHistoryPayload());
-  check("Analista: recibe confianza, motivo y la banca", pay.porConfianza?.[0]?.confianza === 5 && pay.ultimosCupones.some((c) => c.motivo === "Local fuerte") && pay.banca?.unidad === 20);
+  check(
+    "Analista: recibe confianza, motivo y la banca",
+    pay.porConfianza?.[0]?.confianza === 5 &&
+      pay.ultimosCupones.some((c) => c.motivo === "Local fuerte") &&
+      pay.banca?.unidad === 20,
+  );
   // Editar recupera la confianza
   await view(page, "saved");
-  await page.evaluate(() => { const b = document.createElement("button"); b.dataset.detail = db.coupons[0].id; document.body.appendChild(b); b.click(); b.remove(); }); await page.waitForTimeout(200);
-  check("editar un cupón recupera su confianza y motivo", (await page.$eval("#couponConfidence", (e) => e.value)) === "5" && (await page.$eval("#couponReason", (e) => e.value)) === "Local fuerte");
+  await page.evaluate(() => {
+    const b = document.createElement("button");
+    b.dataset.detail = db.coupons[0].id;
+    document.body.appendChild(b);
+    b.click();
+    b.remove();
+  });
+  await page.waitForTimeout(200);
+  check(
+    "editar un cupón recupera su confianza y motivo",
+    (await page.$eval("#couponConfidence", (e) => e.value)) === "5" &&
+      (await page.$eval("#couponReason", (e) => e.value)) === "Local fuerte",
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -675,30 +1821,96 @@ section("17. Control de apuestas: freno al guardar, banca y diario");
 section("18. Valor de la cuota: cierre (CLV), calculadora y comparador");
 {
   const { ctx, page } = await open(baseDb());
-  const vc = await page.evaluate(() => valueCalc({ odd: 2.1, ref: [1.95, 3.6, 4.2], houses: [{ name: "Hondubet", odd: 2.05 }, { name: "Doradobet", odd: 2.2 }] }));
-  check("calculadora: quita el margen y calcula probabilidad, cuota justa y valor esperado", Math.abs(vc.fairP - 0.4985) < 0.001 && Math.abs(vc.fairOdd - 2.006) < 0.01 && Math.abs(vc.margin - 0.0287) < 0.001 && vc.use === 2.2 && Math.abs(vc.ev - (0.4985 * 2.2 - 1)) < 0.002 && vc.kellyQuarter > 0, JSON.stringify(vc));
-  await page.evaluate(() => { db.settings = { banca: { monto: 1000, unidadPct: 2, maxSel: 5, pausaTras: 3 } }; save(); });
+  const vc = await page.evaluate(() =>
+    valueCalc({
+      odd: 2.1,
+      ref: [1.95, 3.6, 4.2],
+      houses: [
+        { name: "Hondubet", odd: 2.05 },
+        { name: "Doradobet", odd: 2.2 },
+      ],
+    }),
+  );
+  check(
+    "calculadora: quita el margen y calcula probabilidad, cuota justa y valor esperado",
+    Math.abs(vc.fairP - 0.4985) < 0.001 &&
+      Math.abs(vc.fairOdd - 2.006) < 0.01 &&
+      Math.abs(vc.margin - 0.0287) < 0.001 &&
+      vc.use === 2.2 &&
+      Math.abs(vc.ev - (0.4985 * 2.2 - 1)) < 0.002 &&
+      vc.kellyQuarter > 0,
+    JSON.stringify(vc),
+  );
+  await page.evaluate(() => {
+    db.settings = { banca: { monto: 1000, unidadPct: 2, maxSel: 5, pausaTras: 3 } };
+    save();
+  });
   await view(page, "analyst");
-  await page.fill("#vcOdd", "2.10"); await page.fill("#vcRef", "1.95 3.60 4.20");
-  await page.fill('[data-vc-house="h1"]', "2.05"); await page.fill('[data-vc-house="h2"]', "2.20");
+  await page.fill("#vcOdd", "2.10");
+  await page.fill("#vcRef", "1.95 3.60 4.20");
+  await page.fill('[data-vc-house="h1"]', "2.05");
+  await page.fill('[data-vc-house="h2"]', "2.20");
   const vt = await page.$eval("#vcResult", (e) => e.innerText.replace(/\s+/g, " "));
-  check("calculadora en pantalla: mejor casa, cuota justa y veredicto con monto prudente", /Mejor cuota: Doradobet 2.20/.test(vt) && /Cuota justa: 2.01/.test(vt) && /Tiene valor/.test(vt) && /¼ de Kelly/.test(vt), vt);
-  await page.fill("#vcOdd", "1.80"); await page.fill('[data-vc-house="h1"]', ""); await page.fill('[data-vc-house="h2"]', "");
-  check("calculadora: una cuota por debajo de la justa no tiene valor", /Sin valor/.test(await page.$eval("#vcResult", (e) => e.innerText)));
+  check(
+    "calculadora en pantalla: mejor casa, cuota justa y veredicto con monto prudente",
+    /Mejor cuota: Doradobet 2.20/.test(vt) &&
+      /Cuota justa: 2.01/.test(vt) &&
+      /Tiene valor/.test(vt) &&
+      /¼ de Kelly/.test(vt),
+    vt,
+  );
+  await page.fill("#vcOdd", "1.80");
+  await page.fill('[data-vc-house="h1"]', "");
+  await page.fill('[data-vc-house="h2"]', "");
+  check(
+    "calculadora: una cuota por debajo de la justa no tiene valor",
+    /Sin valor/.test(await page.$eval("#vcResult", (e) => e.innerText)),
+  );
   // Cuota de cierre desde la ficha del partido
-  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
-  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Fenerbahce")).click());
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#agendaList .agenda-match")]
+      .find((e) => e.innerText.includes("Fenerbahce"))
+      .click(),
+  );
   await page.waitForTimeout(200);
   page.promptAnswer = "1.30";
-  await page.evaluate(() => [...document.querySelectorAll(".match-tab-content > .mk-card")].find((e) => e.innerText.includes("Total de goles")).querySelector("[data-close-odd]").click());
+  await page.evaluate(() =>
+    [...document.querySelectorAll(".match-tab-content > .mk-card")]
+      .find((e) => e.innerText.includes("Total de goles"))
+      .querySelector("[data-close-odd]")
+      .click(),
+  );
   await page.waitForTimeout(200);
-  const chip = await page.evaluate(() => [...document.querySelectorAll(".match-tab-content > .mk-card")].find((e) => e.innerText.includes("Total de goles")).querySelector(".clv-chip")?.innerText);
-  check("cierre: se guarda y muestra el valor (1.50 contra cierre 1.30 = +15 %)", chip === "Cierre 1.30 · +15 %", chip);
-  const st = await page.evaluate(() => ({ s: clvStats(), saved: JSON.parse(localStorage.getItem("kal_coupon_organizer_v2")).coupons[0].fixtures[0].markets[0].closeOdd, pay: analystHistoryPayload().valorCierre }));
-  check("cierre: cuenta en las estadísticas y llega al Analista", st.s.n === 1 && Math.abs(st.s.avg - 0.1538) < 0.001 && st.saved === 1.3 && st.pay.mercados === 1, JSON.stringify(st));
+  const chip = await page.evaluate(
+    () =>
+      [...document.querySelectorAll(".match-tab-content > .mk-card")]
+        .find((e) => e.innerText.includes("Total de goles"))
+        .querySelector(".clv-chip")?.innerText,
+  );
+  check(
+    "cierre: se guarda y muestra el valor (1.50 contra cierre 1.30 = +15 %)",
+    chip === "Cierre 1.30 · +15 %",
+    chip,
+  );
+  const st = await page.evaluate(() => ({
+    s: clvStats(),
+    saved: JSON.parse(localStorage.getItem("kal_coupon_organizer_v2")).coupons[0].fixtures[0].markets[0]
+      .closeOdd,
+    pay: analystHistoryPayload().valorCierre,
+  }));
+  check(
+    "cierre: cuenta en las estadísticas y llega al Analista",
+    st.s.n === 1 && Math.abs(st.s.avg - 0.1538) < 0.001 && st.saved === 1.3 && st.pay.mercados === 1,
+    JSON.stringify(st),
+  );
   await page.evaluate(() => closeMatchDetails());
   await view(page, "stats");
-  check("estadísticas: sección de valor frente al cierre", /Valor medio frente al cierre/.test(await page.$eval("#perfSection", (e) => e.innerText)));
+  check(
+    "estadísticas: sección de valor frente al cierre",
+    /Valor medio frente al cierre/.test(await page.$eval("#perfSection", (e) => e.innerText)),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -707,52 +1919,194 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
 {
   const D = await import(path.join(ROOT, "cloudflare/datos-partido.mjs"));
   const m = D.poissonModel(1.5, 1.5);
-  check("modelo Poisson: probabilidades coherentes (λ 1.5 + 1.5 → más de 2.5 = 57.7 %)", Math.abs(m.p1 - m.p2) < 0.001 && Math.abs(m.p1 + m.px + m.p2 - 1) < 0.002 && Math.abs(m.over25 - 0.577) < 0.002 && m.over15 > m.over25 && m.over25 > m.over35, JSON.stringify(m));
+  check(
+    "modelo Poisson: probabilidades coherentes (λ 1.5 + 1.5 → más de 2.5 = 57.7 %)",
+    Math.abs(m.p1 - m.p2) < 0.001 &&
+      Math.abs(m.p1 + m.px + m.p2 - 1) < 0.002 &&
+      Math.abs(m.over25 - 0.577) < 0.002 &&
+      m.over15 > m.over25 &&
+      m.over25 > m.over35,
+    JSON.stringify(m),
+  );
   const T = (id, name, shortName, tla) => ({ id, name, shortName, tla });
   const fdMatches = [
-    { id: 11, utcDate: "2026-11-22T20:00:00Z", status: "TIMED", competition: { id: 2002, code: "BL1", name: "Bundesliga" }, homeTeam: T(5, "FC Bayern München", "Bayern", "FCB"), awayTeam: T(4, "Borussia Dortmund", "Dortmund", "BVB"), score: { fullTime: {} } },
-    { id: 12, utcDate: "2026-11-22T18:00:00Z", status: "TIMED", competition: { id: 2014, code: "PD", name: "Primera Division" }, homeTeam: T(78, "Club Atlético de Madrid", "Atleti", "ATM"), awayTeam: T(81, "FC Barcelona", "Barça", "FCB"), score: { fullTime: {} } },
+    {
+      id: 11,
+      utcDate: "2026-11-22T20:00:00Z",
+      status: "TIMED",
+      competition: { id: 2002, code: "BL1", name: "Bundesliga" },
+      homeTeam: T(5, "FC Bayern München", "Bayern", "FCB"),
+      awayTeam: T(4, "Borussia Dortmund", "Dortmund", "BVB"),
+      score: { fullTime: {} },
+    },
+    {
+      id: 12,
+      utcDate: "2026-11-22T18:00:00Z",
+      status: "TIMED",
+      competition: { id: 2014, code: "PD", name: "Primera Division" },
+      homeTeam: T(78, "Club Atlético de Madrid", "Atleti", "ATM"),
+      awayTeam: T(81, "FC Barcelona", "Barça", "FCB"),
+      score: { fullTime: {} },
+    },
   ];
-  check("nombres: español, alias y equipos al revés", D.nameScore("España", T(1, "Spain", "Spain", "ESP")) === 1 && D.findMatch(fdMatches, "Bayern Múnich", "Dortmund")?.m.id === 11 && D.findMatch(fdMatches, "Barcelona", "Atlético de Madrid")?.swapped === true && !D.findMatch(fdMatches, "Inter", "Napoli"));
-  const fin = (id, h, a, gh, ga, d) => ({ id, utcDate: d + "T15:00:00Z", status: "FINISHED", competition: { name: "Bundesliga" }, homeTeam: T(h, "H" + h, "H" + h), awayTeam: T(a, "A" + a, "A" + a), score: { fullTime: { home: gh, away: ga } } });
-  const row = (id, pos, pj, gf, ga) => ({ position: pos, team: { id }, playedGames: pj, won: 3, draw: 1, lost: 1, points: 10, goalsFor: gf, goalsAgainst: ga, form: "W,W,D,L,W" });
-  const standings = { standings: ["TOTAL", "HOME", "AWAY"].map((type) => ({ type, table: [row(5, 1, 6, 15, 4), row(4, 2, 6, 12, 6), row(9, 3, 6, 6, 8), row(10, 4, 6, 4, 12)] })) };
+  check(
+    "nombres: español, alias y equipos al revés",
+    D.nameScore("España", T(1, "Spain", "Spain", "ESP")) === 1 &&
+      D.findMatch(fdMatches, "Bayern Múnich", "Dortmund")?.m.id === 11 &&
+      D.findMatch(fdMatches, "Barcelona", "Atlético de Madrid")?.swapped === true &&
+      !D.findMatch(fdMatches, "Inter", "Napoli"),
+  );
+  const fin = (id, h, a, gh, ga, d) => ({
+    id,
+    utcDate: d + "T15:00:00Z",
+    status: "FINISHED",
+    competition: { name: "Bundesliga" },
+    homeTeam: T(h, "H" + h, "H" + h),
+    awayTeam: T(a, "A" + a, "A" + a),
+    score: { fullTime: { home: gh, away: ga } },
+  });
+  const row = (id, pos, pj, gf, ga) => ({
+    position: pos,
+    team: { id },
+    playedGames: pj,
+    won: 3,
+    draw: 1,
+    lost: 1,
+    points: 10,
+    goalsFor: gf,
+    goalsAgainst: ga,
+    form: "W,W,D,L,W",
+  });
+  const standings = {
+    standings: ["TOTAL", "HOME", "AWAY"].map((type) => ({
+      type,
+      table: [row(5, 1, 6, 15, 4), row(4, 2, 6, 12, 6), row(9, 3, 6, 6, 8), row(10, 4, 6, 4, 12)],
+    })),
+  };
   const calls = [];
   const fakeFetch = async (url) => {
     calls.push(url.replace("https://api.football-data.org/v4", ""));
     const ok = (d) => ({ ok: true, status: 200, json: async () => d });
     if (/\/matches\?dateFrom=2026-11-21&dateTo=2026-11-23/.test(url)) return ok({ matches: fdMatches });
     if (/competitions\/BL1\/standings/.test(url)) return ok(standings);
-    if (/matches\/11\/head2head/.test(url)) return ok({ aggregates: { numberOfMatches: 4, totalGoals: 13, homeTeam: { wins: 3, draws: 0, losses: 1 }, awayTeam: { wins: 1, draws: 0, losses: 3 } }, matches: [fin(1, 5, 4, 4, 2, "2026-03-01")] });
-    if (/teams\/5\/matches/.test(url)) return ok({ matches: [fin(2, 5, 9, 3, 0, "2026-11-15"), fin(3, 10, 5, 1, 1, "2026-11-08")] });
+    if (/matches\/11\/head2head/.test(url))
+      return ok({
+        aggregates: {
+          numberOfMatches: 4,
+          totalGoals: 13,
+          homeTeam: { wins: 3, draws: 0, losses: 1 },
+          awayTeam: { wins: 1, draws: 0, losses: 3 },
+        },
+        matches: [fin(1, 5, 4, 4, 2, "2026-03-01")],
+      });
+    if (/teams\/5\/matches/.test(url))
+      return ok({ matches: [fin(2, 5, 9, 3, 0, "2026-11-15"), fin(3, 10, 5, 1, 1, "2026-11-08")] });
     if (/teams\/4\/matches/.test(url)) return ok({ matches: [fin(4, 4, 10, 2, 1, "2026-11-15")] });
     return { ok: false, status: 404, json: async () => ({}) };
   };
-  const mem = new Map(), store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
+  const mem = new Map(),
+    store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
   const req = (q) => new Request("https://x/api/datos-partido?" + new URLSearchParams(q));
-  const r1 = await (await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch })).json();
-  check("datos: encuentra el partido y arma tabla, forma, enfrentamientos y modelo", r1.encontrado && r1.tabla.local.posicion === 1 && r1.tabla.local.forma === "GGEPG" && r1.forma.local[0].resultado === "G" && r1.forma.local[0].marcador === "3-0" && r1.h2h.partidos === 4 && r1.modelo.p1 > r1.modelo.p2 && r1.modelo.base === "tabla de local y visitante", JSON.stringify(r1).slice(0, 300));
-  const onlyTotal = [{ type: "TOTAL", table: [row(5, 1, 12, 40, 10), row(4, 2, 12, 20, 20), row(9, 3, 12, 14, 18), row(10, 4, 12, 10, 36)] }];
-  const xg = D.expectedGoals(onlyTotal, 5, 10), xr = D.expectedGoals(onlyTotal, 10, 5);
-  check("modelo: con solo la tabla general (plan gratis) usa ataque, defensa y ventaja de local", xg && xg.lh > xg.la && xg.lh > xr.lh && /tabla general/.test(xg.base), JSON.stringify(xg));
+  const r1 = await (
+    await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), {
+      token: "t",
+      store,
+      fetchImpl: fakeFetch,
+    })
+  ).json();
+  check(
+    "datos: encuentra el partido y arma tabla, forma, enfrentamientos y modelo",
+    r1.encontrado &&
+      r1.tabla.local.posicion === 1 &&
+      r1.tabla.local.forma === "GGEPG" &&
+      r1.forma.local[0].resultado === "G" &&
+      r1.forma.local[0].marcador === "3-0" &&
+      r1.h2h.partidos === 4 &&
+      r1.modelo.p1 > r1.modelo.p2 &&
+      r1.modelo.base === "tabla de local y visitante",
+    JSON.stringify(r1).slice(0, 300),
+  );
+  const onlyTotal = [
+    {
+      type: "TOTAL",
+      table: [row(5, 1, 12, 40, 10), row(4, 2, 12, 20, 20), row(9, 3, 12, 14, 18), row(10, 4, 12, 10, 36)],
+    },
+  ];
+  const xg = D.expectedGoals(onlyTotal, 5, 10),
+    xr = D.expectedGoals(onlyTotal, 10, 5);
+  check(
+    "modelo: con solo la tabla general (plan gratis) usa ataque, defensa y ventaja de local",
+    xg && xg.lh > xg.la && xg.lh > xr.lh && /tabla general/.test(xg.base),
+    JSON.stringify(xg),
+  );
   const n1 = calls.length;
-  await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch });
-  check("datos: la segunda consulta sale de la caché (cuida el límite de 10 por minuto)", n1 === 5 && calls.length === 5, n1 + "/" + calls.length);
-  const noKey = await D.datosPartido(req({ home: "A", away: "B", date: "2026-11-22" }), { token: "", store, fetchImpl: fakeFetch });
-  const nf = await (await D.datosPartido(req({ home: "Inter", away: "Napoli", date: "2026-11-22" }), { token: "t", store, fetchImpl: fakeFetch })).json();
-  const limited = await D.datosPartido(req({ home: "X", away: "Y", date: "2026-12-01" }), { token: "t", store: null, fetchImpl: async () => ({ ok: false, status: 429 }) });
-  check("datos: sin clave, partido no cubierto y límite de consultas con mensajes claros", noKey.status === 503 && nf.encontrado === false && /Nations League/.test(nf.motivo) && limited.status === 429 && /10 consultas/.test((await limited.json()).error));
+  await D.datosPartido(req({ home: "Bayern Múnich", away: "Dortmund", date: "2026-11-22" }), {
+    token: "t",
+    store,
+    fetchImpl: fakeFetch,
+  });
+  check(
+    "datos: la segunda consulta sale de la caché (cuida el límite de 10 por minuto)",
+    n1 === 5 && calls.length === 5,
+    n1 + "/" + calls.length,
+  );
+  const noKey = await D.datosPartido(req({ home: "A", away: "B", date: "2026-11-22" }), {
+    token: "",
+    store,
+    fetchImpl: fakeFetch,
+  });
+  const nf = await (
+    await D.datosPartido(req({ home: "Inter", away: "Napoli", date: "2026-11-22" }), {
+      token: "t",
+      store,
+      fetchImpl: fakeFetch,
+    })
+  ).json();
+  const limited = await D.datosPartido(req({ home: "X", away: "Y", date: "2026-12-01" }), {
+    token: "t",
+    store: null,
+    fetchImpl: async () => ({ ok: false, status: 429 }),
+  });
+  check(
+    "datos: sin clave, partido no cubierto y límite de consultas con mensajes claros",
+    noKey.status === 503 &&
+      nf.encontrado === false &&
+      /Nations League/.test(nf.motivo) &&
+      limited.status === 429 &&
+      /10 consultas/.test((await limited.json()).error),
+  );
 
   const { ctx, page } = await open(baseDb());
-  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
-  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Fenerbahce")).click());
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#agendaList .agenda-match")]
+      .find((e) => e.innerText.includes("Fenerbahce"))
+      .click(),
+  );
   await page.waitForTimeout(150);
   await tap(page, '[data-match-tab="datos"]');
   await page.waitForTimeout(500);
   const panel = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
-  check("ficha → 📈 Datos: modelo, tabla, forma y enfrentamientos", /Modelo de goles/.test(panel) && /Más de 2.5 goles 53 %/.test(panel) && /12º/.test(panel) && /Forma reciente/.test(panel) && /Enfrentamientos directos/.test(panel), panel.slice(0, 300));
-  check("ficha → 📈 Datos: compara tus mercados con el modelo (más de 1.5 a 1.50: 77 % → +16 % de valor)", /Total de goles · Más de 1.5 Modelo 77 % · cuota 1.50 \(67 %\) \+16 % valor/.test(panel) && /Ambos equipos marcan · Sí Modelo 52 %/.test(panel), panel.match(/Tus mercados[^📊]*/)?.[0]);
-  check("ficha → 📈 Datos: pide los datos con la fecha del partido", seen.some((x) => x.startsWith("datos:Fenerbahce|20")));
+  check(
+    "ficha → 📈 Datos: modelo, tabla, forma y enfrentamientos",
+    /Modelo de goles/.test(panel) &&
+      /Más de 2.5 goles 53 %/.test(panel) &&
+      /12º/.test(panel) &&
+      /Forma reciente/.test(panel) &&
+      /Enfrentamientos directos/.test(panel),
+    panel.slice(0, 300),
+  );
+  check(
+    "ficha → 📈 Datos: compara tus mercados con el modelo (más de 1.5 a 1.50: 77 % → +16 % de valor)",
+    /Total de goles · Más de 1.5 Modelo 77 % · cuota 1.50 \(67 %\) \+16 % valor/.test(panel) &&
+      /Ambos equipos marcan · Sí Modelo 52 %/.test(panel),
+    panel.match(/Tus mercados[^📊]*/)?.[0],
+  );
+  check(
+    "ficha → 📈 Datos: pide los datos con la fecha del partido",
+    seen.some((x) => x.startsWith("datos:Fenerbahce|20")),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -760,32 +2114,131 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
 section("20. Analista: mi semana, armar cupones y riesgo en la revisión");
 {
   const A = await import(path.join(ROOT, "servidor/analista.mjs"));
-  const pa = A.construirPeticion("armar", { partidos: "España vs Suiza\nAlemania vs Italia", banca: { unidad: 20, maxSelecciones: 4 } });
+  const pa = A.construirPeticion("armar", {
+    partidos: "España vs Suiza\nAlemania vs Italia",
+    banca: { unidad: 20, maxSelecciones: 4 },
+  });
   const ps = A.construirPeticion("semana", { semana: { ultimos7dias: { cupones: 3 } } });
-  const bad = await A.leerPeticion(new Request("https://x", { method: "POST", headers: { "x-kal-clave": "s" }, body: JSON.stringify({ modo: "armar", datos: { partidos: "" } }) }), { ANTHROPIC_API_KEY: "k", ANALISTA_CLAVE: "s" });
-  check("servidor: 'armar' busca en internet y recibe tu banca; 'semana' no busca; valida los datos", pa.tools[0].max_uses === 10 && pa.output_config.effort === "high" && /Ayúdame a armar cupones/.test(pa.messages[0].content) && /"maxSelecciones":4/.test(pa.messages[0].content) && /Un partido no se repite/.test(pa.system) && !ps.tools && /últimos 7 días/.test(ps.messages[0].content) && bad.error.status === 400);
+  const bad = await A.leerPeticion(
+    new Request("https://x", {
+      method: "POST",
+      headers: { "x-kal-clave": "s" },
+      body: JSON.stringify({ modo: "armar", datos: { partidos: "" } }),
+    }),
+    { ANTHROPIC_API_KEY: "k", ANALISTA_CLAVE: "s" },
+  );
+  check(
+    "servidor: 'armar' busca en internet y recibe tu banca; 'semana' no busca; valida los datos",
+    pa.tools[0].max_uses === 10 &&
+      pa.output_config.effort === "high" &&
+      /Ayúdame a armar cupones/.test(pa.messages[0].content) &&
+      /"maxSelecciones":4/.test(pa.messages[0].content) &&
+      /Un partido no se repite/.test(pa.system) &&
+      !ps.tools &&
+      /últimos 7 días/.test(ps.messages[0].content) &&
+      bad.error.status === 400,
+  );
   const db0 = baseDb();
   db0.settings = { banca: { monto: 1000, unidadPct: 2, maxSel: 4, pausaTras: 3 } };
-  db0.coupons.push({ id: "W1", name: "Semana 1", created: new Date(Date.now() - 2 * 86400e3).toISOString(), updated: new Date(Date.now() - 86400e3).toISOString(), stake: 50, odds: 3, payout: 150, fixtures: [{ id: "w1", home: "Ajax", away: "PSV", date: "09/11/2026", time: "12:00", markets: [{ market: "1x2", pick: "1", odd: "1.5", settlement: "won" }, { market: "Ambos equipos marcan", pick: "Sí", odd: "2", settlement: "won" }] }] });
-  db0.coupons.push({ id: "W2", name: "Semana 2", created: new Date(Date.now() - 3 * 86400e3).toISOString(), updated: new Date(Date.now() - 2 * 86400e3).toISOString(), stake: 20, odds: 30, payout: 600, fixtures: ["a", "b", "c", "d", "e"].map((k, i) => ({ id: "w2" + k, home: "Ajax", away: "PSV" + (i ? i : ""), date: "09/11/2026", time: "12:00", markets: [{ market: "1x2", pick: "1", odd: "1.8", settlement: i === 4 ? "lost" : "won" }] })) });
+  db0.coupons.push({
+    id: "W1",
+    name: "Semana 1",
+    created: new Date(Date.now() - 2 * 86400e3).toISOString(),
+    updated: new Date(Date.now() - 86400e3).toISOString(),
+    stake: 50,
+    odds: 3,
+    payout: 150,
+    fixtures: [
+      {
+        id: "w1",
+        home: "Ajax",
+        away: "PSV",
+        date: "09/11/2026",
+        time: "12:00",
+        markets: [
+          { market: "1x2", pick: "1", odd: "1.5", settlement: "won" },
+          { market: "Ambos equipos marcan", pick: "Sí", odd: "2", settlement: "won" },
+        ],
+      },
+    ],
+  });
+  db0.coupons.push({
+    id: "W2",
+    name: "Semana 2",
+    created: new Date(Date.now() - 3 * 86400e3).toISOString(),
+    updated: new Date(Date.now() - 2 * 86400e3).toISOString(),
+    stake: 20,
+    odds: 30,
+    payout: 600,
+    fixtures: ["a", "b", "c", "d", "e"].map((k, i) => ({
+      id: "w2" + k,
+      home: "Ajax",
+      away: "PSV" + (i ? i : ""),
+      date: "09/11/2026",
+      time: "12:00",
+      markets: [{ market: "1x2", pick: "1", odd: "1.8", settlement: i === 4 ? "lost" : "won" }],
+    })),
+  });
   const { ctx, page } = await open(db0);
   const week = await page.$eval("#weekCard", (e) => e.innerText.replace(/\s+/g, " "));
-  check("Inicio: tarjeta de los últimos 7 días con resultado y avisos de tus reglas", /Tus últimos 7 días/.test(week) && /2 Cupones/.test(week) && /1 \/ 1/.test(week) && /\+L 80.00/.test(week) && /por encima de tu límite/.test(week) && /monto\(s\) de más de 2 unidades/.test(week), week);
-  await tap(page, "[data-week-analyst]"); await page.waitForTimeout(200);
-  check("Inicio → 🤖 Analizar lleva a 'Mi semana'", (await page.evaluate(() => activeView)) === "analyst" && !!(await page.$("[data-analyst-run=semana]")));
-  await page.evaluate(() => { analystSave({ clave: "secreto" }); renderAnalyst(); });
+  check(
+    "Inicio: tarjeta de los últimos 7 días con resultado y avisos de tus reglas",
+    /Tus últimos 7 días/.test(week) &&
+      /2 Cupones/.test(week) &&
+      /1 \/ 1/.test(week) &&
+      /\+L 80.00/.test(week) &&
+      /por encima de tu límite/.test(week) &&
+      /monto\(s\) de más de 2 unidades/.test(week),
+    week,
+  );
+  await tap(page, "[data-week-analyst]");
+  await page.waitForTimeout(200);
+  check(
+    "Inicio → 🤖 Analizar lleva a 'Mi semana'",
+    (await page.evaluate(() => activeView)) === "analyst" && !!(await page.$("[data-analyst-run=semana]")),
+  );
+  await page.evaluate(() => {
+    analystSave({ clave: "secreto" });
+    renderAnalyst();
+  });
   const before = analystPosts.length;
-  await tap(page, '[data-analyst-run="semana"]'); await page.waitForTimeout(700);
+  await tap(page, '[data-analyst-run="semana"]');
+  await page.waitForTimeout(700);
   const sp = analystPosts.at(-1);
-  check("Mi semana: envía los últimos 7 días y el historial general", analystPosts.length === before + 1 && sp.modo === "semana" && sp.datos.semana.ultimos7dias.cupones === 2 && sp.datos.semana.general.porMercado.length > 0 && /Recomendaciones/.test(await page.$eval("#analystOut-semana", (e) => e.innerText)));
+  check(
+    "Mi semana: envía los últimos 7 días y el historial general",
+    analystPosts.length === before + 1 &&
+      sp.modo === "semana" &&
+      sp.datos.semana.ultimos7dias.cupones === 2 &&
+      sp.datos.semana.general.porMercado.length > 0 &&
+      /Recomendaciones/.test(await page.$eval("#analystOut-semana", (e) => e.innerText)),
+  );
   await page.fill("#analystBuildText", "España vs Suiza\nAlemania vs Italia — me gusta más de 2.5");
-  await tap(page, '[data-analyst-run="armar"]'); await page.waitForTimeout(800);
+  await tap(page, '[data-analyst-run="armar"]');
+  await page.waitForTimeout(800);
   const ap = analystPosts.at(-1);
-  check("Armar cupones: envía tus partidos, tu límite, tu unidad y tu historial", ap.modo === "armar" && /Alemania vs Italia/.test(ap.datos.partidos) && ap.datos.banca.maxSelecciones === 4 && ap.datos.banca.unidad === 20 && Array.isArray(ap.datos.historial));
+  check(
+    "Armar cupones: envía tus partidos, tu límite, tu unidad y tu historial",
+    ap.modo === "armar" &&
+      /Alemania vs Italia/.test(ap.datos.partidos) &&
+      ap.datos.banca.maxSelecciones === 4 &&
+      ap.datos.banca.unidad === 20 &&
+      Array.isArray(ap.datos.historial),
+  );
   await page.selectOption("#analystCouponPick", "A");
-  await tap(page, '[data-analyst-run="cupon"]'); await page.waitForTimeout(800);
+  await tap(page, '[data-analyst-run="cupon"]');
+  await page.waitForTimeout(800);
   const cp = analystPosts.at(-1);
-  check("Revisar cupón: envía el riesgo calculado (sin contar el mismo cupón como repetido)", cp.modo === "cupon" && cp.datos.riesgo?.selecciones >= 1 && cp.datos.riesgo.limiteSelecciones === 4 && Array.isArray(cp.datos.riesgo.repetidosEnOtrosCupones) && !cp.datos.riesgo.repetidosEnOtrosCupones.some((x) => x.cupones > 1) && cp.datos.banca.unidad === 20, JSON.stringify(cp.datos.riesgo));
+  check(
+    "Revisar cupón: envía el riesgo calculado (sin contar el mismo cupón como repetido)",
+    cp.modo === "cupon" &&
+      cp.datos.riesgo?.selecciones >= 1 &&
+      cp.datos.riesgo.limiteSelecciones === 4 &&
+      Array.isArray(cp.datos.riesgo.repetidosEnOtrosCupones) &&
+      !cp.datos.riesgo.repetidosEnOtrosCupones.some((x) => x.cupones > 1) &&
+      cp.datos.banca.unidad === 20,
+    JSON.stringify(cp.datos.riesgo),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -794,27 +2247,72 @@ section("21. Copias automáticas, espejo, novedades y rutas /api");
 {
   const { ctx, page } = await open(baseDb(), { init: "news" });
   await page.waitForTimeout(1400);
-  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 18/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
+  check(
+    "novedades: se muestran una vez al llegar la versión nueva",
+    (await page.$(".news-wrap")) !== null &&
+      /Versión 18/.test(await page.$eval(".news-sheet", (e) => e.innerText)),
+  );
   await tap(page, "[data-news-close]");
-  await page.reload(); await page.waitForTimeout(1500);
+  await page.reload();
+  await page.waitForTimeout(1500);
   check("novedades: no se repiten al volver a abrir", (await page.$(".news-wrap")) === null);
   const snaps = await page.evaluate(async () => (await snapshots()).map((s) => s.motivo));
   check("copias: copia semanal automática al abrir", snaps.includes("Copia semanal"), JSON.stringify(snaps));
   // Espejo: se borra el almacenamiento normal y al abrir se recupera
-  await page.evaluate(async () => { db.coupons[0].name = "Cambiado"; save(); await new Promise((r) => setTimeout(r, 1500)); localStorage.removeItem("kal_coupon_organizer_v2"); });
-  await page.reload(); await page.waitForTimeout(1500);
-  const rec = await page.evaluate(() => ({ n: db.coupons.length, name: db.coupons[0]?.name, ls: !!localStorage.getItem("kal_coupon_organizer_v2") }));
-  check("espejo: si se pierde el almacenamiento normal, los datos se recuperan solos", rec.n === 3 && rec.name === "Cambiado" && rec.ls, JSON.stringify(rec));
+  await page.evaluate(async () => {
+    db.coupons[0].name = "Cambiado";
+    save();
+    await new Promise((r) => setTimeout(r, 1500));
+    localStorage.removeItem("kal_coupon_organizer_v2");
+  });
+  await page.reload();
+  await page.waitForTimeout(1500);
+  const rec = await page.evaluate(() => ({
+    n: db.coupons.length,
+    name: db.coupons[0]?.name,
+    ls: !!localStorage.getItem("kal_coupon_organizer_v2"),
+  }));
+  check(
+    "espejo: si se pierde el almacenamiento normal, los datos se recuperan solos",
+    rec.n === 3 && rec.name === "Cambiado" && rec.ls,
+    JSON.stringify(rec),
+  );
   // Restaurar una copia
   await view(page, "settings");
-  await page.evaluate(async () => { db.coupons = []; save(); renderAll(); await renderSnapshotBox(); });
+  await page.evaluate(async () => {
+    db.coupons = [];
+    save();
+    renderAll();
+    await renderSnapshotBox();
+  });
   await page.waitForTimeout(200);
   await page.evaluate(() => document.querySelector("[data-snap-restore]").click());
   await page.waitForTimeout(600);
-  const after = await page.evaluate(async () => ({ n: db.coupons.length, motivos: (await snapshots()).map((s) => s.motivo) }));
-  check("copias: restaurar desde Ajustes recupera los cupones (y guarda antes una copia de lo actual)", after.n === 3 && after.motivos[0] === "Antes de restaurar", JSON.stringify(after));
-  check("copias: el respaldo descargable usa el mismo formato", await page.evaluate(() => { const p = backupPayload(); return p.version === 3 && Array.isArray(p.db.coupons) && typeof p.logos === "object"; }));
-  check("la app llama a las funciones en /api/ (ya no en /.netlify/)", seen.length > 0 && !(await page.evaluate(() => [...document.scripts].length && performance.getEntriesByType("resource").some((r) => r.name.includes("/.netlify/")))));
+  const after = await page.evaluate(async () => ({
+    n: db.coupons.length,
+    motivos: (await snapshots()).map((s) => s.motivo),
+  }));
+  check(
+    "copias: restaurar desde Ajustes recupera los cupones (y guarda antes una copia de lo actual)",
+    after.n === 3 && after.motivos[0] === "Antes de restaurar",
+    JSON.stringify(after),
+  );
+  check(
+    "copias: el respaldo descargable usa el mismo formato",
+    await page.evaluate(() => {
+      const p = backupPayload();
+      return p.version === 3 && Array.isArray(p.db.coupons) && typeof p.logos === "object";
+    }),
+  );
+  check(
+    "la app llama a las funciones en /api/ (ya no en /.netlify/)",
+    seen.length > 0 &&
+      !(await page.evaluate(
+        () =>
+          [...document.scripts].length &&
+          performance.getEntriesByType("resource").some((r) => r.name.includes("/.netlify/")),
+      )),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -823,86 +2321,385 @@ section("22. Cupones antes de apostar (boleto sin totales)");
 {
   const { ctx, page } = await open(null);
   const slips = [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/previa-${n}.txt`), "utf8"));
-  const r = await page.evaluate((slips) => slips.map((t) => {
-    const p = parseCoupon(t);
-    return { meta: p.meta, n: p.fixtures.length, legs: p.fixtures.reduce((s, f) => s + f.markets.length, 0),
-      f: p.fixtures.map((f) => ({ h: f.home, a: f.away, iso: f.dateISO, t: f.time, b: f.builderOdd, m: f.markets.map((m) => [m.market, m.pick, m.odd, m.builder ? 1 : 0, m.builderOdd || ""]) })) };
-  }), slips);
+  const r = await page.evaluate(
+    (slips) =>
+      slips.map((t) => {
+        const p = parseCoupon(t);
+        return {
+          meta: p.meta,
+          n: p.fixtures.length,
+          legs: p.fixtures.reduce((s, f) => s + f.markets.length, 0),
+          f: p.fixtures.map((f) => ({
+            h: f.home,
+            a: f.away,
+            iso: f.dateISO,
+            t: f.time,
+            b: f.builderOdd,
+            m: f.markets.map((m) => [m.market, m.pick, m.odd, m.builder ? 1 : 0, m.builderOdd || ""]),
+          })),
+        };
+      }),
+    slips,
+  );
   const [a, b, c] = r;
-  check("previa 1: 11 BetBuilder de selecciones con sus 25 selecciones, fecha, hora y cuota del paquete", a.meta.betslip && a.n === 11 && a.legs === 25 && a.f[0].h === "Senegal" && a.f[0].a === "Sudan" && a.f[0].iso === "2026-11-12" && a.f[0].t === "13:00" && a.f[0].b === "1.16" && JSON.stringify(a.f[0].m[1]) === JSON.stringify(["Doble oportunidad", "1 o empate", "", 1, "1.16"]) && a.f[7].m[1][0] === "Remates - Arda Guler (TUR)" && a.f[7].m[1][1] === "Más de 1.5", JSON.stringify(a.f[0]));
+  check(
+    "previa 1: 11 BetBuilder de selecciones con sus 25 selecciones, fecha, hora y cuota del paquete",
+    a.meta.betslip &&
+      a.n === 11 &&
+      a.legs === 25 &&
+      a.f[0].h === "Senegal" &&
+      a.f[0].a === "Sudan" &&
+      a.f[0].iso === "2026-11-12" &&
+      a.f[0].t === "13:00" &&
+      a.f[0].b === "1.16" &&
+      JSON.stringify(a.f[0].m[1]) === JSON.stringify(["Doble oportunidad", "1 o empate", "", 1, "1.16"]) &&
+      a.f[7].m[1][0] === "Remates - Arda Guler (TUR)" &&
+      a.f[7].m[1][1] === "Más de 1.5",
+    JSON.stringify(a.f[0]),
+  );
   const prod1 = [1.16, 1.26, 1.42, 1.3, 1.2, 1.35, 1.13, 1.52, 1.47, 1.33, 1.8].reduce((x, y) => x * y, 1);
-  check("previa 1: cuota total calculada multiplicando cada BetBuilder una vez", Math.abs(a.meta.oddsProduct - Math.round(prod1 * 100) / 100) < 0.011 && a.meta.stake === null && a.meta.payout === null, a.meta.oddsProduct + " vs " + prod1.toFixed(2));
-  check("previa 2: 4 BetBuilder con 12 selecciones (incluye hándicap y remates)", b.n === 4 && b.legs === 12 && b.f[1].m[1][0] === "Hándicap" && b.f[1].m[1][1] === "2 (+0.5)" && b.f[2].b === "2.20" && b.f[2].m.length === 4, JSON.stringify(b.f[1]));
-  const simple = c.f.filter((f) => !f.b), bb = c.f.filter((f) => f.b);
-  check("previa 3: 18 partidos mezclando simples (con fecha después) y BetBuilder (con fecha antes)", c.n === 18 && c.legs === 22 && simple.length === 14 && bb.length === 4 && c.f[0].h === "FK Bodo Glimt" && c.f[0].iso === "2026-11-24" && c.f[0].t === "11:45" && JSON.stringify(c.f[0].m[0]) === JSON.stringify(["Ambos equipos marcan", "Sí", "1.38", 0, ""]) && c.f[11].m[0][0] === "2 marcará" && c.f[11].m[0][2] === "1.25" && c.f[10].h === "Sabah FC" && c.f[10].iso === "2026-11-25" && c.f[10].b === "1.17", JSON.stringify(c.f.slice(10, 12)));
-  const v4 = await page.evaluate((t) => { const p = parseCoupon(t); const f = p.fixtures[0]; return { slip: p.meta.betslip, n: p.fixtures.length, h: f?.home, a: f?.away, b: f?.builderOdd, iso: f?.dateISO, m: f?.markets.map((m) => m.market + ": " + m.pick) }; }, fs.readFileSync(path.join(ROOT, "pruebas/previa-4.txt"), "utf8"));
-  check("previa 4: equipos en líneas separadas con 'competitor logo' y 'vs' sueltos", v4.slip && v4.n === 1 && v4.h === "Turquía" && v4.a === "Bélgica" && v4.b === "2.40" && v4.iso === "2026-11-12" && v4.m.length === 5 && v4.m[4] === "Total de tarjetas: Más de 2.5" && v4.m[1] === "Remates a Puerta (Arda Guler (TUR)) - Incl. suplente: Más de 0.5", JSON.stringify(v4));
-  const totals = await page.evaluate((t) => parseCoupon(t + "\nCuota total 245.10\nValor total L 50\nBono 5\nGanancia total 12,255.00").meta, slips[2]);
-  check("previa: lee los totales si se pegan al final", totals.odds === 245.1 && totals.stake === 50 && totals.bonus === 5 && totals.payout === 12255, JSON.stringify(totals));
-  const old = await page.evaluate((t) => { const p = parseCoupon(t); return { slip: !!p.meta.betslip, n: p.fixtures.length }; }, fs.readFileSync(path.join(ROOT, "pruebas/doradobet-1.txt"), "utf8"));
+  check(
+    "previa 1: cuota total calculada multiplicando cada BetBuilder una vez",
+    Math.abs(a.meta.oddsProduct - Math.round(prod1 * 100) / 100) < 0.011 &&
+      a.meta.stake === null &&
+      a.meta.payout === null,
+    a.meta.oddsProduct + " vs " + prod1.toFixed(2),
+  );
+  check(
+    "previa 2: 4 BetBuilder con 12 selecciones (incluye hándicap y remates)",
+    b.n === 4 &&
+      b.legs === 12 &&
+      b.f[1].m[1][0] === "Hándicap" &&
+      b.f[1].m[1][1] === "2 (+0.5)" &&
+      b.f[2].b === "2.20" &&
+      b.f[2].m.length === 4,
+    JSON.stringify(b.f[1]),
+  );
+  const simple = c.f.filter((f) => !f.b),
+    bb = c.f.filter((f) => f.b);
+  check(
+    "previa 3: 18 partidos mezclando simples (con fecha después) y BetBuilder (con fecha antes)",
+    c.n === 18 &&
+      c.legs === 22 &&
+      simple.length === 14 &&
+      bb.length === 4 &&
+      c.f[0].h === "FK Bodo Glimt" &&
+      c.f[0].iso === "2026-11-24" &&
+      c.f[0].t === "11:45" &&
+      JSON.stringify(c.f[0].m[0]) === JSON.stringify(["Ambos equipos marcan", "Sí", "1.38", 0, ""]) &&
+      c.f[11].m[0][0] === "2 marcará" &&
+      c.f[11].m[0][2] === "1.25" &&
+      c.f[10].h === "Sabah FC" &&
+      c.f[10].iso === "2026-11-25" &&
+      c.f[10].b === "1.17",
+    JSON.stringify(c.f.slice(10, 12)),
+  );
+  const v4 = await page.evaluate(
+    (t) => {
+      const p = parseCoupon(t);
+      const f = p.fixtures[0];
+      return {
+        slip: p.meta.betslip,
+        n: p.fixtures.length,
+        h: f?.home,
+        a: f?.away,
+        b: f?.builderOdd,
+        iso: f?.dateISO,
+        m: f?.markets.map((m) => m.market + ": " + m.pick),
+      };
+    },
+    fs.readFileSync(path.join(ROOT, "pruebas/previa-4.txt"), "utf8"),
+  );
+  check(
+    "previa 4: equipos en líneas separadas con 'competitor logo' y 'vs' sueltos",
+    v4.slip &&
+      v4.n === 1 &&
+      v4.h === "Turquía" &&
+      v4.a === "Bélgica" &&
+      v4.b === "2.40" &&
+      v4.iso === "2026-11-12" &&
+      v4.m.length === 5 &&
+      v4.m[4] === "Total de tarjetas: Más de 2.5" &&
+      v4.m[1] === "Remates a Puerta (Arda Guler (TUR)) - Incl. suplente: Más de 0.5",
+    JSON.stringify(v4),
+  );
+  const totals = await page.evaluate(
+    (t) => parseCoupon(t + "\nCuota total 245.10\nValor total L 50\nBono 5\nGanancia total 12,255.00").meta,
+    slips[2],
+  );
+  check(
+    "previa: lee los totales si se pegan al final",
+    totals.odds === 245.1 && totals.stake === 50 && totals.bonus === 5 && totals.payout === 12255,
+    JSON.stringify(totals),
+  );
+  const old = await page.evaluate(
+    (t) => {
+      const p = parseCoupon(t);
+      return { slip: !!p.meta.betslip, n: p.fixtures.length };
+    },
+    fs.readFileSync(path.join(ROOT, "pruebas/doradobet-1.txt"), "utf8"),
+  );
   check("los cupones ya apostados siguen usando su lector", !old.slip && old.n > 10, JSON.stringify(old));
-  const players = await page.evaluate(() => ["Remates - Arda Guler (TUR)", "Remates a Puerta - Harry Kane (ENG)", "Remates (Lopez Fermin (ESP)) y suplente"].map((mk) => parsePlayerBet({ market: mk, pick: "Más de 1.5" }, { home: "Turquía", away: "Bélgica" })?.name || null));
-  check("jugadores en el formato del boleto: Arda Guler, Harry Kane, Lopez Fermin", players.join("|") === "Arda Guler|Harry Kane|Lopez Fermin", players.join("|"));
+  const players = await page.evaluate(() =>
+    [
+      "Remates - Arda Guler (TUR)",
+      "Remates a Puerta - Harry Kane (ENG)",
+      "Remates (Lopez Fermin (ESP)) y suplente",
+    ].map(
+      (mk) =>
+        parsePlayerBet({ market: mk, pick: "Más de 1.5" }, { home: "Turquía", away: "Bélgica" })?.name ||
+        null,
+    ),
+  );
+  check(
+    "jugadores en el formato del boleto: Arda Guler, Harry Kane, Lopez Fermin",
+    players.join("|") === "Arda Guler|Harry Kane|Lopez Fermin",
+    players.join("|"),
+  );
   await view(page, "new");
-  await page.fill("#raw", slips[2]); await tap(page, "#readBtn"); await page.waitForTimeout(300);
-  const ui = await page.evaluate(() => ({ odds: $("totalOdds").value, hint: $("slipHint").innerText, need: ["stake", "bonus", "payout"].filter((id) => $(id).classList.contains("need-input")), risk: !!document.querySelector("#riskBox .risk-card") }));
-  check("Nuevo cupón: pone la cuota calculada, avisa qué falta y resalta valor apostado y ganancia", Number(ui.odds) > 100 && /antes de apostar/i.test(ui.hint) && /valor apostado/.test(ui.hint) && ui.need.includes("stake") && ui.need.includes("payout") && ui.risk, JSON.stringify(ui));
+  await page.fill("#raw", slips[2]);
+  await tap(page, "#readBtn");
+  await page.waitForTimeout(300);
+  const ui = await page.evaluate(() => ({
+    odds: $("totalOdds").value,
+    hint: $("slipHint").innerText,
+    need: ["stake", "bonus", "payout"].filter((id) => $(id).classList.contains("need-input")),
+    risk: !!document.querySelector("#riskBox .risk-card"),
+  }));
+  check(
+    "Nuevo cupón: pone la cuota calculada, avisa qué falta y resalta valor apostado y ganancia",
+    Number(ui.odds) > 100 &&
+      /antes de apostar/i.test(ui.hint) &&
+      /valor apostado/.test(ui.hint) &&
+      ui.need.includes("stake") &&
+      ui.need.includes("payout") &&
+      ui.risk,
+    JSON.stringify(ui),
+  );
   await page.fill("#stake", "20");
-  check("al escribir el valor apostado deja de estar resaltado", !(await page.$eval("#stake", (e) => e.classList.contains("need-input"))));
-  const ph = await page.$eval("#payout", (e) => ({ ph: e.placeholder, need: e.classList.contains("need-input") }));
+  check(
+    "al escribir el valor apostado deja de estar resaltado",
+    !(await page.$eval("#stake", (e) => e.classList.contains("need-input"))),
+  );
+  const ph = await page.$eval("#payout", (e) => ({
+    ph: e.placeholder,
+    need: e.classList.contains("need-input"),
+  }));
   const oddsNow = Number(await page.$eval("#totalOdds", (e) => e.value));
-  check("ganancia total vacía: muestra la calculada (valor × cuota) y deja de pedirla", ph.ph === (20 * oddsNow).toFixed(2) + " (calculada)" && !ph.need, JSON.stringify(ph));
+  check(
+    "ganancia total vacía: muestra la calculada (valor × cuota) y deja de pedirla",
+    ph.ph === (20 * oddsNow).toFixed(2) + " (calculada)" && !ph.need,
+    JSON.stringify(ph),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
 
 section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
 {
-  const now = Date.now(), day = isoDay(now), time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
-  const fx = (id, markets) => ({ id, home: "Italia", away: "Francia", competition: "UEFA Nations League", dateISO: day, time, builderOdd: "1.80", markets });
-  const mk = (market, pick, builder = true) => ({ market, pick, odd: "", builder, builderOdd: "1.80", settlement: "pending" });
-  const db = { coupons: [
-    { id: "C1", name: "Cupón 1", created: new Date(now).toISOString(), stake: 5, odds: 1.8, payout: 9, fixtures: [fx("a", [mk("Total", "Más de 1.5"), mk("Remates a Puerta - Michael Olise (FRA)", "Más de 0.5"), mk("Remates (Michael Olise (FRA)) y suplente", "Más de 2.5")])] },
-    { id: "C2", name: "Cupón 2", created: new Date(now).toISOString(), stake: 5, odds: 1.8, payout: 9, fixtures: [fx("b", [mk("Total de goles", "Más de 1.5"), mk("Remates a Puerta (Michael Olise (FRA)) - Incl. suplente", "Más de 1.5"), mk("Remates - Michael Olise (FRA)", "Más de 1.5")])] },
-  ], houses: [], transactions: [], resultHistory: [], actionHistory: [],
+  const now = Date.now(),
+    day = isoDay(now),
+    time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
+  const fx = (id, markets) => ({
+    id,
+    home: "Italia",
+    away: "Francia",
+    competition: "UEFA Nations League",
+    dateISO: day,
+    time,
+    builderOdd: "1.80",
+    markets,
+  });
+  const mk = (market, pick, builder = true) => ({
+    market,
+    pick,
+    odd: "",
+    builder,
+    builderOdd: "1.80",
+    settlement: "pending",
+  });
+  const db = {
+    coupons: [
+      {
+        id: "C1",
+        name: "Cupón 1",
+        created: new Date(now).toISOString(),
+        stake: 5,
+        odds: 1.8,
+        payout: 9,
+        fixtures: [
+          fx("a", [
+            mk("Total", "Más de 1.5"),
+            mk("Remates a Puerta - Michael Olise (FRA)", "Más de 0.5"),
+            mk("Remates (Michael Olise (FRA)) y suplente", "Más de 2.5"),
+          ]),
+        ],
+      },
+      {
+        id: "C2",
+        name: "Cupón 2",
+        created: new Date(now).toISOString(),
+        stake: 5,
+        odds: 1.8,
+        payout: 9,
+        fixtures: [
+          fx("b", [
+            mk("Total de goles", "Más de 1.5"),
+            mk("Remates a Puerta (Michael Olise (FRA)) - Incl. suplente", "Más de 1.5"),
+            mk("Remates - Michael Olise (FRA)", "Más de 1.5"),
+          ]),
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
     // contadores viejos (uno por mercado) para probar el paso al marcador
-    progress: {} };
+    progress: {},
+  };
   const { ctx, page } = await open(db);
-  await page.evaluate(() => { const f = db.coupons[1].fixtures[0], m = f.markets[2]; db.progress[marketKey(f, m)] = { count: 1, updatedAt: "2026-11-12T10:00:00Z" }; db.statsMigrated = false; migrateProgressToStats(); save(); renderAll(); });
-  const mig = await page.evaluate(() => { const s = Object.values(db.stats)[0]; return s.players[crestNorm("Michael Olise")]; });
-  check("los contadores viejos pasan al marcador del partido", mig?.shots === 1 && mig.onTarget === 0, JSON.stringify(mig));
-  await page.evaluate(() => { db.stats = {}; save(); renderAll(); }); // se empieza el partido desde cero
-  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
-  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(200);
-  const cards = await page.$$eval(".match-tab-content > .mk-card", (els) => els.map((e) => e.innerText.replace(/\s+/g, " ")));
-  check("'Total · Más de 1.5' y 'Total de goles · Más de 1.5' de cupones distintos se ven en una sola tarjeta", cards.filter((t) => /Más de 1.5/.test(t) && /^(Total|⚽|🥅)/.test(t.replace(/^\S+\s/, "")) && /Total/.test(t) && !/Olise/.test(t)).length === 1 && cards.length === 5, cards.join(" || "));
+  await page.evaluate(() => {
+    const f = db.coupons[1].fixtures[0],
+      m = f.markets[2];
+    db.progress[marketKey(f, m)] = { count: 1, updatedAt: "2026-11-12T10:00:00Z" };
+    db.statsMigrated = false;
+    migrateProgressToStats();
+    save();
+    renderAll();
+  });
+  const mig = await page.evaluate(() => {
+    const s = Object.values(db.stats)[0];
+    return s.players[crestNorm("Michael Olise")];
+  });
+  check(
+    "los contadores viejos pasan al marcador del partido",
+    mig?.shots === 1 && mig.onTarget === 0,
+    JSON.stringify(mig),
+  );
+  await page.evaluate(() => {
+    db.stats = {};
+    save();
+    renderAll();
+  }); // se empieza el partido desde cero
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click());
+  await page.waitForTimeout(200);
+  const cards = await page.$$eval(".match-tab-content > .mk-card", (els) =>
+    els.map((e) => e.innerText.replace(/\s+/g, " ")),
+  );
+  check(
+    "'Total · Más de 1.5' y 'Total de goles · Más de 1.5' de cupones distintos se ven en una sola tarjeta",
+    cards.filter(
+      (t) =>
+        /Más de 1.5/.test(t) &&
+        /^(Total|⚽|🥅)/.test(t.replace(/^\S+\s/, "")) &&
+        /Total/.test(t) &&
+        !/Olise/.test(t),
+    ).length === 1 && cards.length === 5,
+    cards.join(" || "),
+  );
   const board = await page.$eval(".live-board", (e) => e.innerText.replace(/\s+/g, " "));
-  check("marcador: goles y una ficha de Olise con 'Remates (tiros totales)', 'Remates a puerta' y su suplente", /Goles/.test(board) && /Michael Olise/.test(board) && /Remates \(tiros totales\)/.test(board) && /Remates a puerta/.test(board) && !/Fuera/.test(board) && /Agregar suplente de Olise/.test(board), board);
-  const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
+  check(
+    "marcador: goles y una ficha de Olise con 'Remates (tiros totales)', 'Remates a puerta' y su suplente",
+    /Goles/.test(board) &&
+      /Michael Olise/.test(board) &&
+      /Remates \(tiros totales\)/.test(board) &&
+      /Remates a puerta/.test(board) &&
+      !/Fuera/.test(board) &&
+      /Agregar suplente de Olise/.test(board),
+    board,
+  );
+  const stBtn = (target, step = 1) =>
+    `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
   const pk = await page.evaluate(() => crestNorm("Michael Olise"));
-  const status = () => page.evaluate(() => db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "));
-  for (let i = 0; i < 2; i++) { await tap(page, stBtn("goals:home")); await page.waitForTimeout(100); }
-  check("2 goles: las dos líneas de +1.5 (una en cada cupón) quedan ganadas a la vez", (await status()) === "wpp wpp", await status());
-  await tap(page, stBtn(`player:${pk}:main:onTarget`)); await page.waitForTimeout(150);
-  const s1 = await page.evaluate((pk) => ({ st: db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "), p: Object.values(db.stats)[0].players[pk] }), pk);
-  check("1 a puerta de Olise: '+0.5 a puerta (solo él)' ganada; '+1.5 con suplente' espera; también suma 1 remate", s1.st === "wwp wpp" && s1.p.onTarget === 1 && s1.p.shots === 1, JSON.stringify(s1));
+  const status = () =>
+    page.evaluate(() =>
+      db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "),
+    );
+  for (let i = 0; i < 2; i++) {
+    await tap(page, stBtn("goals:home"));
+    await page.waitForTimeout(100);
+  }
+  check(
+    "2 goles: las dos líneas de +1.5 (una en cada cupón) quedan ganadas a la vez",
+    (await status()) === "wpp wpp",
+    await status(),
+  );
+  await tap(page, stBtn(`player:${pk}:main:onTarget`));
+  await page.waitForTimeout(150);
+  const s1 = await page.evaluate(
+    (pk) => ({
+      st: db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "),
+      p: Object.values(db.stats)[0].players[pk],
+    }),
+    pk,
+  );
+  check(
+    "1 a puerta de Olise: '+0.5 a puerta (solo él)' ganada; '+1.5 con suplente' espera; también suma 1 remate",
+    s1.st === "wwp wpp" && s1.p.onTarget === 1 && s1.p.shots === 1,
+    JSON.stringify(s1),
+  );
   page.promptAnswer = "Kolo Muani";
-  await tap(page, ".live-board [data-st-sub-add]"); await page.waitForTimeout(400);
-  await tap(page, stBtn(`player:${pk}:sub:onTarget`)); await page.waitForTimeout(150);
-  check("suplente 1 a puerta: '+1.5 a puerta con suplente' ganada (1 + 1); 'remates +1.5 solo él' sigue esperando", (await status()) === "wwp wwp", await status());
-  await tap(page, stBtn(`player:${pk}:main:shots`)); await page.waitForTimeout(150);
-  check("Olise llega a 2 remates (1 a puerta + 1 más): '+1.5 remates solo él' ganada; '+2.5 con suplente' (2 + 1 = 3) también", (await status()) === "www www", await status());
-  await tap(page, stBtn(`player:${pk}:main:shots`, -1)); await page.waitForTimeout(150);
-  check("si restas, las líneas que ganó el marcador vuelven a pendiente", (await status()) === "wwp wwp", await status());
+  await tap(page, ".live-board [data-st-sub-add]");
+  await page.waitForTimeout(400);
+  await tap(page, stBtn(`player:${pk}:sub:onTarget`));
+  await page.waitForTimeout(150);
+  check(
+    "suplente 1 a puerta: '+1.5 a puerta con suplente' ganada (1 + 1); 'remates +1.5 solo él' sigue esperando",
+    (await status()) === "wwp wwp",
+    await status(),
+  );
+  await tap(page, stBtn(`player:${pk}:main:shots`));
+  await page.waitForTimeout(150);
+  check(
+    "Olise llega a 2 remates (1 a puerta + 1 más): '+1.5 remates solo él' ganada; '+2.5 con suplente' (2 + 1 = 3) también",
+    (await status()) === "www www",
+    await status(),
+  );
+  await tap(page, stBtn(`player:${pk}:main:shots`, -1));
+  await page.waitForTimeout(150);
+  check(
+    "si restas, las líneas que ganó el marcador vuelven a pendiente",
+    (await status()) === "wwp wwp",
+    await status(),
+  );
   // Tu ejemplo: 2 a puerta = 2 remates → se ganan "a puerta +0.5" y "remates +1.5"
-  const ex = await page.evaluate(() => [lineValueFromStats({ players: { x: { onTarget: 2, shots: 2 } } }, { type: "player", stat: "shots", playerKey: "x" }), lineValueFromStats({ players: { x: { onTarget: 1, off: 1 } } }, { type: "player", stat: "shots", playerKey: "x" })]);
-  check("2 a puerta cuentan como 2 remates; los datos de la versión anterior (a puerta + fuera) se convierten al total", ex.join() === "2,2", ex.join());
+  const ex = await page.evaluate(() => [
+    lineValueFromStats(
+      { players: { x: { onTarget: 2, shots: 2 } } },
+      { type: "player", stat: "shots", playerKey: "x" },
+    ),
+    lineValueFromStats(
+      { players: { x: { onTarget: 1, off: 1 } } },
+      { type: "player", stat: "shots", playerKey: "x" },
+    ),
+  ]);
+  check(
+    "2 a puerta cuentan como 2 remates; los datos de la versión anterior (a puerta + fuera) se convierten al total",
+    ex.join() === "2,2",
+    ex.join(),
+  );
   // Escribir el número (copiado de Sofascore): Esposito-Olise remates 4, a puerta 2
-  await page.evaluate(() => { db.stats = {}; save(); renderAll(); }); await page.waitForTimeout(100);
-  page.promptAnswer = "4"; await tap(page, `.live-board button[data-st-set][data-st-target="player:${pk}:main:shots"]`); await page.waitForTimeout(150);
-  page.promptAnswer = "2"; await tap(page, `.live-board button[data-st-set][data-st-target="player:${pk}:main:onTarget"]`); await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    db.stats = {};
+    save();
+    renderAll();
+  });
+  await page.waitForTimeout(100);
+  page.promptAnswer = "4";
+  await tap(page, `.live-board button[data-st-set][data-st-target="player:${pk}:main:shots"]`);
+  await page.waitForTimeout(150);
+  page.promptAnswer = "2";
+  await tap(page, `.live-board button[data-st-set][data-st-target="player:${pk}:main:onTarget"]`);
+  await page.waitForTimeout(150);
   const typed = await page.evaluate((pk) => Object.values(db.stats)[0].players[pk], pk);
-  check("tocar el número para escribirlo: remates 4 y a puerta 2 (el total no se infla)", typed.shots === 4 && typed.onTarget === 2, JSON.stringify(typed));
+  check(
+    "tocar el número para escribirlo: remates 4 y a puerta 2 (el total no se infla)",
+    typed.shots === 4 && typed.onTarget === 2,
+    JSON.stringify(typed),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -910,41 +2707,126 @@ section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
 section("24. El análisis se guarda en el cupón y se compara con el resultado");
 {
   const { ctx, page } = await open(baseDb());
-  const pure = await page.evaluate(() => ({ s: stripAiJson("Hola\n<kal-json>{\"a\":1}</kal-json>"), partial: stripAiJson("Hola\n<kal-json>{\"a\""), v: parseAiVerdict("x <kal-json>{\"veredicto\":\"razonable\"}</kal-json>")?.veredicto }));
-  check("el bloque de datos se oculta (también a medias) y se lee", pure.s === "Hola" && pure.partial === "Hola" && pure.v === "razonable", JSON.stringify(pure));
-  await page.evaluate(() => { analystSave({ clave: "secreto" }); });
+  const pure = await page.evaluate(() => ({
+    s: stripAiJson('Hola\n<kal-json>{"a":1}</kal-json>'),
+    partial: stripAiJson('Hola\n<kal-json>{"a"'),
+    v: parseAiVerdict('x <kal-json>{"veredicto":"razonable"}</kal-json>')?.veredicto,
+  }));
+  check(
+    "el bloque de datos se oculta (también a medias) y se lee",
+    pure.s === "Hola" && pure.partial === "Hola" && pure.v === "razonable",
+    JSON.stringify(pure),
+  );
+  await page.evaluate(() => {
+    analystSave({ clave: "secreto" });
+  });
   await view(page, "analyst");
   await page.selectOption("#analystCouponPick", "A");
-  await tap(page, '[data-analyst-run="cupon"]'); await page.waitForTimeout(1200);
+  await tap(page, '[data-analyst-run="cupon"]');
+  await page.waitForTimeout(1200);
   const shown = await page.$eval("#analystOut-cupon", (e) => e.innerText);
-  const a = await page.evaluate(() => { const c = db.coupons.find((x) => x.id === "A"); return { has: !!c.analysis, ver: c.analysis?.veredicto, ai: c.fixtures[0].markets.map((m) => m.ai || null), cloud: JSON.stringify(db).includes("analysis") }; });
-  check("revisión de un cupón pendiente: se guarda en el cupón (viaja con la nube) sin mostrar el bloque de datos", a.has && a.ver === "arriesgado" && a.cloud && !/kal-json/.test(shown), JSON.stringify(a));
+  const a = await page.evaluate(() => {
+    const c = db.coupons.find((x) => x.id === "A");
+    return {
+      has: !!c.analysis,
+      ver: c.analysis?.veredicto,
+      ai: c.fixtures[0].markets.map((m) => m.ai || null),
+      cloud: JSON.stringify(db).includes("analysis"),
+    };
+  });
+  check(
+    "revisión de un cupón pendiente: se guarda en el cupón (viaja con la nube) sin mostrar el bloque de datos",
+    a.has && a.ver === "arriesgado" && a.cloud && !/kal-json/.test(shown),
+    JSON.stringify(a),
+  );
   const sent = analystPosts.at(-1).datos;
-  check("la app envía los partidos del cupón (equipos y fecha) para consultar sus datos", sent.partidos?.length === 2 && sent.partidos[0].local === "Fenerbahce" && /^\d{4}-\d{2}-\d{2}$/.test(sent.partidos[0].fecha), JSON.stringify(sent.partidos));
-  check("cada selección guarda también la probabilidad que dio el Analista", a.ai[0]?.p === 0.9 && a.ai[1]?.p === 0.55, JSON.stringify(a.ai));
-  check("cada selección queda con su confianza y el eslabón débil marcado", a.ai[0]?.nivel === "Alta" && !a.ai[0]?.debil && a.ai[1]?.nivel === "Baja" && a.ai[1]?.debil === true, JSON.stringify(a.ai));
-  await page.evaluate(() => { const f = db.coupons.find((x) => x.id === "A").fixtures[0]; setMarketStatus(marketKey(f, f.markets[1]), "lost"); });
+  check(
+    "la app envía los partidos del cupón (equipos y fecha) para consultar sus datos",
+    sent.partidos?.length === 2 &&
+      sent.partidos[0].local === "Fenerbahce" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(sent.partidos[0].fecha),
+    JSON.stringify(sent.partidos),
+  );
+  check(
+    "cada selección guarda también la probabilidad que dio el Analista",
+    a.ai[0]?.p === 0.9 && a.ai[1]?.p === 0.55,
+    JSON.stringify(a.ai),
+  );
+  check(
+    "cada selección queda con su confianza y el eslabón débil marcado",
+    a.ai[0]?.nivel === "Alta" && !a.ai[0]?.debil && a.ai[1]?.nivel === "Baja" && a.ai[1]?.debil === true,
+    JSON.stringify(a.ai),
+  );
+  await page.evaluate(() => {
+    const f = db.coupons.find((x) => x.id === "A").fixtures[0];
+    setMarketStatus(marketKey(f, f.markets[1]), "lost");
+  });
   await page.waitForTimeout(400);
   await page.evaluate(() => document.querySelector(".result-card-wrap")?.click());
   const out = await page.evaluate(() => couponAiOutcome(db.coupons.find((x) => x.id === "A")));
-  check("cupón perdido por el eslabón débil: 'El Analista lo vio venir'", out.kind === "good" && /lo vio venir/.test(out.text) && /Ambos equipos marcan/.test(out.text), JSON.stringify(out));
-  await view(page, "saved"); await page.evaluate(() => document.querySelector('[data-coupon-filter="lost"]')?.click()); await page.waitForTimeout(150);
-  check("Mis cupones muestra el resultado del Analista y su análisis plegado", /lo vio venir/.test(await page.$eval("#couponList", (e) => e.innerText)) && !!(await page.$("#couponList details.coupon-ai .analyst-md")));
+  check(
+    "cupón perdido por el eslabón débil: 'El Analista lo vio venir'",
+    out.kind === "good" && /lo vio venir/.test(out.text) && /Ambos equipos marcan/.test(out.text),
+    JSON.stringify(out),
+  );
+  await view(page, "saved");
+  await page.evaluate(() => document.querySelector('[data-coupon-filter="lost"]')?.click());
+  await page.waitForTimeout(150);
+  check(
+    "Mis cupones muestra el resultado del Analista y su análisis plegado",
+    /lo vio venir/.test(await page.$eval("#couponList", (e) => e.innerText)) &&
+      !!(await page.$("#couponList details.coupon-ai .analyst-md")),
+  );
   await view(page, "stats");
   const stx = await page.$eval("#perfSection", (e) => e.innerText.replace(/\s+/g, " "));
-  check("Estadísticas: el Analista frente a tus resultados", /El Analista frente a tus resultados/.test(stx) && /Confianza Baja 1 selecciones resueltas 0 % acertadas/.test(stx) && /1 de 1/.test(stx), stx.match(/El Analista frente[^]*?Según tu confianza/)?.[0]);
+  check(
+    "Estadísticas: el Analista frente a tus resultados",
+    /El Analista frente a tus resultados/.test(stx) &&
+      /Confianza Baja 1 selecciones resueltas 0 % acertadas/.test(stx) &&
+      /1 de 1/.test(stx),
+    stx.match(/El Analista frente[^]*?Según tu confianza/)?.[0],
+  );
   const prec = await page.evaluate(() => aiPrecisionPayload());
-  check("calibración: probabilidad media que dio frente al acierto real, y se le envía en la siguiente revisión", prec.calibracion?.selecciones === 1 && prec.calibracion.probabilidadMediaQueDiste === 0.55 && prec.calibracion.aciertoReal === 0 && prec.porConfianza.Baja.falladas === 1, JSON.stringify(prec));
-  check("el Analista recibe su propia precisión", await page.evaluate(() => analystHistoryPayload().precisionAnalista?.perdidosQueVioVenir === 1));
+  check(
+    "calibración: probabilidad media que dio frente al acierto real, y se le envía en la siguiente revisión",
+    prec.calibracion?.selecciones === 1 &&
+      prec.calibracion.probabilidadMediaQueDiste === 0.55 &&
+      prec.calibracion.aciertoReal === 0 &&
+      prec.porConfianza.Baja.falladas === 1,
+    JSON.stringify(prec),
+  );
+  check(
+    "el Analista recibe su propia precisión",
+    await page.evaluate(() => analystHistoryPayload().precisionAnalista?.perdidosQueVioVenir === 1),
+  );
   // Desde Nuevo cupón: analizar y después guardar
   await view(page, "new");
-  await page.fill("#raw", "Europa, UEFA Liga Campeones\nFenerbahce\nvs.\nLiverpool\n20/11/2026 • 14:00\nTotal de goles: Más de 1.5\nCuotas: 1.50\nAmbos equipos marcan: Sí\nCuotas: 1.70\nVALOR APOSTADO L 20.00");
-  await tap(page, "#readBtn"); await page.waitForTimeout(250);
-  await tap(page, "[data-analyst-preview]"); await page.waitForTimeout(1300);
+  await page.fill(
+    "#raw",
+    "Europa, UEFA Liga Campeones\nFenerbahce\nvs.\nLiverpool\n20/11/2026 • 14:00\nTotal de goles: Más de 1.5\nCuotas: 1.50\nAmbos equipos marcan: Sí\nCuotas: 1.70\nVALOR APOSTADO L 20.00",
+  );
+  await tap(page, "#readBtn");
+  await page.waitForTimeout(250);
+  await tap(page, "[data-analyst-preview]");
+  await page.waitForTimeout(1300);
   const pend = await page.evaluate(() => !!analystState().pendiente);
-  await tap(page, "#saveBtn"); await page.waitForTimeout(300);
-  const saved = await page.evaluate(() => ({ has: !!db.coupons[0].analysis, ai: db.coupons[0].fixtures[0].markets.map((m) => m.ai?.nivel || null), left: !!analystState().pendiente, toast: $("toast").textContent }));
-  check("desde Nuevo cupón: el análisis espera y se pega al guardar el cupón", pend && saved.has && saved.ai.join() === "Alta,Baja" && !saved.left && /Con su análisis/.test(saved.toast), JSON.stringify(saved));
+  await tap(page, "#saveBtn");
+  await page.waitForTimeout(300);
+  const saved = await page.evaluate(() => ({
+    has: !!db.coupons[0].analysis,
+    ai: db.coupons[0].fixtures[0].markets.map((m) => m.ai?.nivel || null),
+    left: !!analystState().pendiente,
+    toast: $("toast").textContent,
+  }));
+  check(
+    "desde Nuevo cupón: el análisis espera y se pega al guardar el cupón",
+    pend &&
+      saved.has &&
+      saved.ai.join() === "Alta,Baja" &&
+      !saved.left &&
+      /Con su análisis/.test(saved.toast),
+    JSON.stringify(saved),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -954,166 +2836,803 @@ section("25. Búsqueda de logos en varias fuentes, en español e inglés");
   const N = await import(path.join(ROOT, "servidor/nombres.mjs"));
   const L = await import(path.join(ROOT, "servidor/buscar-logos.mjs"));
   const G = await import(path.join(ROOT, "servidor/logo.mjs"));
-  check("países y selecciones en español o inglés → bandera", N.findCountry("España")?.flag === "es" && N.findCountry("Selección de Inglaterra")?.flag === "gb-eng" && N.findCountry("Ivory Coast")?.es === "Costa de Marfil" && N.findCountry("Países Bajos")?.en === "Netherlands" && N.findCountry("RD Congo")?.flag === "cd" && !N.findCountry("Real Madrid"));
-  check("ligas: nombre en español → país y código", N.leagueInfo("LaLiga EA Sports").code === "PD" && N.leagueInfo("Liga MX").country === "Mexico" && N.leagueInfo("UEFA Liga Campeones").code === "CL");
+  check(
+    "países y selecciones en español o inglés → bandera",
+    N.findCountry("España")?.flag === "es" &&
+      N.findCountry("Selección de Inglaterra")?.flag === "gb-eng" &&
+      N.findCountry("Ivory Coast")?.es === "Costa de Marfil" &&
+      N.findCountry("Países Bajos")?.en === "Netherlands" &&
+      N.findCountry("RD Congo")?.flag === "cd" &&
+      !N.findCountry("Real Madrid"),
+  );
+  check(
+    "ligas: nombre en español → país y código",
+    N.leagueInfo("LaLiga EA Sports").code === "PD" &&
+      N.leagueInfo("Liga MX").country === "Mexico" &&
+      N.leagueInfo("UEFA Liga Campeones").code === "CL",
+  );
   const calls = [];
   const fakeFetch = async (url, init) => {
-    const u = String(url); calls.push(u);
+    const u = String(url);
+    calls.push(u);
     const ok = (d) => ({ ok: true, status: 200, json: async () => d });
     if (u.includes("api.football-data.org/v4/competitions/") && u.endsWith("/teams")) {
       const code = u.split("/").at(-2);
-      return ok({ teams: code === "BL1" ? [{ name: "FC Bayern München", shortName: "Bayern", tla: "FCB", area: { name: "Germany" }, crest: "https://crests.football-data.org/5.png" }] : [] });
+      return ok({
+        teams:
+          code === "BL1"
+            ? [
+                {
+                  name: "FC Bayern München",
+                  shortName: "Bayern",
+                  tla: "FCB",
+                  area: { name: "Germany" },
+                  crest: "https://crests.football-data.org/5.png",
+                },
+              ]
+            : [],
+      });
     }
-    if (u.endsWith("api.football-data.org/v4/competitions")) return ok({ competitions: [{ code: "PD", name: "Primera Division", area: { name: "Spain" }, emblem: "https://crests.football-data.org/PD.png" }, { code: "CL", name: "UEFA Champions League", area: { name: "Europe" }, emblem: "https://crests.football-data.org/CL.png" }] });
-    if (u.includes("wbsearchentities")) return ok({ search: /bayern/i.test(decodeURIComponent(u)) ? [{ id: "Q15789" }] : /liga[+ ]mx/i.test(decodeURIComponent(u)) ? [{ id: "Q1068" }] : [] });
-    if (u.includes("wbgetentities")) return ok({ entities: {
-      Q15789: { id: "Q15789", labels: { es: { value: "FC Bayern de Múnich" }, en: { value: "FC Bayern Munich" } }, descriptions: { es: { value: "club de fútbol alemán" } }, claims: { P154: [{ mainsnak: { datavalue: { value: "FC Bayern München logo (2017).svg" } } }] } },
-      Q1068: { id: "Q1068", labels: { es: { value: "Liga MX" }, en: { value: "Liga MX" } }, descriptions: { es: { value: "liga de fútbol de México" } }, claims: { P154: [{ mainsnak: { datavalue: { value: "Liga MX logo.svg" } } }] } } } });
-    if (u.includes("searchteams.php")) return ok({ teams: /bayern/i.test(decodeURIComponent(u)) ? [{ strTeam: "Bayern Munich", strCountry: "Germany", strSport: "Soccer", strBadge: "https://r2.thesportsdb.com/images/media/team/badge/b.png" }] : null });
-    if (u.includes("search_all_leagues.php")) return ok({ countries: /Mexico/.test(u) ? [{ strLeague: "Mexican Primera League", strLeagueAlternate: "Liga MX", strCountry: "Mexico", strBadge: "https://r2.thesportsdb.com/images/media/league/badge/mx.png" }] : [] });
+    if (u.endsWith("api.football-data.org/v4/competitions"))
+      return ok({
+        competitions: [
+          {
+            code: "PD",
+            name: "Primera Division",
+            area: { name: "Spain" },
+            emblem: "https://crests.football-data.org/PD.png",
+          },
+          {
+            code: "CL",
+            name: "UEFA Champions League",
+            area: { name: "Europe" },
+            emblem: "https://crests.football-data.org/CL.png",
+          },
+        ],
+      });
+    if (u.includes("wbsearchentities"))
+      return ok({
+        search: /bayern/i.test(decodeURIComponent(u))
+          ? [{ id: "Q15789" }]
+          : /liga[+ ]mx/i.test(decodeURIComponent(u))
+            ? [{ id: "Q1068" }]
+            : [],
+      });
+    if (u.includes("wbgetentities"))
+      return ok({
+        entities: {
+          Q15789: {
+            id: "Q15789",
+            labels: { es: { value: "FC Bayern de Múnich" }, en: { value: "FC Bayern Munich" } },
+            descriptions: { es: { value: "club de fútbol alemán" } },
+            claims: { P154: [{ mainsnak: { datavalue: { value: "FC Bayern München logo (2017).svg" } } }] },
+          },
+          Q1068: {
+            id: "Q1068",
+            labels: { es: { value: "Liga MX" }, en: { value: "Liga MX" } },
+            descriptions: { es: { value: "liga de fútbol de México" } },
+            claims: { P154: [{ mainsnak: { datavalue: { value: "Liga MX logo.svg" } } }] },
+          },
+        },
+      });
+    if (u.includes("searchteams.php"))
+      return ok({
+        teams: /bayern/i.test(decodeURIComponent(u))
+          ? [
+              {
+                strTeam: "Bayern Munich",
+                strCountry: "Germany",
+                strSport: "Soccer",
+                strBadge: "https://r2.thesportsdb.com/images/media/team/badge/b.png",
+              },
+            ]
+          : null,
+      });
+    if (u.includes("search_all_leagues.php"))
+      return ok({
+        countries: /Mexico/.test(u)
+          ? [
+              {
+                strLeague: "Mexican Primera League",
+                strLeagueAlternate: "Liga MX",
+                strCountry: "Mexico",
+                strBadge: "https://r2.thesportsdb.com/images/media/league/badge/mx.png",
+              },
+            ]
+          : [],
+      });
     return { ok: false, status: 404, json: async () => ({}) };
   };
-  const mem = new Map(), store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
-  const run = async (q) => (await (await L.buscarLogos(new Request("https://x/api/buscar-logo?" + new URLSearchParams(q)), { footballDataKey: "k", store, fetchImpl: fakeFetch })).json());
+  const mem = new Map(),
+    store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
+  const run = async (q) =>
+    await (
+      await L.buscarLogos(new Request("https://x/api/buscar-logo?" + new URLSearchParams(q)), {
+        footballDataKey: "k",
+        store,
+        fetchImpl: fakeFetch,
+      })
+    ).json();
   const b = await run({ tipo: "equipo", q: "Bayern Múnich", pais: "Alemania" });
-  check("'Bayern Múnich' (en español) encuentra el escudo en football-data, Wikipedia y TheSportsDB; el país sale en español", b.options.length === 3 && b.options[0].source === "football-data.org" && b.options.some((o) => o.source === "Wikipedia" && /Special:FilePath\/FC_Bayern_M%C3%BCnchen_logo/.test(o.logo)) && b.options.some((o) => o.source === "TheSportsDB") && b.options[0].country === "Alemania", JSON.stringify(b.options.map((o) => o.source + ":" + o.name + ":" + o.country)));
-  check("Wikipedia se consulta en español e inglés y con una identificación de la app (sin datos personales)", calls.some((u) => u.includes("language=es")) && calls.some((u) => u.includes("language=en")));
+  check(
+    "'Bayern Múnich' (en español) encuentra el escudo en football-data, Wikipedia y TheSportsDB; el país sale en español",
+    b.options.length === 3 &&
+      b.options[0].source === "football-data.org" &&
+      b.options.some(
+        (o) => o.source === "Wikipedia" && /Special:FilePath\/FC_Bayern_M%C3%BCnchen_logo/.test(o.logo),
+      ) &&
+      b.options.some((o) => o.source === "TheSportsDB") &&
+      b.options[0].country === "Alemania",
+    JSON.stringify(b.options.map((o) => o.source + ":" + o.name + ":" + o.country)),
+  );
+  check(
+    "Wikipedia se consulta en español e inglés y con una identificación de la app (sin datos personales)",
+    calls.some((u) => u.includes("language=es")) && calls.some((u) => u.includes("language=en")),
+  );
   const e = await run({ tipo: "equipo", q: "Selección de España" });
-  check("selección nacional: bandera por su nombre en español", e.options[0]?.source === "Bandera" && e.options[0].logo === "https://flagcdn.com/w160/es.png", JSON.stringify(e.options));
+  check(
+    "selección nacional: bandera por su nombre en español",
+    e.options[0]?.source === "Bandera" && e.options[0].logo === "https://flagcdn.com/w160/es.png",
+    JSON.stringify(e.options),
+  );
   const lmx = await run({ tipo: "liga", q: "Liga MX" });
-  check("liga: 'Liga MX' en Wikipedia y en TheSportsDB (por país)", lmx.options.some((o) => o.source === "Wikipedia") && lmx.options.some((o) => o.source === "TheSportsDB" && /mx\.png/.test(o.logo)), JSON.stringify(lmx.options));
+  check(
+    "liga: 'Liga MX' en Wikipedia y en TheSportsDB (por país)",
+    lmx.options.some((o) => o.source === "Wikipedia") &&
+      lmx.options.some((o) => o.source === "TheSportsDB" && /mx\.png/.test(o.logo)),
+    JSON.stringify(lmx.options),
+  );
   const cl = await run({ tipo: "liga", q: "UEFA Liga Campeones" });
-  check("liga: 'UEFA Liga Campeones' → logo oficial de la Champions (football-data)", cl.options[0]?.logo === "https://crests.football-data.org/CL.png", JSON.stringify(cl.options));
-  const n1 = calls.length; await run({ tipo: "equipo", q: "Bayern Múnich", pais: "Alemania" });
+  check(
+    "liga: 'UEFA Liga Campeones' → logo oficial de la Champions (football-data)",
+    cl.options[0]?.logo === "https://crests.football-data.org/CL.png",
+    JSON.stringify(cl.options),
+  );
+  const n1 = calls.length;
+  await run({ tipo: "equipo", q: "Bayern Múnich", pais: "Alemania" });
   check("las búsquedas repetidas salen de la caché", calls.length - n1 <= 1, String(calls.length - n1));
   const sim = (a, b) => L.similarity(a, b);
-  check("parecido de nombres sin falsos positivos (AZ≠Internazionale, AC Milan≠Inter, Liga MX≠Primeira Liga)", sim("internazionale", "AZ") < 0.6 && sim("Inter de Milán", "AC Milan") < 0.6 && sim("Liga MX", "Primeira Liga") < 0.6 && sim("UEFA Nations League", "UEFA Champions League") < 0.6 && sim("Selección de España", "ES Troyes AC") < 0.6 && sim("Manchester City", "Manchester United") < 0.6 && sim("internazionale", "FC Internazionale Milano") >= 0.6 && sim("Barcelona (F)", "FC Barcelona") >= 0.6 && sim("Como", "Como 1907") >= 0.6 && sim("Real Madrid", "Real Madrid CF") >= 0.6);
-  check("países con 'de' y 'y' en el nombre", N.findCountry("Costa de Marfil")?.flag === "ci" && N.findCountry("Selección de Costa de Marfil")?.flag === "ci" && N.findCountry("Bosnia y Herzegovina")?.flag === "ba" && N.findCountry("Spain U21")?.flag === "es");
+  check(
+    "parecido de nombres sin falsos positivos (AZ≠Internazionale, AC Milan≠Inter, Liga MX≠Primeira Liga)",
+    sim("internazionale", "AZ") < 0.6 &&
+      sim("Inter de Milán", "AC Milan") < 0.6 &&
+      sim("Liga MX", "Primeira Liga") < 0.6 &&
+      sim("UEFA Nations League", "UEFA Champions League") < 0.6 &&
+      sim("Selección de España", "ES Troyes AC") < 0.6 &&
+      sim("Manchester City", "Manchester United") < 0.6 &&
+      sim("internazionale", "FC Internazionale Milano") >= 0.6 &&
+      sim("Barcelona (F)", "FC Barcelona") >= 0.6 &&
+      sim("Como", "Como 1907") >= 0.6 &&
+      sim("Real Madrid", "Real Madrid CF") >= 0.6,
+  );
+  check(
+    "países con 'de' y 'y' en el nombre",
+    N.findCountry("Costa de Marfil")?.flag === "ci" &&
+      N.findCountry("Selección de Costa de Marfil")?.flag === "ci" &&
+      N.findCountry("Bosnia y Herzegovina")?.flag === "ba" &&
+      N.findCountry("Spain U21")?.flag === "es",
+  );
   const ok = (u) => G.isExtraLogoSource(new URL(u));
-  check("proxy de imágenes: acepta las fuentes nuevas y rechaza otras", ok("https://crests.football-data.org/5.png") && ok("https://flagcdn.com/w160/gb-eng.png") && ok("https://commons.wikimedia.org/wiki/Special:FilePath/X.svg") && !ok("https://evil.example.com/x.png") && !ok("http://flagcdn.com/w160/es.png"));
+  check(
+    "proxy de imágenes: acepta las fuentes nuevas y rechaza otras",
+    ok("https://crests.football-data.org/5.png") &&
+      ok("https://flagcdn.com/w160/gb-eng.png") &&
+      ok("https://commons.wikimedia.org/wiki/Special:FilePath/X.svg") &&
+      !ok("https://evil.example.com/x.png") &&
+      !ok("http://flagcdn.com/w160/es.png"),
+  );
   const { ctx, page } = await open(null);
-  const safe = await page.evaluate(() => ["https://crests.football-data.org/5.svg", "https://flagcdn.com/w160/es.png", "https://commons.wikimedia.org/wiki/Special:FilePath/Liga_MX_logo.svg?width=200", "https://evil.example.com/logo.png"].map(safeCrestSource).join());
-  check("la app muestra escudos de las fuentes nuevas (y no de otras)", safe === "true,true,true,false", safe);
+  const safe = await page.evaluate(() =>
+    [
+      "https://crests.football-data.org/5.svg",
+      "https://flagcdn.com/w160/es.png",
+      "https://commons.wikimedia.org/wiki/Special:FilePath/Liga_MX_logo.svg?width=200",
+      "https://evil.example.com/logo.png",
+    ]
+      .map(safeCrestSource)
+      .join(),
+  );
+  check(
+    "la app muestra escudos de las fuentes nuevas (y no de otras)",
+    safe === "true,true,true,false",
+    safe,
+  );
   await ctx.close();
 }
 
 section("26. Ficha del partido: marcador por equipo, resultado automático, IA y banderas");
 {
-  const now = Date.now(), day = isoDay(now), time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
-  const fx = (id, markets, b) => ({ id, home: "Sudan", away: "Senegal", league: "Africa, Copa de Naciones Africanas, Cla", competition: "Copa de Naciones Africanas,Cla", country: "Africa", dateISO: day, time, builderOdd: b, markets });
-  const mk = (market, pick, b, builder = true) => ({ market, pick, odd: "", builder, builderOdd: b, settlement: "pending" });
-  const db0 = { coupons: [
-    { id: "C1", name: "Cupón 1", created: new Date(now).toISOString(), stake: 5, odds: 1.36, payout: 6.8, fixtures: [fx("a", [mk("Doble oportunidad", "Empate o 2", "1.36"), mk("Total de goles", "Más de 1.5", "1.36")], "1.36")] },
-    { id: "C2", name: "Cupón 2", created: new Date(now).toISOString(), stake: 5, odds: 1.41, payout: 7.05, fixtures: [fx("b", [mk("Doble oportunidad", "Empate o Senegal", "1.41"), mk("Total", "Más de 1.5", "1.41"), mk("Ambos equipos marcan", "Sí", "1.41"), mk("Total de goles - Senegal", "Más de 1.5", "1.41"), mk("Total Tiros De Esquina", "Más de 7.5", "1.41")], "1.41")] },
-  ], houses: [], transactions: [], resultHistory: [], actionHistory: [], statsMigrated: true };
+  const now = Date.now(),
+    day = isoDay(now),
+    time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
+  const fx = (id, markets, b) => ({
+    id,
+    home: "Sudan",
+    away: "Senegal",
+    league: "Africa, Copa de Naciones Africanas, Cla",
+    competition: "Copa de Naciones Africanas,Cla",
+    country: "Africa",
+    dateISO: day,
+    time,
+    builderOdd: b,
+    markets,
+  });
+  const mk = (market, pick, b, builder = true) => ({
+    market,
+    pick,
+    odd: "",
+    builder,
+    builderOdd: b,
+    settlement: "pending",
+  });
+  const db0 = {
+    coupons: [
+      {
+        id: "C1",
+        name: "Cupón 1",
+        created: new Date(now).toISOString(),
+        stake: 5,
+        odds: 1.36,
+        payout: 6.8,
+        fixtures: [
+          fx(
+            "a",
+            [mk("Doble oportunidad", "Empate o 2", "1.36"), mk("Total de goles", "Más de 1.5", "1.36")],
+            "1.36",
+          ),
+        ],
+      },
+      {
+        id: "C2",
+        name: "Cupón 2",
+        created: new Date(now).toISOString(),
+        stake: 5,
+        odds: 1.41,
+        payout: 7.05,
+        fixtures: [
+          fx(
+            "b",
+            [
+              mk("Doble oportunidad", "Empate o Senegal", "1.41"),
+              mk("Total", "Más de 1.5", "1.41"),
+              mk("Ambos equipos marcan", "Sí", "1.41"),
+              mk("Total de goles - Senegal", "Más de 1.5", "1.41"),
+              mk("Total Tiros De Esquina", "Más de 7.5", "1.41"),
+            ],
+            "1.41",
+          ),
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
   const { ctx, page } = await open(db0);
   const pure = await page.evaluate(() => {
-    const f = { home: "Sudan", away: "Senegal" }, sp = (market, pick) => outcomeSpec({ market, pick }, f);
+    const f = { home: "Sudan", away: "Senegal" },
+      sp = (market, pick) => outcomeSpec({ market, pick }, f);
     const key = (market, pick) => outcomeKey(sp(market, pick));
     return {
-      same: key("Doble oportunidad", "Empate o 2") === key("Doble oportunidad", "Empate o Senegal") && key("Doble oportunidad", "X2") === key("Doble oportunidad", "Empate o 2"),
+      same:
+        key("Doble oportunidad", "Empate o 2") === key("Doble oportunidad", "Empate o Senegal") &&
+        key("Doble oportunidad", "X2") === key("Doble oportunidad", "Empate o 2"),
       diff: key("Doble oportunidad", "1 o empate") !== key("Doble oportunidad", "Empate o 2"),
-      res: [outcomeResult(sp("Doble oportunidad", "Empate o 2"), 0, 2), outcomeResult(sp("Doble oportunidad", "Empate o 2"), 1, 0), outcomeResult(sp("1x2", "Sudan"), 1, 0), outcomeResult(sp("1x2", "X"), 1, 1), outcomeResult(sp("Ambos equipos marcan", "Sí"), 1, 0), outcomeResult(sp("Ambos equipos marcan", "No"), 1, 0), outcomeResult(sp("Apuesta sin empate", "2"), 1, 1), outcomeResult(sp("2 marcará", "Sí"), 0, 1)].join(),
-      none: [sp("1x2 - 1ª mitad", "1"), sp("Total de goles", "Más de 1.5"), sp("Hándicap", "2 (+0.5)"), sp("Argelia gana cualquier mitad", "Sí")].every((x) => x === null),
-      side: [marketSide({ market: "Total de goles - Senegal", pick: "Más de 1.5" }, f), marketSide({ market: "1 total de goles", pick: "Más de 0.5" }, f), marketSide({ market: "Total de goles", pick: "Más de 1.5" }, f)].join(),
-      flags: [nationFlagUrl("Sudan"), nationFlagUrl("Sudán"), nationFlagUrl("Senegal"), nationFlagUrl("Costa de Marfil"), nationFlagUrl("Real Madrid")].join(),
-      comp: db.coupons[0].fixtures[0].competition + " | " + parseCoupon("Africa, Copa de Naciones Africanas, Cla 16/11 • 07:00\nSudan vs. Senegal\nTotal de goles: Más de 1.5\nCuotas:\n1.36").fixtures[0].competition,
+      res: [
+        outcomeResult(sp("Doble oportunidad", "Empate o 2"), 0, 2),
+        outcomeResult(sp("Doble oportunidad", "Empate o 2"), 1, 0),
+        outcomeResult(sp("1x2", "Sudan"), 1, 0),
+        outcomeResult(sp("1x2", "X"), 1, 1),
+        outcomeResult(sp("Ambos equipos marcan", "Sí"), 1, 0),
+        outcomeResult(sp("Ambos equipos marcan", "No"), 1, 0),
+        outcomeResult(sp("Apuesta sin empate", "2"), 1, 1),
+        outcomeResult(sp("2 marcará", "Sí"), 0, 1),
+      ].join(),
+      none: [
+        sp("1x2 - 1ª mitad", "1"),
+        sp("Total de goles", "Más de 1.5"),
+        sp("Hándicap", "2 (+0.5)"),
+        sp("Argelia gana cualquier mitad", "Sí"),
+      ].every((x) => x === null),
+      side: [
+        marketSide({ market: "Total de goles - Senegal", pick: "Más de 1.5" }, f),
+        marketSide({ market: "1 total de goles", pick: "Más de 0.5" }, f),
+        marketSide({ market: "Total de goles", pick: "Más de 1.5" }, f),
+      ].join(),
+      flags: [
+        nationFlagUrl("Sudan"),
+        nationFlagUrl("Sudán"),
+        nationFlagUrl("Senegal"),
+        nationFlagUrl("Costa de Marfil"),
+        nationFlagUrl("Real Madrid"),
+      ].join(),
+      comp:
+        db.coupons[0].fixtures[0].competition +
+        " | " +
+        parseCoupon(
+          "Africa, Copa de Naciones Africanas, Cla 16/11 • 07:00\nSudan vs. Senegal\nTotal de goles: Más de 1.5\nCuotas:\n1.36",
+        ).fixtures[0].competition,
     };
   });
-  check("mercados de resultado: 'Empate o 2' = 'Empate o Senegal' = 'X2'; se resuelven con el marcador", pure.same && pure.diff && pure.res === "won,lost,won,won,lost,won,void,won" && pure.none, JSON.stringify(pure));
-  check("mercado de un solo equipo se reconoce por el nombre o '1/2 total'", pure.side === "away,home,", pure.side);
-  check("banderas de selecciones por su nombre (con o sin tilde); ninguna para clubes", pure.flags === "https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sn.png,https://flagcdn.com/w160/ci.png,", pure.flags);
-  check("competición cortada por la casa: 'Cla' → 'Clasificación' (cupones guardados y nuevos)", /Clasificación \| Copa de Naciones Africanas, Clasificación/.test(pure.comp), pure.comp);
-  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
-  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(250);
-  const ui = await page.evaluate(() => ({ cards: [...document.querySelectorAll(".match-tab-content > .mk-card")].map((e) => e.innerText.replace(/\s+/g, " ").slice(0, 60)), crests: [...document.querySelectorAll(".hero-team img.team-crest")].map((i) => i.dataset.crestUrl), board: document.querySelector(".live-board").innerText.replace(/\s+/g, " "), vs: document.querySelector(".hero-vs").textContent, finish: !!document.querySelector("[data-pg-finish]"), ai: !!document.querySelector("[data-match-ai]") }));
-  check("la ficha junta los dos 'Doble oportunidad' y los dos '+1.5 goles' (5 tarjetas en vez de 7)", ui.cards.length === 5 && ui.cards.filter((c) => /Doble oportunidad/.test(c)).length === 1, ui.cards.join(" || "));
-  check("los dos equipos muestran su bandera sin haberla buscado", ui.crests.join() === "https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sn.png", ui.crests.join());
-  check("marcador por equipo: goles y córners de Sudan y de Senegal, y botón del Analista", /Goles Total: 0 .*Sudan.*Senegal/.test(ui.board) && /Córners Total: 0/.test(ui.board) && ui.vs === "VS" && ui.finish && ui.ai, ui.board);
-  const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
-  const status = () => page.evaluate(() => db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "));
-  await tap(page, stBtn("goals:away")); await page.waitForTimeout(150);
-  const g1 = await page.evaluate(() => ({ toast: $("toast").textContent, score: document.querySelector(".hero-score")?.textContent, pop: document.querySelector(".hero-score")?.classList.contains("goal-pop") }));
-  check("gol de Senegal: aviso, marcador 0 – 1 en la cabecera y animación", /Gol de Senegal! 0 – 1/.test(g1.toast) && g1.score === "0 – 1" && g1.pop, JSON.stringify(g1));
-  await tap(page, stBtn("goals:away")); await page.waitForTimeout(150);
-  check("0 – 2: se ganan '+1.5 goles' (los dos cupones) y '+1.5 goles de Senegal'; lo demás espera", (await status()) === "pw pwpwp", await status());
-  await tap(page, stBtn("goals:home")); await page.waitForTimeout(150);
+  check(
+    "mercados de resultado: 'Empate o 2' = 'Empate o Senegal' = 'X2'; se resuelven con el marcador",
+    pure.same && pure.diff && pure.res === "won,lost,won,won,lost,won,void,won" && pure.none,
+    JSON.stringify(pure),
+  );
+  check(
+    "mercado de un solo equipo se reconoce por el nombre o '1/2 total'",
+    pure.side === "away,home,",
+    pure.side,
+  );
+  check(
+    "banderas de selecciones por su nombre (con o sin tilde); ninguna para clubes",
+    pure.flags ===
+      "https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sn.png,https://flagcdn.com/w160/ci.png,",
+    pure.flags,
+  );
+  check(
+    "competición cortada por la casa: 'Cla' → 'Clasificación' (cupones guardados y nuevos)",
+    /Clasificación \| Copa de Naciones Africanas, Clasificación/.test(pure.comp),
+    pure.comp,
+  );
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click());
+  await page.waitForTimeout(250);
+  const ui = await page.evaluate(() => ({
+    cards: [...document.querySelectorAll(".match-tab-content > .mk-card")].map((e) =>
+      e.innerText.replace(/\s+/g, " ").slice(0, 60),
+    ),
+    crests: [...document.querySelectorAll(".hero-team img.team-crest")].map((i) => i.dataset.crestUrl),
+    board: document.querySelector(".live-board").innerText.replace(/\s+/g, " "),
+    vs: document.querySelector(".hero-vs").textContent,
+    finish: !!document.querySelector("[data-pg-finish]"),
+    ai: !!document.querySelector("[data-match-ai]"),
+  }));
+  check(
+    "la ficha junta los dos 'Doble oportunidad' y los dos '+1.5 goles' (5 tarjetas en vez de 7)",
+    ui.cards.length === 5 && ui.cards.filter((c) => /Doble oportunidad/.test(c)).length === 1,
+    ui.cards.join(" || "),
+  );
+  check(
+    "los dos equipos muestran su bandera sin haberla buscado",
+    ui.crests.join() === "https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sn.png",
+    ui.crests.join(),
+  );
+  check(
+    "marcador por equipo: goles y córners de Sudan y de Senegal, y botón del Analista",
+    /Goles Total: 0 .*Sudan.*Senegal/.test(ui.board) &&
+      /Córners Total: 0/.test(ui.board) &&
+      ui.vs === "VS" &&
+      ui.finish &&
+      ui.ai,
+    ui.board,
+  );
+  const stBtn = (target, step = 1) =>
+    `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
+  const status = () =>
+    page.evaluate(() =>
+      db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "),
+    );
+  await tap(page, stBtn("goals:away"));
+  await page.waitForTimeout(150);
+  const g1 = await page.evaluate(() => ({
+    toast: $("toast").textContent,
+    score: document.querySelector(".hero-score")?.textContent,
+    pop: document.querySelector(".hero-score")?.classList.contains("goal-pop"),
+  }));
+  check(
+    "gol de Senegal: aviso, marcador 0 – 1 en la cabecera y animación",
+    /Gol de Senegal! 0 – 1/.test(g1.toast) && g1.score === "0 – 1" && g1.pop,
+    JSON.stringify(g1),
+  );
+  await tap(page, stBtn("goals:away"));
+  await page.waitForTimeout(150);
+  check(
+    "0 – 2: se ganan '+1.5 goles' (los dos cupones) y '+1.5 goles de Senegal'; lo demás espera",
+    (await status()) === "pw pwpwp",
+    await status(),
+  );
+  await tap(page, stBtn("goals:home"));
+  await page.waitForTimeout(150);
   page.promptAnswer = "1-2";
-  await tap(page, "[data-pg-finish]"); await page.waitForTimeout(400);
+  await tap(page, "[data-pg-finish]");
+  await page.waitForTimeout(400);
   await page.evaluate(() => document.querySelector(".result-card-wrap")?.click());
-  check("Terminó el partido 1-2: doble oportunidad (en los dos cupones) y ambos marcan ganados; córners sin llegar, perdido", (await status()) === "ww wwwwl", await status());
+  check(
+    "Terminó el partido 1-2: doble oportunidad (en los dos cupones) y ambos marcan ganados; córners sin llegar, perdido",
+    (await status()) === "ww wwwwl",
+    await status(),
+  );
   // Desmarcar tocando de nuevo
-  await page.evaluate(() => { if (!document.querySelector(".marked-fold.is-open")) document.querySelector("[data-marked-toggle]").click(); }); await page.waitForTimeout(120);
-  await page.evaluate(() => [...document.querySelectorAll(".marked-fold .mk-card")].find((e) => /Ambos equipos/.test(e.innerText)).querySelector(".mk-btn.won.selected").click()); await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    if (!document.querySelector(".marked-fold.is-open"))
+      document.querySelector("[data-marked-toggle]").click();
+  });
+  await page.waitForTimeout(120);
+  await page.evaluate(() =>
+    [...document.querySelectorAll(".marked-fold .mk-card")]
+      .find((e) => /Ambos equipos/.test(e.innerText))
+      .querySelector(".mk-btn.won.selected")
+      .click(),
+  );
+  await page.waitForTimeout(200);
   await page.evaluate(() => document.querySelector(".result-card-wrap")?.click());
-  check("tocar de nuevo un estado ya marcado lo devuelve a pendiente", (await status()) === "ww wwpwl", await status());
+  check(
+    "tocar de nuevo un estado ya marcado lo devuelve a pendiente",
+    (await status()) === "ww wwpwl",
+    await status(),
+  );
   // IA del partido
-  await page.evaluate(() => { analystSave({ clave: "secreto" }); db.coupons[1].fixtures[0].markets[4].settlement = "pending"; save(); renderAll(); });
+  await page.evaluate(() => {
+    analystSave({ clave: "secreto" });
+    db.coupons[1].fixtures[0].markets[4].settlement = "pending";
+    save();
+    renderAll();
+  });
   const before = analystPosts.length;
-  await tap(page, "[data-match-ai]"); await page.waitForTimeout(1300);
+  await tap(page, "[data-match-ai]");
+  await page.waitForTimeout(1300);
   const post = analystPosts.at(-1);
-  const aiUi = await page.evaluate(() => ({ saved: !!Object.values(db.stats)[0].ai?.texto, box: document.querySelector(".match-ai").innerText.replace(/\s+/g, " ").slice(0, 80), details: !!document.querySelector(".match-ai-saved") }));
-  check("🤖 Analizar este partido: envía solo sus mercados pendientes (sin repetir) y guarda el análisis en el partido", analystPosts.length === before + 1 && post.modo === "cupon" && /Sudan vs Senegal/.test(post.datos.cupon) && (post.datos.cupon.match(/^- /gm) || []).length === 2 && post.datos.partidos.length === 1 && aiUi.saved && aiUi.details, JSON.stringify(aiUi) + " " + post.datos.cupon);
+  const aiUi = await page.evaluate(() => ({
+    saved: !!Object.values(db.stats)[0].ai?.texto,
+    box: document.querySelector(".match-ai").innerText.replace(/\s+/g, " ").slice(0, 80),
+    details: !!document.querySelector(".match-ai-saved"),
+  }));
+  check(
+    "🤖 Analizar este partido: envía solo sus mercados pendientes (sin repetir) y guarda el análisis en el partido",
+    analystPosts.length === before + 1 &&
+      post.modo === "cupon" &&
+      /Sudan vs Senegal/.test(post.datos.cupon) &&
+      (post.datos.cupon.match(/^- /gm) || []).length === 2 &&
+      post.datos.partidos.length === 1 &&
+      aiUi.saved &&
+      aiUi.details,
+    JSON.stringify(aiUi) + " " + post.datos.cupon,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
   const gen = await import(path.join(ROOT, "herramientas/generar-paises.mjs"));
-  check("la lista de países de la app está al día con la del servidor", fs.readFileSync(path.join(ROOT, "site/js/29-paises.js"), "utf8") === gen.contenido());
+  check(
+    "la lista de países de la app está al día con la del servidor",
+    fs.readFileSync(path.join(ROOT, "site/js/29-paises.js"), "utf8") === gen.contenido(),
+  );
 }
 
 section("27. Registros propios de equipos y jugadores (promedios y goleadores)");
 {
   const day = (n) => isoDay(Date.now() - n * 86400e3);
   const mk = (market, pick) => ({ market, pick, odd: "1.8", builder: false, settlement: "won" });
-  const fx = (id, home, away, comp, d, markets) => ({ id, home, away, competition: comp, league: comp, dateISO: day(d), time: "14:00", markets });
-  const db0 = { coupons: [
-    { id: "R1", name: "R1", created: new Date().toISOString(), stake: 5, odds: 2, payout: 10, fixtures: [
-      fx("a", "Real Madrid", "Sevilla", "LaLiga", 20, [mk("Remates a Puerta - Kylian Mbappe (RMD)", "Más de 0.5"), mk("Total de goles", "Más de 1.5")]),
-      fx("b", "Betis", "Real Madrid", "LaLiga", 12, [mk("Remates - Kylian Mbappe (RMD)", "Más de 1.5")]),
-      fx("c", "Francia", "Italia", "UEFA Nations League", 6, [mk("Remates a Puerta - Kylian Mbappe (FRA)", "Más de 0.5")]),
-      fx("d", "Real Madrid", "Barcelona", "LaLiga", -2, [{ market: "Remates a Puerta - Kylian Mbappe (RMD)", pick: "Más de 1.5", odd: "2.1", builder: false, settlement: "pending" }]),
-    ] }], houses: [], transactions: [], resultHistory: [], actionHistory: [], statsMigrated: true };
+  const fx = (id, home, away, comp, d, markets) => ({
+    id,
+    home,
+    away,
+    competition: comp,
+    league: comp,
+    dateISO: day(d),
+    time: "14:00",
+    markets,
+  });
+  const db0 = {
+    coupons: [
+      {
+        id: "R1",
+        name: "R1",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 2,
+        payout: 10,
+        fixtures: [
+          fx("a", "Real Madrid", "Sevilla", "LaLiga", 20, [
+            mk("Remates a Puerta - Kylian Mbappe (RMD)", "Más de 0.5"),
+            mk("Total de goles", "Más de 1.5"),
+          ]),
+          fx("b", "Betis", "Real Madrid", "LaLiga", 12, [mk("Remates - Kylian Mbappe (RMD)", "Más de 1.5")]),
+          fx("c", "Francia", "Italia", "UEFA Nations League", 6, [
+            mk("Remates a Puerta - Kylian Mbappe (FRA)", "Más de 0.5"),
+          ]),
+          fx("d", "Real Madrid", "Barcelona", "LaLiga", -2, [
+            {
+              market: "Remates a Puerta - Kylian Mbappe (RMD)",
+              pick: "Más de 1.5",
+              odd: "2.1",
+              builder: false,
+              settlement: "pending",
+            },
+          ]),
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
   const { ctx, page } = await open(db0);
   await page.evaluate(() => {
-    const fk = (i) => fixtureKey(db.coupons[0].fixtures[i]), pk = crestNorm("Kylian Mbappe");
-    const put = (i, gh, ga, ch, ca, shots, onT, scorers) => { db.stats[fk(i)] = { goals: gh + ga, corners: ch + ca, cards: 0, final: true, teams: { home: { goals: gh, corners: ch, cards: 0 }, away: { goals: ga, corners: ca, cards: 0 } }, players: { [pk]: { shots, onTarget: onT } }, scorers, auto: {} }; };
+    const fk = (i) => fixtureKey(db.coupons[0].fixtures[i]),
+      pk = crestNorm("Kylian Mbappe");
+    const put = (i, gh, ga, ch, ca, shots, onT, scorers) => {
+      db.stats[fk(i)] = {
+        goals: gh + ga,
+        corners: ch + ca,
+        cards: 0,
+        final: true,
+        teams: { home: { goals: gh, corners: ch, cards: 0 }, away: { goals: ga, corners: ca, cards: 0 } },
+        players: { [pk]: { shots, onTarget: onT } },
+        scorers,
+        auto: {},
+      };
+    };
     db.stats = {};
-    put(0, 3, 1, 7, 2, 5, 3, [{ name: "Kylian Mbappe", side: "home" }, { name: "Kylian Mbappe", side: "home" }, { name: "Vinicius Junior", side: "home" }]);
+    put(0, 3, 1, 7, 2, 5, 3, [
+      { name: "Kylian Mbappe", side: "home" },
+      { name: "Kylian Mbappe", side: "home" },
+      { name: "Vinicius Junior", side: "home" },
+    ]);
     put(1, 0, 2, 4, 6, 3, 1, [{ name: "Kylian Mbappe", side: "away" }]);
     put(2, 1, 1, 5, 5, 2, 2, [{ name: "Kylian Mbappe", side: "home" }]);
-    save(); renderAll();
+    save();
+    renderAll();
   });
   const rec = await page.evaluate(() => {
-    const t = teamSummary(teamRecord("Real Madrid")), p = playerSummary(playerRecord("Kylian Mbappe")), fr = teamRecord("Francia"), vini = playerRecord("Vinicius Junior");
-    return { t, club: p.porEquipo.find((g) => g.equipo === "Real Madrid"), sel: p.porEquipo.find((g) => g.equipo === "Francia"), goles: p.goles, n: p.partidosRegistrados, frTipo: fr.tipo, frGf: recAvg(fr.matches, "gf"), vini: vini && { goles: playerSummary(vini).goles, equipo: vini.matches[0].equipo }, barca: teamRecord("Barcelona") };
+    const t = teamSummary(teamRecord("Real Madrid")),
+      p = playerSummary(playerRecord("Kylian Mbappe")),
+      fr = teamRecord("Francia"),
+      vini = playerRecord("Vinicius Junior");
+    return {
+      t,
+      club: p.porEquipo.find((g) => g.equipo === "Real Madrid"),
+      sel: p.porEquipo.find((g) => g.equipo === "Francia"),
+      goles: p.goles,
+      n: p.partidosRegistrados,
+      frTipo: fr.tipo,
+      frGf: recAvg(fr.matches, "gf"),
+      vini: vini && { goles: playerSummary(vini).goles, equipo: vini.matches[0].equipo },
+      barca: teamRecord("Barcelona"),
+    };
   });
-  check("equipo: promedio de sus partidos registrados (Real Madrid: 2 partidos, 2.5 goles a favor, 0.5 en contra, 6.5 córners)", rec.t.partidosRegistrados === 2 && rec.t.golesFavor.prom === 2.5 && rec.t.golesContra.prom === 0.5 && rec.t.cornersFavor.prom === 6.5 && rec.t.tipo === "club" && rec.barca === null, JSON.stringify(rec.t));
-  check("jugador ligado a su club y a su selección por separado (Mbappé: Madrid 4 remates y 2 a puerta de media; Francia 2 y 2)", rec.club.tipo === "club" && rec.club.partidos === 2 && rec.club.remates.prom === 4 && rec.club.aPuerta.prom === 2 && rec.club.goles === 3 && rec.sel.tipo === "selección" && rec.sel.remates.prom === 2 && rec.sel.goles === 1 && rec.goles === 4 && rec.n === 3, JSON.stringify([rec.club, rec.sel]));
-  check("selección reconocida como tal y goleador sin mercado también queda registrado", rec.frTipo === "selección" && rec.frGf.prom === 1 && rec.vini?.goles === 1 && rec.vini.equipo === "Real Madrid", JSON.stringify(rec.vini));
+  check(
+    "equipo: promedio de sus partidos registrados (Real Madrid: 2 partidos, 2.5 goles a favor, 0.5 en contra, 6.5 córners)",
+    rec.t.partidosRegistrados === 2 &&
+      rec.t.golesFavor.prom === 2.5 &&
+      rec.t.golesContra.prom === 0.5 &&
+      rec.t.cornersFavor.prom === 6.5 &&
+      rec.t.tipo === "club" &&
+      rec.barca === null,
+    JSON.stringify(rec.t),
+  );
+  check(
+    "jugador ligado a su club y a su selección por separado (Mbappé: Madrid 4 remates y 2 a puerta de media; Francia 2 y 2)",
+    rec.club.tipo === "club" &&
+      rec.club.partidos === 2 &&
+      rec.club.remates.prom === 4 &&
+      rec.club.aPuerta.prom === 2 &&
+      rec.club.goles === 3 &&
+      rec.sel.tipo === "selección" &&
+      rec.sel.remates.prom === 2 &&
+      rec.sel.goles === 1 &&
+      rec.goles === 4 &&
+      rec.n === 3,
+    JSON.stringify([rec.club, rec.sel]),
+  );
+  check(
+    "selección reconocida como tal y goleador sin mercado también queda registrado",
+    rec.frTipo === "selección" &&
+      rec.frGf.prom === 1 &&
+      rec.vini?.goles === 1 &&
+      rec.vini.equipo === "Real Madrid",
+    JSON.stringify(rec.vini),
+  );
   const pay = await page.evaluate(() => recordsPayload([db.coupons[0].fixtures[3]]));
   const mb = pay.jugadores[0];
-  check("al Analista le llegan los registros del cupón: Real Madrid y Mbappé con club y selección (Barcelona sin registros no aparece)", pay.equipos.length === 1 && pay.equipos[0].equipo === "Real Madrid" && /2.5 \(2 partidos\)/.test(pay.equipos[0].promedios.golesFavor) && pay.equipos[0].ultimos[0].marcador === "2-0" && mb.jugador === "Kylian Mbappe" && mb.porEquipo.length === 2 && /4 \(2 partidos\)/.test(mb.porEquipo.find((g) => g.equipo === "Real Madrid").rematesPromedio) && mb.ultimos.length === 3 && mb.ultimos[0].competicion === "UEFA Nations League", JSON.stringify(pay).slice(0, 400));
+  check(
+    "al Analista le llegan los registros del cupón: Real Madrid y Mbappé con club y selección (Barcelona sin registros no aparece)",
+    pay.equipos.length === 1 &&
+      pay.equipos[0].equipo === "Real Madrid" &&
+      /2.5 \(2 partidos\)/.test(pay.equipos[0].promedios.golesFavor) &&
+      pay.equipos[0].ultimos[0].marcador === "2-0" &&
+      mb.jugador === "Kylian Mbappe" &&
+      mb.porEquipo.length === 2 &&
+      /4 \(2 partidos\)/.test(mb.porEquipo.find((g) => g.equipo === "Real Madrid").rematesPromedio) &&
+      mb.ultimos.length === 3 &&
+      mb.ultimos[0].competicion === "UEFA Nations League",
+    JSON.stringify(pay).slice(0, 400),
+  );
   // Goleadores en la ficha
-  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
-  await page.evaluate(() => [...document.querySelectorAll("#agendaList .agenda-match")].find((e) => e.innerText.includes("Barcelona")).click()); await page.waitForTimeout(250);
+  await view(page, "calendar");
+  await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() =>
+    [...document.querySelectorAll("#agendaList .agenda-match")]
+      .find((e) => e.innerText.includes("Barcelona"))
+      .click(),
+  );
+  await page.waitForTimeout(250);
   const stBtn = (target) => `.live-board button[data-st-target="${target}"][data-st-step="1"]`;
-  await tap(page, stBtn("goals:home")); await page.waitForTimeout(150);
+  await tap(page, stBtn("goals:home"));
+  await page.waitForTimeout(150);
   const ask = await page.$eval(".live-board", (e) => e.innerText);
   page.promptAnswer = "1";
-  await tap(page, '[data-scorer-add="home"]'); await page.waitForTimeout(200);
-  const sc = await page.evaluate(() => ({ scorers: Object.values(db.stats).find((x) => x.scorers?.length === 1 && !x.final)?.scorers, chip: document.querySelector(".scorer-chip")?.innerText }));
-  check("en el partido: tras un gol aparece '¿Quién anotó?' y sugiere a los jugadores conocidos del equipo", /¿Quién anotó\?/.test(ask) && sc.scorers?.[0]?.name === "Kylian Mbappe" && sc.scorers[0].side === "home" && /Kylian Mbappe/.test(sc.chip), JSON.stringify(sc));
-  await tap(page, ".scorer-chip"); await page.waitForTimeout(150);
+  await tap(page, '[data-scorer-add="home"]');
+  await page.waitForTimeout(200);
+  const sc = await page.evaluate(() => ({
+    scorers: Object.values(db.stats).find((x) => x.scorers?.length === 1 && !x.final)?.scorers,
+    chip: document.querySelector(".scorer-chip")?.innerText,
+  }));
+  check(
+    "en el partido: tras un gol aparece '¿Quién anotó?' y sugiere a los jugadores conocidos del equipo",
+    /¿Quién anotó\?/.test(ask) &&
+      sc.scorers?.[0]?.name === "Kylian Mbappe" &&
+      sc.scorers[0].side === "home" &&
+      /Kylian Mbappe/.test(sc.chip),
+    JSON.stringify(sc),
+  );
+  await tap(page, ".scorer-chip");
+  await page.waitForTimeout(150);
   check("tocar un goleador lo quita", (await page.$$(".scorer-chip")).length === 0);
-  await tap(page, '[data-match-tab="datos"]'); await page.waitForTimeout(400);
+  // Seguir a un jugador sin mercado, anotar goleadores y goles por jugador
+  const bd = await page.$eval(".live-board", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "el marcador siempre ofrece '＋ Goleador' y '＋ Seguir jugador' (aunque no haya goles ni mercados del jugador)",
+    /＋ Goleador/.test(bd) &&
+      /Seguir jugador de Real Madrid/.test(bd) &&
+      /Seguir jugador de Barcelona/.test(bd),
+    bd.slice(0, 200),
+  );
+  page.promptAnswer = "Lamine Yamal";
+  await tap(page, '[data-track-add="away"]');
+  await page.waitForTimeout(250);
+  const fkD = await page.evaluate(() => Object.keys(db.stats).find((k) => db.stats[k].tracked?.length));
+  const card = await page.evaluate(() =>
+    [...document.querySelectorAll(".lb-player")]
+      .find((e) => /Lamine Yamal/.test(e.innerText))
+      ?.innerText.replace(/\s+/g, " "),
+  );
+  check(
+    "jugador seguido: aparece con su equipo y sus contadores de remates, a puerta y goles",
+    /Lamine Yamal · Barcelona/.test(card) &&
+      /Remates \(tiros totales\)/.test(card) &&
+      /Remates a puerta/.test(card) &&
+      /⚽ Goles/.test(card),
+    card,
+  );
+  const yk = await page.evaluate(() => crestNorm("Lamine Yamal"));
+  await tap(page, `.live-board button[data-st-target="player:${yk}:main:onTarget"][data-st-step="1"]`);
+  await page.waitForTimeout(120);
+  await tap(page, `.live-board button[data-player-goal="1"][data-st-pk="${yk}"]`);
+  await page.waitForTimeout(250);
+  const g = await page.evaluate((k) => {
+    const st = Object.values(db.stats).find((x) => x.tracked?.length);
+    return {
+      away: st.teams.away.goals,
+      total: st.goals,
+      sum: st.teams.home.goals + st.teams.away.goals,
+      scorers: st.scorers,
+      p: st.players[k],
+    };
+  }, yk);
+  check(
+    "＋ gol en el jugador: anota al goleador y también sube el marcador de su equipo (Barcelona 1)",
+    g.away === 1 &&
+      g.total === g.sum &&
+      g.scorers.length === 1 &&
+      g.scorers[0].name === "Lamine Yamal" &&
+      g.scorers[0].side === "away" &&
+      g.scorers[0].add === true &&
+      g.p.onTarget === 1 &&
+      g.p.shots === 1,
+    JSON.stringify(g),
+  );
+  await tap(page, `.live-board button[data-player-goal="-1"][data-st-pk="${yk}"]`);
+  await page.waitForTimeout(250);
+  const g2 = await page.evaluate(() => {
+    const st = Object.values(db.stats).find((x) => x.tracked?.length);
+    return { away: st.teams.away.goals, scorers: st.scorers.length };
+  });
+  check(
+    "− gol: lo quita del jugador y del marcador del equipo",
+    g2.away === 0 && g2.scorers === 0,
+    JSON.stringify(g2),
+  );
+  // Mercado existente (Mbappé, código RMD): si no se sabe su equipo, lo pregunta una vez
+  const mk2 = await page.evaluate(() => crestNorm("Kylian Mbappe"));
+  page.promptAnswer = "1";
+  await tap(page, `.live-board button[data-player-goal="1"][data-st-pk="${mk2}"]`);
+  await page.waitForTimeout(250);
+  const g3 = await page.evaluate(() => {
+    const st = Object.values(db.stats).find((x) => x.tracked?.length);
+    return { home: st.teams.home.goals, who: st.scorers.map((x) => x.name + ":" + x.side).join() };
+  });
+  check(
+    "jugador con mercado: su gol también cuenta (Real Madrid 1, goleador Mbappé)",
+    g3.home === 1 && g3.who === "Kylian Mbappe:home",
+    JSON.stringify(g3),
+  );
+  await tap(page, `.live-board button[data-player-goal="-1"][data-st-pk="${mk2}"]`);
+  await page.waitForTimeout(150);
+  page.promptAnswer = "Rodrygo Goes";
+  await tap(page, '[data-scorer-add="home"]');
+  await page.waitForTimeout(250);
+  const g4 = await page.evaluate(() => {
+    const st = Object.values(db.stats).find((x) => x.tracked?.length);
+    return {
+      home: st.teams.home.goals,
+      who: st.scorers.map((x) => x.name).join(),
+      seg: [...document.querySelectorAll(".lb-player")].some((e) => /Rodrygo Goes/.test(e.innerText)),
+    };
+  });
+  check(
+    "'＋ Goleador' sin sumar el gol antes: anota a Rodrygo, sube el marcador y aparece su ficha",
+    g4.home === 1 && g4.who === "Rodrygo Goes" && g4.seg,
+    JSON.stringify(g4),
+  );
+  // Cerrar el partido (pasado) para que cuente en los registros
+  await page.evaluate(() => {
+    const k = Object.keys(db.stats).find((x) => db.stats[x].tracked?.length);
+    db.stats[k].final = true;
+    db.stats[k].players[crestNorm("Lamine Yamal")] = { onTarget: 2, shots: 3 };
+    save();
+  });
+  const reg = await page.evaluate(() => {
+    const p = playerRecord("Lamine Yamal");
+    return p && playerSummary(p);
+  });
+  check(
+    "el jugador seguido entra en los registros con su equipo (Barcelona), remates y a puerta",
+    reg &&
+      reg.porEquipo[0].equipo === "Barcelona" &&
+      reg.porEquipo[0].tipo === "club" &&
+      reg.porEquipo[0].remates.prom === 3 &&
+      reg.porEquipo[0].aPuerta.prom === 2,
+    JSON.stringify(reg),
+  );
+  const rg = await page.evaluate(() => playerSummary(playerRecord("Rodrygo Goes")));
+  check(
+    "el goleador sin mercado entra en los registros con su gol",
+    rg.goles === 1 && rg.porEquipo[0].equipo === "Real Madrid",
+    JSON.stringify(rg),
+  );
+  page.promptAnswer = "";
+  await page.evaluate(() => {
+    const k = Object.keys(db.stats).find((x) => db.stats[x].tracked?.length);
+    db.stats[k].final = false;
+    save();
+  });
+  await tap(page, '[data-match-tab="datos"]');
+  await page.waitForTimeout(400);
   const dt = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
-  check("ficha → 📈 Datos: 'Tus registros' con los dos equipos y los jugadores de tus mercados", /Tus registros/.test(dt) && /Real Madrid 2 partidos registrados/.test(dt) && /Barcelona Sin partidos registrados/.test(dt) && /Kylian Mbappe 3 partido\(s\) registrado\(s\) · 4 gol/.test(dt) && /Francia \(selección\)/.test(dt), dt.slice(0, 420));
+  check(
+    "ficha → 📈 Datos: 'Tus registros' con los dos equipos y los jugadores de tus mercados",
+    /Tus registros/.test(dt) &&
+      /Real Madrid 2 partidos registrados/.test(dt) &&
+      /Barcelona Sin partidos registrados/.test(dt) &&
+      /Kylian Mbappe 3 partido\(s\) registrado\(s\) · 4 gol/.test(dt) &&
+      /Francia \(selección\)/.test(dt),
+    dt.slice(0, 420),
+  );
   await page.evaluate(() => closeMatchDetails());
   await view(page, "stats");
   const stt = await page.$eval("#recordsSection", (e) => e.innerText.replace(/\s+/g, " "));
-  check("Estadísticas: registros de todos los equipos y jugadores", /Equipos y selecciones \(5\)/.test(stt) && /Jugadores \(2\)/.test(stt), stt.slice(0, 200));
+  check(
+    "Estadísticas: registros de todos los equipos y jugadores",
+    /Equipos y selecciones \(5\)/.test(stt) && /Jugadores \(2\)/.test(stt),
+    stt.slice(0, 200),
+  );
   const A2 = await import(path.join(ROOT, "servidor/analista.mjs"));
-  const pr = A2.construirPeticion("cupon", { cupon: "Real Madrid vs Barcelona · Remates a puerta Mbappe +1.5", registros: pay });
-  check("el servidor pasa 'misRegistros' al Analista con la indicación de combinarlos con la actualidad", /misRegistros/.test(pr.messages[0].content) && /Kylian Mbappe/.test(pr.messages[0].content) && /misRegistros/.test(pr.system) && /club y selección/.test(pr.system));
+  const pr = A2.construirPeticion("cupon", {
+    cupon: "Real Madrid vs Barcelona · Remates a puerta Mbappe +1.5",
+    registros: pay,
+  });
+  check(
+    "el servidor pasa 'misRegistros' al Analista con la indicación de combinarlos con la actualidad",
+    /misRegistros/.test(pr.messages[0].content) &&
+      /Kylian Mbappe/.test(pr.messages[0].content) &&
+      /misRegistros/.test(pr.system) &&
+      /club y selección/.test(pr.system),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
@@ -1124,100 +3643,410 @@ section("8. Funciones del servidor (API-Football y TheSportsDB)");
   process.env.API_FOOTBALL_KEY = "x";
   let mode = "ok";
   globalThis.fetch = async (u) => {
-    u = new URL(u); const p = u.searchParams; const json = (b) => ({ status: 200, ok: true, json: async () => b });
-    if (mode === "plan") return json({ errors: { plan: "Free plans do not have access to this season, try from 2022 to 2024." }, response: [] });
-    if (p.get("from") && !p.get("season")) return json({ errors: { season: "The Season field is required." }, response: [] });
-    if (p.get("from")) return json({ errors: [], response: [{ fixture: { id: 9, date: "2026-11-04T14:00:00Z" }, league: { id: 2, season: 2026 }, teams: { home: { id: 1 }, away: { id: 2 } } }] });
+    u = new URL(u);
+    const p = u.searchParams;
+    const json = (b) => ({ status: 200, ok: true, json: async () => b });
+    if (mode === "plan")
+      return json({
+        errors: { plan: "Free plans do not have access to this season, try from 2022 to 2024." },
+        response: [],
+      });
+    if (p.get("from") && !p.get("season"))
+      return json({ errors: { season: "The Season field is required." }, response: [] });
+    if (p.get("from"))
+      return json({
+        errors: [],
+        response: [
+          {
+            fixture: { id: 9, date: "2026-11-04T14:00:00Z" },
+            league: { id: 2, season: 2026 },
+            teams: { home: { id: 1 }, away: { id: 2 } },
+          },
+        ],
+      });
     return json({ errors: [], response: [{ fixture: { id: 9 }, statistics: [] }] });
   };
   const { default: partido } = await import(path.join(ROOT, "servidor/partido.mjs"));
-  let r = await partido(new Request("https://x/p?homeId=1&awayId=2&date=2026-11-04&mode=match", { headers: { "x-nf-client-connection-ip": "a" } }));
+  let r = await partido(
+    new Request("https://x/p?homeId=1&awayId=2&date=2026-11-04&mode=match", {
+      headers: { "x-nf-client-connection-ip": "a" },
+    }),
+  );
   check("partido: envía la temporada y encuentra el partido", (await r.json()).fixture?.fixture?.id === 9);
   mode = "plan";
-  r = await partido(new Request("https://x/p?homeId=1&awayId=3&date=2026-11-04&mode=match", { headers: { "x-nf-client-connection-ip": "b" } }));
-  check("partido: explica el límite del plan gratis en español", /plan gratis/.test((await r.json()).error || ""));
+  r = await partido(
+    new Request("https://x/p?homeId=1&awayId=3&date=2026-11-04&mode=match", {
+      headers: { "x-nf-client-connection-ip": "b" },
+    }),
+  );
+  check(
+    "partido: explica el límite del plan gratis en español",
+    /plan gratis/.test((await r.json()).error || ""),
+  );
   // TheSportsDB (con respuestas simuladas como las reales: un resultado por búsqueda)
   const tsdbCalls = [];
   globalThis.fetch = async (u) => {
-    const url = new URL(u), q = url.searchParams.get("t") || url.searchParams.get("p");
+    const url = new URL(u),
+      q = url.searchParams.get("t") || url.searchParams.get("p");
     tsdbCalls.push(q);
     const R = {
-      "Club Brugge KV": { teams: [{ idTeam: "2", strTeam: "Club NXT", strCountry: "Belgium", strSport: "Soccer", strBadge: "https://r2.thesportsdb.com/images/media/team/badge/nxt.png" }] },
-      "Club Brugge": { teams: [{ idTeam: "1", strTeam: "Club Brugge", strCountry: "Belgium", strSport: "Soccer", strBadge: "https://r2.thesportsdb.com/images/media/team/badge/cb.png" }] },
-      "Anastasios Douvikas": { player: [{ idPlayer: "5", strPlayer: "Anastasios Douvikas", strTeam: "_Retired Soccer", strSport: "Soccer" }] },
-      "Douvikas": { player: [{ idPlayer: "6", strPlayer: "Tasos Douvikas", strTeam: "Como", strSport: "Soccer", strCutout: "https://r2.thesportsdb.com/images/media/player/cutout/d.png" }] },
+      "Club Brugge KV": {
+        teams: [
+          {
+            idTeam: "2",
+            strTeam: "Club NXT",
+            strCountry: "Belgium",
+            strSport: "Soccer",
+            strBadge: "https://r2.thesportsdb.com/images/media/team/badge/nxt.png",
+          },
+        ],
+      },
+      "Club Brugge": {
+        teams: [
+          {
+            idTeam: "1",
+            strTeam: "Club Brugge",
+            strCountry: "Belgium",
+            strSport: "Soccer",
+            strBadge: "https://r2.thesportsdb.com/images/media/team/badge/cb.png",
+          },
+        ],
+      },
+      "Anastasios Douvikas": {
+        player: [
+          { idPlayer: "5", strPlayer: "Anastasios Douvikas", strTeam: "_Retired Soccer", strSport: "Soccer" },
+        ],
+      },
+      Douvikas: {
+        player: [
+          {
+            idPlayer: "6",
+            strPlayer: "Tasos Douvikas",
+            strTeam: "Como",
+            strSport: "Soccer",
+            strCutout: "https://r2.thesportsdb.com/images/media/player/cutout/d.png",
+          },
+        ],
+      },
     };
     return { ok: true, status: 200, json: async () => R[q] || { teams: null, player: null } };
   };
   const { default: imagenes } = await import(path.join(ROOT, "servidor/imagenes.mjs"));
   let ri = await (await imagenes(new Request("https://x/i?tipo=equipo&q=Club%20Brugge%20KV"))).json();
-  check("TheSportsDB: prueba el nombre sin 'KV' y pone primero el equipo correcto", ri.options.map((o) => o.name).join() === "Club Brugge,Club NXT" && tsdbCalls.includes("Club Brugge"), JSON.stringify(ri.options.map((o) => o.name)));
-  ri = await (await imagenes(new Request("https://x/i?tipo=jugador&q=Anastasios%20Douvikas&club=Como"))).json();
-  check("TheSportsDB: prueba el apellido y descarta fichas sin foto", ri.options.length === 1 && ri.options[0].name === "Tasos Douvikas" && ri.options[0].photo.includes("cutout"), JSON.stringify(ri.options));
+  check(
+    "TheSportsDB: prueba el nombre sin 'KV' y pone primero el equipo correcto",
+    ri.options.map((o) => o.name).join() === "Club Brugge,Club NXT" && tsdbCalls.includes("Club Brugge"),
+    JSON.stringify(ri.options.map((o) => o.name)),
+  );
+  ri = await (
+    await imagenes(new Request("https://x/i?tipo=jugador&q=Anastasios%20Douvikas&club=Como"))
+  ).json();
+  check(
+    "TheSportsDB: prueba el apellido y descarta fichas sin foto",
+    ri.options.length === 1 &&
+      ri.options[0].name === "Tasos Douvikas" &&
+      ri.options[0].photo.includes("cutout"),
+    JSON.stringify(ri.options),
+  );
 }
 
 section("15. Función del Analista (Claude simulado)");
 {
   const A = await import(path.join(ROOT, "servidor/analista.mjs"));
   const env = { ANTHROPIC_API_KEY: "sk-prueba", ANALISTA_CLAVE: "secreto" };
-  const req = (body, clave = "secreto", method = "POST") => new Request("https://x/api/analista", { method, headers: { "x-kal-clave": clave }, body: method === "POST" ? JSON.stringify(body) : undefined });
+  const req = (body, clave = "secreto", method = "POST") =>
+    new Request("https://x/api/analista", {
+      method,
+      headers: { "x-kal-clave": clave },
+      body: method === "POST" ? JSON.stringify(body) : undefined,
+    });
   const status = async (r, e = env) => (await A.leerPeticion(r, e)).error?.status;
-  check("rechaza sin ANTHROPIC_API_KEY, sin ANALISTA_CLAVE, con código malo o modo raro",
-    (await status(req({ modo: "historial", datos: {} }), { ANALISTA_CLAVE: "x" })) === 503 && (await status(req({ modo: "historial", datos: {} }), { ANTHROPIC_API_KEY: "x" })) === 503 &&
-    (await status(req({ modo: "historial", datos: {} }, "otro"))) === 401 && (await status(req({ modo: "x", datos: {} }))) === 400 && (await status(req({ modo: "cupon", datos: { cupon: "" } }))) === 400 &&
-    (await status(new Request("https://x", { method: "GET" }))) === 405 && (await status(req({ modo: "historial", datos: { x: "a".repeat(130000) } }))) === 413);
-  const pc = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2", historial: [{ tipo: "1X2" }], hoy: "2026-11-11" });
+  check(
+    "rechaza sin ANTHROPIC_API_KEY, sin ANALISTA_CLAVE, con código malo o modo raro",
+    (await status(req({ modo: "historial", datos: {} }), { ANALISTA_CLAVE: "x" })) === 503 &&
+      (await status(req({ modo: "historial", datos: {} }), { ANTHROPIC_API_KEY: "x" })) === 503 &&
+      (await status(req({ modo: "historial", datos: {} }, "otro"))) === 401 &&
+      (await status(req({ modo: "x", datos: {} }))) === 400 &&
+      (await status(req({ modo: "cupon", datos: { cupon: "" } }))) === 400 &&
+      (await status(new Request("https://x", { method: "GET" }))) === 405 &&
+      (await status(req({ modo: "historial", datos: { x: "a".repeat(130000) } }))) === 413,
+  );
+  const pc = A.construirPeticion("cupon", {
+    cupon: "Barcelona vs Real Madrid 1x2",
+    historial: [{ tipo: "1X2" }],
+    hoy: "2026-11-11",
+  });
   const ph = A.construirPeticion("historial", { historial: { resumen: {} } });
   // Método, búsquedas según el tamaño y datos de los partidos
   const sys = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system;
-  check("método: probabilidad por selección, titularidad en mercados de jugador, BetBuilder como un solo paquete y calibración", /≈ NN %/.test(sys) && /titular/.test(sys) && /BetBuilder es una sola apuesta/.test(sys) && /precisionAnalista/.test(sys) && /"p":0.72/.test(sys));
+  check(
+    "método: probabilidad por selección, titularidad en mercados de jugador, BetBuilder como un solo paquete y calibración",
+    /≈ NN %/.test(sys) &&
+      /titular/.test(sys) &&
+      /BetBuilder es una sola apuesta/.test(sys) &&
+      /precisionAnalista/.test(sys) &&
+      /"p":0.72/.test(sys),
+  );
   const uses = (d) => A.construirPeticion("cupon", d).tools[0].max_uses;
-  const lista = (n) => Array.from({ length: n }, (_, i) => ({ local: "A" + i, visitante: "B" + i, fecha: "2026-11-22" }));
-  check("búsquedas según el número de partidos (mínimo 4, uno por partido + 2, máximo 12)", uses({ cupon: "A vs B 1x2", partidos: lista(1) }) === 4 && uses({ cupon: "x", partidos: lista(5) }) === 7 && uses({ cupon: "x", partidos: lista(12) }) === 12 && uses({ cupon: "A vs. B\nC vs D\nE vs F\nG vs H" }) === 6);
-  const dp = { encontrado: true, alReves: false, partido: { competicion: "Primera Division", fecha: "2026-11-22T20:00:00Z", estado: "TIMED", local: { nombre: "Barça" }, visitante: { nombre: "Real Madrid" } }, tabla: { local: { posicion: 1, puntos: 33, jugados: 12, golesFavor: 48, golesContra: 13 }, visitante: { posicion: 2, puntos: 30, jugados: 12, golesFavor: 30, golesContra: 10 }, equipos: 20 }, forma: { local: [{ resultado: "G", marcador: "3-0", enCasa: true }], visitante: [] }, h2h: { partidos: 10, goles: 35, local: { ganados: 5, empates: 1 }, visitante: { ganados: 4 } }, modelo: { lambdaLocal: 2.1, lambdaVisitante: 1.3, p1: 0.55, px: 0.2, p2: 0.25, over15: 0.85, over25: 0.66, over35: 0.44, btts: 0.65, base: "tabla general" } };
+  const lista = (n) =>
+    Array.from({ length: n }, (_, i) => ({ local: "A" + i, visitante: "B" + i, fecha: "2026-11-22" }));
+  check(
+    "búsquedas según el número de partidos (mínimo 4, uno por partido + 2, máximo 12)",
+    uses({ cupon: "A vs B 1x2", partidos: lista(1) }) === 4 &&
+      uses({ cupon: "x", partidos: lista(5) }) === 7 &&
+      uses({ cupon: "x", partidos: lista(12) }) === 12 &&
+      uses({ cupon: "A vs. B\nC vs D\nE vs F\nG vs H" }) === 6,
+  );
+  const dp = {
+    encontrado: true,
+    alReves: false,
+    partido: {
+      competicion: "Primera Division",
+      fecha: "2026-11-22T20:00:00Z",
+      estado: "TIMED",
+      local: { nombre: "Barça" },
+      visitante: { nombre: "Real Madrid" },
+    },
+    tabla: {
+      local: { posicion: 1, puntos: 33, jugados: 12, golesFavor: 48, golesContra: 13 },
+      visitante: { posicion: 2, puntos: 30, jugados: 12, golesFavor: 30, golesContra: 10 },
+      equipos: 20,
+    },
+    forma: { local: [{ resultado: "G", marcador: "3-0", enCasa: true }], visitante: [] },
+    h2h: { partidos: 10, goles: 35, local: { ganados: 5, empates: 1 }, visitante: { ganados: 4 } },
+    modelo: {
+      lambdaLocal: 2.1,
+      lambdaVisitante: 1.3,
+      p1: 0.55,
+      px: 0.2,
+      p2: 0.25,
+      over15: 0.85,
+      over25: 0.66,
+      over35: 0.44,
+      btts: 0.65,
+      base: "tabla general",
+    },
+  };
   const estados = [];
   let llamadas = 0;
-  const reunidos = await A.reunirDatosPartidos([{ local: "Barcelona", visitante: "Real Madrid", fecha: "2026-11-22" }, { local: "Sin", visitante: "Fecha", fecha: "" }, { local: "No", visitante: "Cubierto", fecha: "2026-11-22" }, { local: "Limite", visitante: "X", fecha: "2026-11-22" }, { local: "Despues", visitante: "Y", fecha: "2026-11-22" }], async (p) => { llamadas++; return p.local === "Barcelona" ? dp : p.local === "Limite" ? { limite: true } : { encontrado: false }; }, (e) => estados.push(e.v));
-  check("datos de partidos: resume el modelo y la tabla, salta los que no tienen fecha o no están cubiertos y se detiene en el límite", reunidos.length === 1 && reunidos[0].modelo.mas25 === 0.66 && reunidos[0].tabla.local.posicion === 1 && /G 3-0 \(casa\)/.test(reunidos[0].ultimos5.local) && llamadas === 3 && /Consultando datos/.test(estados[0]), JSON.stringify(reunidos).slice(0, 200) + " llamadas=" + llamadas);
-  const conDatos = A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2", datosPartidos: reunidos, precisionAnalista: { porConfianza: { Alta: { acertadas: 3, falladas: 2 } } } }).messages[0].content;
-  check("la petición incluye los datos de los partidos y la precisión del Analista", /datosPartidos/.test(conDatos) && /"mas25":0.66/.test(conDatos) && /precisionAnalista/.test(conDatos) && /"falladas":2/.test(conDatos));
-  const val = await A.leerPeticion(req({ modo: "cupon", datos: { cupon: "Barcelona vs Real Madrid 1x2: 1", partidos: [{ local: "Barcelona", visitante: "Real Madrid", fecha: "22/11/2026" }, { local: 5 }, "x"] } }), env);
-  check("valida la lista de partidos (descarta entradas raras y fechas mal formadas)", val.datos.partidos.length === 1 && val.datos.partidos[0].fecha === "", JSON.stringify(val.datos?.partidos));
+  const reunidos = await A.reunirDatosPartidos(
+    [
+      { local: "Barcelona", visitante: "Real Madrid", fecha: "2026-11-22" },
+      { local: "Sin", visitante: "Fecha", fecha: "" },
+      { local: "No", visitante: "Cubierto", fecha: "2026-11-22" },
+      { local: "Limite", visitante: "X", fecha: "2026-11-22" },
+      { local: "Despues", visitante: "Y", fecha: "2026-11-22" },
+    ],
+    async (p) => {
+      llamadas++;
+      return p.local === "Barcelona" ? dp : p.local === "Limite" ? { limite: true } : { encontrado: false };
+    },
+    (e) => estados.push(e.v),
+  );
+  check(
+    "datos de partidos: resume el modelo y la tabla, salta los que no tienen fecha o no están cubiertos y se detiene en el límite",
+    reunidos.length === 1 &&
+      reunidos[0].modelo.mas25 === 0.66 &&
+      reunidos[0].tabla.local.posicion === 1 &&
+      /G 3-0 \(casa\)/.test(reunidos[0].ultimos5.local) &&
+      llamadas === 3 &&
+      /Consultando datos/.test(estados[0]),
+    JSON.stringify(reunidos).slice(0, 200) + " llamadas=" + llamadas,
+  );
+  const conDatos = A.construirPeticion("cupon", {
+    cupon: "Barcelona vs Real Madrid 1x2",
+    datosPartidos: reunidos,
+    precisionAnalista: { porConfianza: { Alta: { acertadas: 3, falladas: 2 } } },
+  }).messages[0].content;
+  check(
+    "la petición incluye los datos de los partidos y la precisión del Analista",
+    /datosPartidos/.test(conDatos) &&
+      /"mas25":0.66/.test(conDatos) &&
+      /precisionAnalista/.test(conDatos) &&
+      /"falladas":2/.test(conDatos),
+  );
+  const val = await A.leerPeticion(
+    req({
+      modo: "cupon",
+      datos: {
+        cupon: "Barcelona vs Real Madrid 1x2: 1",
+        partidos: [{ local: "Barcelona", visitante: "Real Madrid", fecha: "22/11/2026" }, { local: 5 }, "x"],
+      },
+    }),
+    env,
+  );
+  check(
+    "valida la lista de partidos (descarta entradas raras y fechas mal formadas)",
+    val.datos.partidos.length === 1 && val.datos.partidos[0].fecha === "",
+    JSON.stringify(val.datos?.partidos),
+  );
   let pidio = null;
-  const respD = await A.manejar(req({ modo: "cupon", datos: { cupon: "Barcelona vs Real Madrid 1x2: 1", partidos: [{ local: "Barcelona", visitante: "Real Madrid", fecha: "2026-11-22" }] } }), { env, datosDePartido: async () => dp, crearCliente: () => { const c = fakeClient([{ stop: "end_turn", events: [["text", "ok"]] }]); pidio = c; return c; } });
-  const lineasD = (await respD.text()).trim().split("\n").map((l) => JSON.parse(l));
-  check("manejar: consulta los datos, los pasa a Claude y avisa de cada paso", /"mas25":0.66/.test(pidio.calls[0].messages[0].content) && lineasD.some((l) => l.v === "Consultando datos de los partidos…") && lineasD.some((l) => l.v === "Analizando…") && lineasD.at(-1).t === "fin", JSON.stringify(lineasD.map((l) => l.v || l.t)));
-  check("revisión de cupón: pide el bloque de datos <kal-json> con confianza y eslabón débil", /<kal-json>/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system) && /eslabonDebil/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system));
-  check("petición: modelo, respaldo ante rechazos, esfuerzo y búsqueda web solo al revisar cupones",
-    pc.model === "claude-opus-5-5" && pc.fallbacks === "default" && pc.betas.includes("server-side-fallback-2026-07-01") && pc.output_config.effort === "high" && ph.output_config.effort === "medium" &&
-    pc.tools[0].type === "web_search_20260209" && !ph.tools && /2026-11-11/.test(pc.messages[0].content) && /<cupon>/.test(pc.messages[0].content) && !("thinking" in pc) && !("temperature" in pc));
+  const respD = await A.manejar(
+    req({
+      modo: "cupon",
+      datos: {
+        cupon: "Barcelona vs Real Madrid 1x2: 1",
+        partidos: [{ local: "Barcelona", visitante: "Real Madrid", fecha: "2026-11-22" }],
+      },
+    }),
+    {
+      env,
+      datosDePartido: async () => dp,
+      crearCliente: () => {
+        const c = fakeClient([{ stop: "end_turn", events: [["text", "ok"]] }]);
+        pidio = c;
+        return c;
+      },
+    },
+  );
+  const lineasD = (await respD.text())
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
+  check(
+    "manejar: consulta los datos, los pasa a Claude y avisa de cada paso",
+    /"mas25":0.66/.test(pidio.calls[0].messages[0].content) &&
+      lineasD.some((l) => l.v === "Consultando datos de los partidos…") &&
+      lineasD.some((l) => l.v === "Analizando…") &&
+      lineasD.at(-1).t === "fin",
+    JSON.stringify(lineasD.map((l) => l.v || l.t)),
+  );
+  check(
+    "revisión de cupón: pide el bloque de datos <kal-json> con confianza y eslabón débil",
+    /<kal-json>/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system) &&
+      /eslabonDebil/.test(A.construirPeticion("cupon", { cupon: "Barcelona vs Real Madrid 1x2" }).system),
+  );
+  check(
+    "petición: modelo, respaldo ante rechazos, esfuerzo y búsqueda web solo al revisar cupones",
+    pc.model === "claude-opus-5-5" &&
+      pc.fallbacks === "default" &&
+      pc.betas.includes("server-side-fallback-2026-07-01") &&
+      pc.output_config.effort === "high" &&
+      ph.output_config.effort === "medium" &&
+      pc.tools[0].type === "web_search_20260209" &&
+      !ph.tools &&
+      /2026-11-11/.test(pc.messages[0].content) &&
+      /<cupon>/.test(pc.messages[0].content) &&
+      !("thinking" in pc) &&
+      !("temperature" in pc),
+  );
   // Cliente simulado: cada llamada sigue un guion de eventos y devuelve un mensaje final.
-  function fakeClient(scripts) { const calls = []; return { calls, beta: { messages: { stream(params) {
-    const sc = scripts[calls.length]; calls.push(JSON.parse(JSON.stringify(params))); const h = {};
-    return { on(ev, fn) { (h[ev] = h[ev] || []).push(fn); return this; }, async finalMessage() {
-      if (sc.throw) throw sc.throw;
-      for (const [ev, ...args] of sc.events || []) (h[ev] || []).forEach((fn) => fn(...args));
-      return { stop_reason: sc.stop, content: sc.content || [{ type: "text", text: "x" }], usage: { input_tokens: 10, output_tokens: 5, server_tool_use: { web_search_requests: sc.searches || 0 } } };
-    } };
-  } } } }; }
-  const run = async (scripts) => { const client = fakeClient(scripts), out = []; await A.analizar(client, pc, (e) => out.push(e)); return { client, out }; };
+  function fakeClient(scripts) {
+    const calls = [];
+    return {
+      calls,
+      beta: {
+        messages: {
+          stream(params) {
+            const sc = scripts[calls.length];
+            calls.push(JSON.parse(JSON.stringify(params)));
+            const h = {};
+            return {
+              on(ev, fn) {
+                (h[ev] = h[ev] || []).push(fn);
+                return this;
+              },
+              async finalMessage() {
+                if (sc.throw) throw sc.throw;
+                for (const [ev, ...args] of sc.events || []) (h[ev] || []).forEach((fn) => fn(...args));
+                return {
+                  stop_reason: sc.stop,
+                  content: sc.content || [{ type: "text", text: "x" }],
+                  usage: {
+                    input_tokens: 10,
+                    output_tokens: 5,
+                    server_tool_use: { web_search_requests: sc.searches || 0 },
+                  },
+                };
+              },
+            };
+          },
+        },
+      },
+    };
+  }
+  const run = async (scripts) => {
+    const client = fakeClient(scripts),
+      out = [];
+    await A.analizar(client, pc, (e) => out.push(e));
+    return { client, out };
+  };
   let r = await run([
-    { stop: "pause_turn", searches: 2, content: [{ type: "server_tool_use", id: "s1", name: "web_search", input: { query: "Barcelona lesiones" } }],
-      events: [["streamEvent", { type: "content_block_start", content_block: { type: "server_tool_use" } }], ["contentBlock", { type: "server_tool_use", input: { query: "Barcelona lesiones" } }], ["text", "Hola "]] },
+    {
+      stop: "pause_turn",
+      searches: 2,
+      content: [
+        { type: "server_tool_use", id: "s1", name: "web_search", input: { query: "Barcelona lesiones" } },
+      ],
+      events: [
+        ["streamEvent", { type: "content_block_start", content_block: { type: "server_tool_use" } }],
+        ["contentBlock", { type: "server_tool_use", input: { query: "Barcelona lesiones" } }],
+        ["text", "Hola "],
+      ],
+    },
     { stop: "end_turn", searches: 1, events: [["text", "mundo"]] },
   ]);
-  check("búsqueda larga (pause_turn): continúa con lo hecho y suma el uso", r.client.calls.length === 2 && r.client.calls[1].messages.at(-1).role === "assistant" && r.client.calls[1].messages.length === 2 &&
-    r.out.filter((e) => e.t === "texto").map((e) => e.v).join("") === "Hola mundo" && r.out.some((e) => e.v === "Buscando: Barcelona lesiones") && r.out.at(-1).t === "fin" && r.out.at(-1).uso.busquedas === 3, JSON.stringify(r.out));
-  r = await run([{ stop: "end_turn", events: [["text", "parcial"], ["streamEvent", { type: "content_block_start", content_block: { type: "fallback" } }], ["text", "nuevo"]] }]);
-  check("si otro modelo retoma la respuesta, la app descarta lo parcial", r.out.map((e) => e.t).join() === "texto,reinicio,texto,fin");
+  check(
+    "búsqueda larga (pause_turn): continúa con lo hecho y suma el uso",
+    r.client.calls.length === 2 &&
+      r.client.calls[1].messages.at(-1).role === "assistant" &&
+      r.client.calls[1].messages.length === 2 &&
+      r.out
+        .filter((e) => e.t === "texto")
+        .map((e) => e.v)
+        .join("") === "Hola mundo" &&
+      r.out.some((e) => e.v === "Buscando: Barcelona lesiones") &&
+      r.out.at(-1).t === "fin" &&
+      r.out.at(-1).uso.busquedas === 3,
+    JSON.stringify(r.out),
+  );
+  r = await run([
+    {
+      stop: "end_turn",
+      events: [
+        ["text", "parcial"],
+        ["streamEvent", { type: "content_block_start", content_block: { type: "fallback" } }],
+        ["text", "nuevo"],
+      ],
+    },
+  ]);
+  check(
+    "si otro modelo retoma la respuesta, la app descarta lo parcial",
+    r.out.map((e) => e.t).join() === "texto,reinicio,texto,fin",
+  );
   r = await run([{ stop: "refusal" }]);
-  check("un rechazo se informa como error legible", r.out.at(-1).t === "error" && !r.out.some((e) => e.t === "fin"));
-  const resp = await A.manejar(req({ modo: "historial", datos: { historial: {} } }), { env, crearCliente: () => fakeClient([{ throw: Object.assign(new Error("rate"), { status: 429 }) }]) });
-  const lines = (await resp.text()).trim().split("\n").map((l) => JSON.parse(l));
-  check("respuesta en streaming: empieza con 'Pensando…' y traduce los errores de la API", resp.headers.get("content-type").includes("ndjson") && lines[0].t === "estado" && lines.at(-1).t === "error" && /límite de uso/.test(lines.at(-1).v), JSON.stringify(lines));
-  check("mensajes de error claros (sin saldo, clave mala)", /saldo/.test(A.mensajeDeError({ status: 400, message: "Your credit balance is too low" })) && /ANTHROPIC_API_KEY/.test(A.mensajeDeError({ status: 401 })));
+  check(
+    "un rechazo se informa como error legible",
+    r.out.at(-1).t === "error" && !r.out.some((e) => e.t === "fin"),
+  );
+  const resp = await A.manejar(req({ modo: "historial", datos: { historial: {} } }), {
+    env,
+    crearCliente: () => fakeClient([{ throw: Object.assign(new Error("rate"), { status: 429 }) }]),
+  });
+  const lines = (await resp.text())
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
+  check(
+    "respuesta en streaming: empieza con 'Pensando…' y traduce los errores de la API",
+    resp.headers.get("content-type").includes("ndjson") &&
+      lines[0].t === "estado" &&
+      lines.at(-1).t === "error" &&
+      /límite de uso/.test(lines.at(-1).v),
+    JSON.stringify(lines),
+  );
+  check(
+    "mensajes de error claros (sin saldo, clave mala)",
+    /saldo/.test(A.mensajeDeError({ status: 400, message: "Your credit balance is too low" })) &&
+      /ANTHROPIC_API_KEY/.test(A.mensajeDeError({ status: 401 })),
+  );
   const edge = fs.readFileSync(path.join(ROOT, "cloudflare/worker.mjs"), "utf8");
-  check("Worker: /api/analista con el SDK oficial y la clave desde las variables de Cloudflare", /nombre === "analista"/.test(edge) && /from "@anthropic-ai\/sdk"/.test(edge) && /env\.ANTHROPIC_API_KEY/.test(edge));
+  check(
+    "Worker: /api/analista con el SDK oficial y la clave desde las variables de Cloudflare",
+    /nombre === "analista"/.test(edge) &&
+      /from "@anthropic-ai\/sdk"/.test(edge) &&
+      /env\.ANTHROPIC_API_KEY/.test(edge),
+  );
 }
 
 section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
@@ -1227,78 +4056,240 @@ section("16. Cloudflare: notificaciones, avisos y el servidor real (workerd)");
   const nodeCrypto = await import("node:crypto");
   const ece = require("http_ece");
   // Teléfono simulado: sus claves y una captura del envío
-  const ua = nodeCrypto.createECDH("prime256v1"); ua.generateKeys();
+  const ua = nodeCrypto.createECDH("prime256v1");
+  ua.generateKeys();
   const auth = nodeCrypto.randomBytes(16);
-  const sub = { endpoint: "https://web.push.apple.com/QAbc", keys: { p256dh: W.b64u(ua.getPublicKey()), auth: W.b64u(auth) } };
+  const sub = {
+    endpoint: "https://web.push.apple.com/QAbc",
+    keys: { p256dh: W.b64u(ua.getPublicKey()), auth: W.b64u(auth) },
+  };
   const keys = await W.generateVapidKeys();
   const realFetch = nativeFetch;
-  let sent = null, status = 201;
-  globalThis.fetch = async (url, init) => { sent = { url, init }; return new Response(null, { status }); };
-  const r1 = await W.sendWebPush(sub, { title: "⏰ Barça", body: "Empieza en 15 min" }, { keys, subject: "https://kal.example.workers.dev" });
-  const plain = ece.decrypt(Buffer.from(sent.init.body), { version: "aes128gcm", privateKey: ua, authSecret: W.b64u(auth) }).toString();
-  check("Web Push: el mensaje cifrado (aes128gcm) se descifra con la librería de referencia", r1 === "ok" && plain === '{"title":"⏰ Barça","body":"Empieza en 15 min"}' && sent.init.headers["Content-Encoding"] === "aes128gcm", plain);
+  let sent = null,
+    status = 201;
+  globalThis.fetch = async (url, init) => {
+    sent = { url, init };
+    return new Response(null, { status });
+  };
+  const r1 = await W.sendWebPush(
+    sub,
+    { title: "⏰ Barça", body: "Empieza en 15 min" },
+    { keys, subject: "https://kal.example.workers.dev" },
+  );
+  const plain = ece
+    .decrypt(Buffer.from(sent.init.body), { version: "aes128gcm", privateKey: ua, authSecret: W.b64u(auth) })
+    .toString();
+  check(
+    "Web Push: el mensaje cifrado (aes128gcm) se descifra con la librería de referencia",
+    r1 === "ok" &&
+      plain === '{"title":"⏰ Barça","body":"Empieza en 15 min"}' &&
+      sent.init.headers["Content-Encoding"] === "aes128gcm",
+    plain,
+  );
   const [, t, k] = sent.init.headers.Authorization.match(/^vapid t=([^,]+), k=(.+)$/);
   const [h, c, sg] = t.split(".");
-  const pk = nodeCrypto.createPublicKey({ key: { kty: "EC", crv: "P-256", x: W.b64u(W.unb64u(k).slice(1, 33)), y: W.b64u(W.unb64u(k).slice(33)) }, format: "jwk" });
+  const pk = nodeCrypto.createPublicKey({
+    key: { kty: "EC", crv: "P-256", x: W.b64u(W.unb64u(k).slice(1, 33)), y: W.b64u(W.unb64u(k).slice(33)) },
+    format: "jwk",
+  });
   const claims = JSON.parse(Buffer.from(W.unb64u(c)).toString());
-  check("Web Push: firma VAPID (ES256) válida, para el servicio correcto y con contacto", nodeCrypto.verify("sha256", Buffer.from(h + "." + c), { key: pk, dsaEncoding: "ieee-p1363" }, Buffer.from(W.unb64u(sg))) && claims.aud === "https://web.push.apple.com" && claims.sub === "https://kal.example.workers.dev" && claims.exp > Date.now() / 1000);
+  check(
+    "Web Push: firma VAPID (ES256) válida, para el servicio correcto y con contacto",
+    nodeCrypto.verify(
+      "sha256",
+      Buffer.from(h + "." + c),
+      { key: pk, dsaEncoding: "ieee-p1363" },
+      Buffer.from(W.unb64u(sg)),
+    ) &&
+      claims.aud === "https://web.push.apple.com" &&
+      claims.sub === "https://kal.example.workers.dev" &&
+      claims.exp > Date.now() / 1000,
+  );
   status = 410;
-  check("Web Push: un teléfono que ya no acepta avisos se detecta", (await W.sendWebPush(sub, {}, { keys, subject: "x" })) === "gone");
+  check(
+    "Web Push: un teléfono que ya no acepta avisos se detecta",
+    (await W.sendWebPush(sub, {}, { keys, subject: "x" })) === "gone",
+  );
   globalThis.fetch = realFetch;
 
   // Lógica de avisos con un almacenamiento en memoria (igual al Durable Object)
   const mem = new Map();
-  const store = { get: async (k2) => (mem.has(k2) ? structuredClone(mem.get(k2)) : null), put: async (k2, v) => void mem.set(k2, structuredClone(v)), delete: async (k2) => void mem.delete(k2), list: async (p) => [...mem.keys()].filter((x) => x.startsWith(p)) };
+  const store = {
+    get: async (k2) => (mem.has(k2) ? structuredClone(mem.get(k2)) : null),
+    put: async (k2, v) => void mem.set(k2, structuredClone(v)),
+    delete: async (k2) => void mem.delete(k2),
+    list: async (p) => [...mem.keys()].filter((x) => x.startsWith(p)),
+  };
   const pushes = [];
-  const fakeSend = async (s2, payload, opts) => { pushes.push({ payload, opts }); return s2.endpoint.includes("muerto") ? "gone" : "ok"; };
-  const call = (body, method = "POST") => avisosHandler(new Request("https://kal-cupones.ejemplo.workers.dev/.netlify/functions/avisos" + (method === "GET" ? "?accion=clave" : ""), { method, body: method === "POST" ? JSON.stringify(body) : undefined }), store, fakeSend);
-  const pub1 = (await (await call(null, "GET")).json()).publicKey, pub2 = (await (await call(null, "GET")).json()).publicKey;
-  check("avisos: clave pública estable y dirección de la app guardada", pub1 && pub1 === pub2 && W.unb64u(pub1).length === 65 && mem.get("config/origin") === "https://kal-cupones.ejemplo.workers.dev");
+  const fakeSend = async (s2, payload, opts) => {
+    pushes.push({ payload, opts });
+    return s2.endpoint.includes("muerto") ? "gone" : "ok";
+  };
+  const call = (body, method = "POST") =>
+    avisosHandler(
+      new Request(
+        "https://kal-cupones.ejemplo.workers.dev/.netlify/functions/avisos" +
+          (method === "GET" ? "?accion=clave" : ""),
+        { method, body: method === "POST" ? JSON.stringify(body) : undefined },
+      ),
+      store,
+      fakeSend,
+    );
+  const pub1 = (await (await call(null, "GET")).json()).publicKey,
+    pub2 = (await (await call(null, "GET")).json()).publicKey;
+  check(
+    "avisos: clave pública estable y dirección de la app guardada",
+    pub1 &&
+      pub1 === pub2 &&
+      W.unb64u(pub1).length === 65 &&
+      mem.get("config/origin") === "https://kal-cupones.ejemplo.workers.dev",
+  );
   const now = Date.now();
-  const saveRes = await (await call({ accion: "guardar", subscription: sub, lead: 15, matches: [{ id: "m1", title: "Barcelona vs Real Madrid", kickoff: new Date(now + 10 * 60000).toISOString() }, { id: "viejo", title: "X", kickoff: new Date(now - 5 * 3600000).toISOString() }] })).json();
+  const saveRes = await (
+    await call({
+      accion: "guardar",
+      subscription: sub,
+      lead: 15,
+      matches: [
+        { id: "m1", title: "Barcelona vs Real Madrid", kickoff: new Date(now + 10 * 60000).toISOString() },
+        { id: "viejo", title: "X", kickoff: new Date(now - 5 * 3600000).toISOString() },
+      ],
+    })
+  ).json();
   check("avisos: guarda solo partidos válidos", saveRes.partidos === 1);
-  await call({ accion: "guardar", subscription: { endpoint: "https://push.example/muerto", keys: { p256dh: "a", auth: "b" } }, matches: [{ id: "z", title: "Y", kickoff: new Date(now + 5 * 60000).toISOString() }] });
+  await call({
+    accion: "guardar",
+    subscription: { endpoint: "https://push.example/muerto", keys: { p256dh: "a", auth: "b" } },
+    matches: [{ id: "z", title: "Y", kickoff: new Date(now + 5 * 60000).toISOString() }],
+  });
   let r = await enviarAvisos(store, fakeSend, now);
   const pre = pushes.filter((p) => /Empieza en 10 min/.test(p.payload.body));
-  check("avisos: 'Empieza en 10 min' con la clave y el contacto de la app; borra teléfonos que ya no existen", r.telefonos === 2 && pre.length === 1 && pre[0].opts.subject === "https://kal-cupones.ejemplo.workers.dev" && pre[0].opts.keys.publicKey === pub1 && (await store.list("sub/")).length === 1, JSON.stringify(r));
+  check(
+    "avisos: 'Empieza en 10 min' con la clave y el contacto de la app; borra teléfonos que ya no existen",
+    r.telefonos === 2 &&
+      pre.length === 1 &&
+      pre[0].opts.subject === "https://kal-cupones.ejemplo.workers.dev" &&
+      pre[0].opts.keys.publicKey === pub1 &&
+      (await store.list("sub/")).length === 1,
+    JSON.stringify(r),
+  );
   pushes.length = 0;
   await enviarAvisos(store, fakeSend, now + 60000);
   check("avisos: no repite el mismo aviso", pushes.length === 0);
   await enviarAvisos(store, fakeSend, now + 11 * 60000);
-  check("avisos: 'Empezó' a la hora del partido", pushes.length === 1 && /Empezó/.test(pushes[0].payload.title));
+  check(
+    "avisos: 'Empezó' a la hora del partido",
+    pushes.length === 1 && /Empezó/.test(pushes[0].payload.title),
+  );
   await enviarAvisos(store, fakeSend, now + 4 * 3600000);
-  check("avisos: limpia partidos de hace más de 3 horas", (await store.get((await store.list("sub/"))[0])).matches.length === 0);
+  check(
+    "avisos: limpia partidos de hace más de 3 horas",
+    (await store.get((await store.list("sub/"))[0])).matches.length === 0,
+  );
   const pr = await call({ accion: "prueba", subscription: sub });
   check("avisos: notificación de prueba", pr.status === 200 && pushes.at(-1).payload.tag === "kal-prueba");
 
   // Servidor real de Cloudflare (workerd) con wrangler dev: archivos, rutas, Analista y tarea programada
   const { spawn } = await import("node:child_process");
   const net = await import("node:net");
-  const port = await new Promise((res) => { const s2 = net.createServer(); s2.listen(0, () => { const p = s2.address().port; s2.close(() => res(p)); }); });
+  const port = await new Promise((res) => {
+    const s2 = net.createServer();
+    s2.listen(0, () => {
+      const p = s2.address().port;
+      s2.close(() => res(p));
+    });
+  });
   let log = "";
-  const dev = spawn(path.join(ROOT, "node_modules/.bin/wrangler"), ["dev", "--port", String(port), "--test-scheduled", "--persist-to", path.join(os.tmpdir(), "kal-wrangler-" + port), "--var", "ANALISTA_CLAVE:secreto", "--var", "ANTHROPIC_API_KEY:sk-prueba", "--var", "API_FOOTBALL_KEY:prueba"], { cwd: ROOT, detached: true, env: { ...process.env, WRANGLER_SEND_METRICS: "false", CI: "1" } });
-  dev.stdout.on("data", (d) => (log += d)); dev.stderr.on("data", (d) => (log += d));
+  const dev = spawn(
+    path.join(ROOT, "node_modules/.bin/wrangler"),
+    [
+      "dev",
+      "--port",
+      String(port),
+      "--test-scheduled",
+      "--persist-to",
+      path.join(os.tmpdir(), "kal-wrangler-" + port),
+      "--var",
+      "ANALISTA_CLAVE:secreto",
+      "--var",
+      "ANTHROPIC_API_KEY:sk-prueba",
+      "--var",
+      "API_FOOTBALL_KEY:prueba",
+    ],
+    { cwd: ROOT, detached: true, env: { ...process.env, WRANGLER_SEND_METRICS: "false", CI: "1" } },
+  );
+  dev.stdout.on("data", (d) => (log += d));
+  dev.stderr.on("data", (d) => (log += d));
   const B2 = `http://127.0.0.1:${port}`;
   let up = false;
-  for (let i = 0; i < 120 && !up; i++) { await new Promise((res) => setTimeout(res, 500)); up = await realFetch(B2 + "/").then((x) => x.ok, () => false); }
+  for (let i = 0; i < 120 && !up; i++) {
+    await new Promise((res) => setTimeout(res, 500));
+    up = await realFetch(B2 + "/").then(
+      (x) => x.ok,
+      () => false,
+    );
+  }
   check("workerd: el Worker arranca", up, log.slice(-400));
   if (up) {
-    const home = await realFetch(B2 + "/"), swr = await realFetch(B2 + "/sw.js"), css = await realFetch(B2 + "/css/16-analista.css");
-    check("workerd: sirve la app sin caché en la página y con el permiso del service worker", home.headers.get("cache-control") === "no-cache" && /<title>/.test(await home.text()) && swr.headers.get("service-worker-allowed") === "/" && css.ok);
+    const home = await realFetch(B2 + "/"),
+      swr = await realFetch(B2 + "/sw.js"),
+      css = await realFetch(B2 + "/css/16-analista.css");
+    check(
+      "workerd: sirve la app sin caché en la página y con el permiso del service worker",
+      home.headers.get("cache-control") === "no-cache" &&
+        /<title>/.test(await home.text()) &&
+        swr.headers.get("service-worker-allowed") === "/" &&
+        css.ok,
+    );
     const clave = await (await realFetch(B2 + "/api/avisos?accion=clave")).json();
-    check("workerd: avisos con almacenamiento (Durable Object) y claves generadas", W.unb64u(clave.publicKey).length === 65);
-    const guard = await (await realFetch(B2 + "/api/avisos", { method: "POST", body: JSON.stringify({ accion: "guardar", lead: 15, subscription: sub, matches: [{ id: "w1", title: "A vs B", kickoff: new Date(Date.now() + 10 * 60000).toISOString() }] }) })).json();
-    const an = await realFetch(B2 + "/api/analista", { method: "POST", headers: { "x-kal-clave": "malo" }, body: "{}" });
+    check(
+      "workerd: avisos con almacenamiento (Durable Object) y claves generadas",
+      W.unb64u(clave.publicKey).length === 65,
+    );
+    const guard = await (
+      await realFetch(B2 + "/api/avisos", {
+        method: "POST",
+        body: JSON.stringify({
+          accion: "guardar",
+          lead: 15,
+          subscription: sub,
+          matches: [{ id: "w1", title: "A vs B", kickoff: new Date(Date.now() + 10 * 60000).toISOString() }],
+        }),
+      })
+    ).json();
+    const an = await realFetch(B2 + "/api/analista", {
+      method: "POST",
+      headers: { "x-kal-clave": "malo" },
+      body: "{}",
+    });
     const nf = await realFetch(B2 + "/api/nada");
     const fb = await (await realFetch(B2 + "/.netlify/functions/escudos")).json().catch(() => ({}));
-    check("workerd: rutas de funciones y Analista protegidas", guard.partidos === 1 && an.status === 401 && nf.status === 404 && typeof fb === "object", JSON.stringify(guard));
+    check(
+      "workerd: rutas de funciones y Analista protegidas",
+      guard.partidos === 1 && an.status === 401 && nf.status === 404 && typeof fb === "object",
+      JSON.stringify(guard),
+    );
     const dp = await realFetch(B2 + "/api/datos-partido?home=Barcelona&away=Madrid&date=2026-11-22");
-    check("workerd: datos del partido sin clave explica cómo configurarla", dp.status === 503 && (await dp.json()).codigo === "sin_clave");
+    check(
+      "workerd: datos del partido sin clave explica cómo configurarla",
+      dp.status === 503 && (await dp.json()).codigo === "sin_clave",
+    );
     await realFetch(B2 + "/__scheduled?cron=*/5+*+*+*+*");
-    for (let i = 0; i < 20 && !/avisos: \d+ teléfono/.test(log); i++) await new Promise((res) => setTimeout(res, 300));
-    check("workerd: la tarea programada de avisos corre", /avisos: 1 teléfono\(s\)/.test(log), log.split("\n").filter((l) => /avisos|rror/.test(l)).slice(-3).join(" | "));
+    for (let i = 0; i < 20 && !/avisos: \d+ teléfono/.test(log); i++)
+      await new Promise((res) => setTimeout(res, 300));
+    check(
+      "workerd: la tarea programada de avisos corre",
+      /avisos: 1 teléfono\(s\)/.test(log),
+      log
+        .split("\n")
+        .filter((l) => /avisos|rror/.test(l))
+        .slice(-3)
+        .join(" | "),
+    );
   }
-  try { process.kill(-dev.pid, "SIGTERM"); } catch {} // termina wrangler y su workerd (mismo grupo de procesos)
+  try {
+    process.kill(-dev.pid, "SIGTERM");
+  } catch {} // termina wrangler y su workerd (mismo grupo de procesos)
   await new Promise((res) => setTimeout(res, 500));
   fs.rmSync(path.join(os.tmpdir(), "kal-wrangler-" + port), { recursive: true, force: true });
 }

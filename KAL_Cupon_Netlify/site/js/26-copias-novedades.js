@@ -205,8 +205,18 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "18";
+const APP_VERSION = "18.1";
 const NOVEDADES = [
+  {
+    v: "18.1",
+    titulo: "Goleadores y jugadores en el partido en vivo",
+    items: [
+      "＋ Seguir jugador: en el marcador en vivo puedes añadir a cualquier jugador (aunque no tenga mercado) y anotar sus remates, remates a puerta y goles.",
+      "⚽ Cada jugador tiene su contador de Goles: al sumar uno también sube el marcador de su equipo; al restarlo se revierte.",
+      "＋ Goleador siempre visible para anotar quién marcó.",
+      "Todo alimenta los registros y promedios de cada jugador, y el Analista los usa.",
+    ],
+  },
   {
     v: "18",
     titulo: "Tus registros de equipos y jugadores",
