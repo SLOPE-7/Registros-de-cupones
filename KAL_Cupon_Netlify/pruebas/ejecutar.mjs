@@ -100,7 +100,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
   await ctx.addInitScript(([d, extra]) => {
     if (!localStorage.getItem("kal_coupon_organizer_v2") && d) localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
     localStorage.setItem("kal_last_backup", String(Date.now()));
-    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "16.5");
+    if (extra !== "news" && !localStorage.getItem("kal_version_vista")) localStorage.setItem("kal_version_vista", "17");
     if (extra === "push") {
       let perm = "default";
       Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -371,12 +371,12 @@ section("9. Barra de progreso de mercados");
   const flags = await page.evaluate(() => ["España", "Inglaterra", "Países Bajos", "Estados Unidos", "Honduras", "Costa de Marfil", "Brasil Sub 20", "Real Madrid"].map(nationFlag).join(" "));
   check("banderas de selecciones (y ninguna para clubes)", flags.split(" ").filter(Boolean).length === 7 && !flags.trim().endsWith("🇪🇸 "), flags);
   const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
-  for (let i = 0; i < 3; i++) { await tap(page, stBtn("goals")); await page.waitForTimeout(80); }
+  for (let i = 0; i < 3; i++) { await tap(page, stBtn("goals:home")); await page.waitForTimeout(80); }
   check("Más de 2.5 goles: con 3 en el marcador se marca ganado solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "won");
   check("avisa con un mensaje de línea superada", /superada/.test(await page.$eval("#toast", (e) => e.textContent)), await page.$eval("#toast", (e) => e.textContent));
-  await tap(page, stBtn("goals", -1)); await page.waitForTimeout(100);
+  await tap(page, stBtn("goals:home", -1)); await page.waitForTimeout(100);
   check("si restas, vuelve a pendiente", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[0].settlement)) === "pending");
-  for (let i = 0; i < 3; i++) { await tap(page, stBtn("corners")); await page.waitForTimeout(80); }
+  for (let i = 0; i < 3; i++) { await tap(page, stBtn("corners:away")); await page.waitForTimeout(80); }
   check("Menos de 2.5 córners: con 3 se marca perdido solo", (await page.evaluate(() => db.coupons[0].fixtures[0].markets[1].settlement)) === "lost");
   await page.evaluate(() => { db.coupons[0].fixtures[0].markets[1].settlement = "pending"; db.stats = {}; db.progress = {}; save(); renderAll(); });
   await page.waitForTimeout(100);
@@ -391,7 +391,7 @@ section("9. Barra de progreso de mercados");
   await page.click(".match-close"); await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
   check("la Agenda muestra el progreso en miniatura", /Goles 0\/3/.test(await page.$eval("#agendaList", (e) => e.innerText)), await page.$eval("#agendaList", (e) => e.innerText.replace(/\s+/g, " ")));
   await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(150);
-  await tap(page, stBtn("cards")); await page.waitForTimeout(80);
+  await tap(page, stBtn("cards:home")); await page.waitForTimeout(80);
   await page.click("[data-pg-finish]"); await page.waitForTimeout(200);
   const st = await page.evaluate(() => db.coupons[0].fixtures[0].markets.map((m) => m.settlement).join(","));
   check("Terminó el partido: Más de sin llegar → perdido, Menos de → ganado", st === "lost,won,won,lost,pending", st);
@@ -794,7 +794,7 @@ section("21. Copias automáticas, espejo, novedades y rutas /api");
 {
   const { ctx, page } = await open(baseDb(), { init: "news" });
   await page.waitForTimeout(1400);
-  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 16.5/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
+  check("novedades: se muestran una vez al llegar la versión nueva", (await page.$(".news-wrap")) !== null && /Versión 17/.test(await page.$eval(".news-sheet", (e) => e.innerText)));
   await tap(page, "[data-news-close]");
   await page.reload(); await page.waitForTimeout(1500);
   check("novedades: no se repiten al volver a abrir", (await page.$(".news-wrap")) === null);
@@ -881,7 +881,7 @@ section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
   const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
   const pk = await page.evaluate(() => crestNorm("Michael Olise"));
   const status = () => page.evaluate(() => db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "));
-  for (let i = 0; i < 2; i++) { await tap(page, stBtn("goals")); await page.waitForTimeout(100); }
+  for (let i = 0; i < 2; i++) { await tap(page, stBtn("goals:home")); await page.waitForTimeout(100); }
   check("2 goles: las dos líneas de +1.5 (una en cada cupón) quedan ganadas a la vez", (await status()) === "wpp wpp", await status());
   await tap(page, stBtn(`player:${pk}:main:onTarget`)); await page.waitForTimeout(150);
   const s1 = await page.evaluate((pk) => ({ st: db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "), p: Object.values(db.stats)[0].players[pk] }), pk);
@@ -995,6 +995,69 @@ section("25. Búsqueda de logos en varias fuentes, en español e inglés");
   const safe = await page.evaluate(() => ["https://crests.football-data.org/5.svg", "https://flagcdn.com/w160/es.png", "https://commons.wikimedia.org/wiki/Special:FilePath/Liga_MX_logo.svg?width=200", "https://evil.example.com/logo.png"].map(safeCrestSource).join());
   check("la app muestra escudos de las fuentes nuevas (y no de otras)", safe === "true,true,true,false", safe);
   await ctx.close();
+}
+
+section("26. Ficha del partido: marcador por equipo, resultado automático, IA y banderas");
+{
+  const now = Date.now(), day = isoDay(now), time = new Date(now + 30 * 60e3).toTimeString().slice(0, 5);
+  const fx = (id, markets, b) => ({ id, home: "Sudan", away: "Senegal", league: "Africa, Copa de Naciones Africanas, Cla", competition: "Copa de Naciones Africanas,Cla", country: "Africa", dateISO: day, time, builderOdd: b, markets });
+  const mk = (market, pick, b, builder = true) => ({ market, pick, odd: "", builder, builderOdd: b, settlement: "pending" });
+  const db0 = { coupons: [
+    { id: "C1", name: "Cupón 1", created: new Date(now).toISOString(), stake: 5, odds: 1.36, payout: 6.8, fixtures: [fx("a", [mk("Doble oportunidad", "Empate o 2", "1.36"), mk("Total de goles", "Más de 1.5", "1.36")], "1.36")] },
+    { id: "C2", name: "Cupón 2", created: new Date(now).toISOString(), stake: 5, odds: 1.41, payout: 7.05, fixtures: [fx("b", [mk("Doble oportunidad", "Empate o Senegal", "1.41"), mk("Total", "Más de 1.5", "1.41"), mk("Ambos equipos marcan", "Sí", "1.41"), mk("Total de goles - Senegal", "Más de 1.5", "1.41"), mk("Total Tiros De Esquina", "Más de 7.5", "1.41")], "1.41")] },
+  ], houses: [], transactions: [], resultHistory: [], actionHistory: [], statsMigrated: true };
+  const { ctx, page } = await open(db0);
+  const pure = await page.evaluate(() => {
+    const f = { home: "Sudan", away: "Senegal" }, sp = (market, pick) => outcomeSpec({ market, pick }, f);
+    const key = (market, pick) => outcomeKey(sp(market, pick));
+    return {
+      same: key("Doble oportunidad", "Empate o 2") === key("Doble oportunidad", "Empate o Senegal") && key("Doble oportunidad", "X2") === key("Doble oportunidad", "Empate o 2"),
+      diff: key("Doble oportunidad", "1 o empate") !== key("Doble oportunidad", "Empate o 2"),
+      res: [outcomeResult(sp("Doble oportunidad", "Empate o 2"), 0, 2), outcomeResult(sp("Doble oportunidad", "Empate o 2"), 1, 0), outcomeResult(sp("1x2", "Sudan"), 1, 0), outcomeResult(sp("1x2", "X"), 1, 1), outcomeResult(sp("Ambos equipos marcan", "Sí"), 1, 0), outcomeResult(sp("Ambos equipos marcan", "No"), 1, 0), outcomeResult(sp("Apuesta sin empate", "2"), 1, 1), outcomeResult(sp("2 marcará", "Sí"), 0, 1)].join(),
+      none: [sp("1x2 - 1ª mitad", "1"), sp("Total de goles", "Más de 1.5"), sp("Hándicap", "2 (+0.5)"), sp("Argelia gana cualquier mitad", "Sí")].every((x) => x === null),
+      side: [marketSide({ market: "Total de goles - Senegal", pick: "Más de 1.5" }, f), marketSide({ market: "1 total de goles", pick: "Más de 0.5" }, f), marketSide({ market: "Total de goles", pick: "Más de 1.5" }, f)].join(),
+      flags: [nationFlagUrl("Sudan"), nationFlagUrl("Sudán"), nationFlagUrl("Senegal"), nationFlagUrl("Costa de Marfil"), nationFlagUrl("Real Madrid")].join(),
+      comp: db.coupons[0].fixtures[0].competition + " | " + parseCoupon("Africa, Copa de Naciones Africanas, Cla 16/11 • 07:00\nSudan vs. Senegal\nTotal de goles: Más de 1.5\nCuotas:\n1.36").fixtures[0].competition,
+    };
+  });
+  check("mercados de resultado: 'Empate o 2' = 'Empate o Senegal' = 'X2'; se resuelven con el marcador", pure.same && pure.diff && pure.res === "won,lost,won,won,lost,won,void,won" && pure.none, JSON.stringify(pure));
+  check("mercado de un solo equipo se reconoce por el nombre o '1/2 total'", pure.side === "away,home,", pure.side);
+  check("banderas de selecciones por su nombre (con o sin tilde); ninguna para clubes", pure.flags === "https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sn.png,https://flagcdn.com/w160/ci.png,", pure.flags);
+  check("competición cortada por la casa: 'Cla' → 'Clasificación' (cupones guardados y nuevos)", /Clasificación \| Copa de Naciones Africanas, Clasificación/.test(pure.comp), pure.comp);
+  await view(page, "calendar"); await page.click('[data-agenda-range="all"]');
+  await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click()); await page.waitForTimeout(250);
+  const ui = await page.evaluate(() => ({ cards: [...document.querySelectorAll(".match-tab-content > .mk-card")].map((e) => e.innerText.replace(/\s+/g, " ").slice(0, 60)), crests: [...document.querySelectorAll(".hero-team img.team-crest")].map((i) => i.dataset.crestUrl), board: document.querySelector(".live-board").innerText.replace(/\s+/g, " "), vs: document.querySelector(".hero-vs").textContent, finish: !!document.querySelector("[data-pg-finish]"), ai: !!document.querySelector("[data-match-ai]") }));
+  check("la ficha junta los dos 'Doble oportunidad' y los dos '+1.5 goles' (5 tarjetas en vez de 7)", ui.cards.length === 5 && ui.cards.filter((c) => /Doble oportunidad/.test(c)).length === 1, ui.cards.join(" || "));
+  check("los dos equipos muestran su bandera sin haberla buscado", ui.crests.join() === "https://flagcdn.com/w160/sd.png,https://flagcdn.com/w160/sn.png", ui.crests.join());
+  check("marcador por equipo: goles y córners de Sudan y de Senegal, y botón del Analista", /Goles Total: 0 .*Sudan.*Senegal/.test(ui.board) && /Córners Total: 0/.test(ui.board) && ui.vs === "VS" && ui.finish && ui.ai, ui.board);
+  const stBtn = (target, step = 1) => `.live-board button[data-st-target="${target}"][data-st-step="${step}"]`;
+  const status = () => page.evaluate(() => db.coupons.map((c) => c.fixtures[0].markets.map((m) => m.settlement[0]).join("")).join(" "));
+  await tap(page, stBtn("goals:away")); await page.waitForTimeout(150);
+  const g1 = await page.evaluate(() => ({ toast: $("toast").textContent, score: document.querySelector(".hero-score")?.textContent, pop: document.querySelector(".hero-score")?.classList.contains("goal-pop") }));
+  check("gol de Senegal: aviso, marcador 0 – 1 en la cabecera y animación", /Gol de Senegal! 0 – 1/.test(g1.toast) && g1.score === "0 – 1" && g1.pop, JSON.stringify(g1));
+  await tap(page, stBtn("goals:away")); await page.waitForTimeout(150);
+  check("0 – 2: se ganan '+1.5 goles' (los dos cupones) y '+1.5 goles de Senegal'; lo demás espera", (await status()) === "pw pwpwp", await status());
+  await tap(page, stBtn("goals:home")); await page.waitForTimeout(150);
+  page.promptAnswer = "1-2";
+  await tap(page, "[data-pg-finish]"); await page.waitForTimeout(400);
+  await page.evaluate(() => document.querySelector(".result-card-wrap")?.click());
+  check("Terminó el partido 1-2: doble oportunidad (en los dos cupones) y ambos marcan ganados; córners sin llegar, perdido", (await status()) === "ww wwwwl", await status());
+  // Desmarcar tocando de nuevo
+  await page.evaluate(() => { if (!document.querySelector(".marked-fold.is-open")) document.querySelector("[data-marked-toggle]").click(); }); await page.waitForTimeout(120);
+  await page.evaluate(() => [...document.querySelectorAll(".marked-fold .mk-card")].find((e) => /Ambos equipos/.test(e.innerText)).querySelector(".mk-btn.won.selected").click()); await page.waitForTimeout(200);
+  await page.evaluate(() => document.querySelector(".result-card-wrap")?.click());
+  check("tocar de nuevo un estado ya marcado lo devuelve a pendiente", (await status()) === "ww wwpwl", await status());
+  // IA del partido
+  await page.evaluate(() => { analystSave({ clave: "secreto" }); db.coupons[1].fixtures[0].markets[4].settlement = "pending"; save(); renderAll(); });
+  const before = analystPosts.length;
+  await tap(page, "[data-match-ai]"); await page.waitForTimeout(1300);
+  const post = analystPosts.at(-1);
+  const aiUi = await page.evaluate(() => ({ saved: !!Object.values(db.stats)[0].ai?.texto, box: document.querySelector(".match-ai").innerText.replace(/\s+/g, " ").slice(0, 80), details: !!document.querySelector(".match-ai-saved") }));
+  check("🤖 Analizar este partido: envía solo sus mercados pendientes (sin repetir) y guarda el análisis en el partido", analystPosts.length === before + 1 && post.modo === "cupon" && /Sudan vs Senegal/.test(post.datos.cupon) && (post.datos.cupon.match(/^- /gm) || []).length === 2 && post.datos.partidos.length === 1 && aiUi.saved && aiUi.details, JSON.stringify(aiUi) + " " + post.datos.cupon);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+  const gen = await import(path.join(ROOT, "herramientas/generar-paises.mjs"));
+  check("la lista de países de la app está al día con la del servidor", fs.readFileSync(path.join(ROOT, "site/js/29-paises.js"), "utf8") === gen.contenido());
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

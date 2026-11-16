@@ -205,8 +205,20 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "16.5";
+const APP_VERSION = "17";
 const NOVEDADES = [
+  {
+    v: "17",
+    titulo: "El partido en vivo",
+    items: [
+      "⚽ Marcador por equipo: goles, córners y tarjetas de cada equipo, con el resultado en la cabecera y animación de gol.",
+      "🏁 “Terminó el partido” confirma el marcador final y marca solos 1X2, doble oportunidad, ambos marcan y apuesta sin empate.",
+      "🔗 “Empate o 2” y “Empate o Senegal” ya son un solo mercado.",
+      "↩️ Toca de nuevo un estado marcado para desmarcarlo.",
+      "🤖 “Analizar este partido” en la ficha; cada mercado muestra la probabilidad y la confianza del Analista.",
+      "🏳️ Banderas automáticas para selecciones y búsqueda de logos en español e inglés.",
+    ],
+  },
   {
     v: "16.5",
     titulo: "Marcador en vivo y Analista en cada cupón",

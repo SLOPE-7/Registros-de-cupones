@@ -1,0 +1,25 @@
+// GENERADO por herramientas/generar-paises.mjs a partir de servidor/nombres.mjs. No editar a mano.
+// Países y selecciones en español e inglés, con el código de su bandera (flagcdn.com).
+"use strict";
+const KAL_COUNTRIES = [["Alemania","Germany","de"],["Albania","Albania","al"],["Andorra","Andorra","ad"],["Armenia","Armenia","am"],["Austria","Austria","at"],["Azerbaiyán","Azerbaijan","az"],["Bélgica","Belgium","be"],["Bielorrusia","Belarus","by"],["Bosnia y Herzegovina","Bosnia and Herzegovina","ba","bosnia"],["Bulgaria","Bulgaria","bg"],["Chipre","Cyprus","cy"],["Croacia","Croatia","hr"],["Dinamarca","Denmark","dk"],["Escocia","Scotland","gb-sct"],["Eslovaquia","Slovakia","sk"],["Eslovenia","Slovenia","si"],["España","Spain","es"],["Estonia","Estonia","ee"],["Finlandia","Finland","fi"],["Francia","France","fr"],["Gales","Wales","gb-wls"],["Georgia","Georgia","ge"],["Gibraltar","Gibraltar","gi"],["Grecia","Greece","gr"],["Hungría","Hungary","hu"],["Inglaterra","England","gb-eng"],["Irlanda","Ireland","ie","republic of ireland"],["Irlanda del Norte","Northern Ireland","gb-nir"],["Islandia","Iceland","is"],["Islas Feroe","Faroe Islands","fo"],["Israel","Israel","il"],["Italia","Italy","it"],["Kazajistán","Kazakhstan","kz"],["Kosovo","Kosovo","xk"],["Letonia","Latvia","lv"],["Liechtenstein","Liechtenstein","li"],["Lituania","Lithuania","lt"],["Luxemburgo","Luxembourg","lu"],["Macedonia del Norte","North Macedonia","mk","macedonia"],["Malta","Malta","mt"],["Moldavia","Moldova","md"],["Montenegro","Montenegro","me"],["Noruega","Norway","no"],["Países Bajos","Netherlands","nl","holanda","holland"],["Polonia","Poland","pl"],["Portugal","Portugal","pt"],["Reino Unido","United Kingdom","gb"],["República Checa","Czechia","cz","chequia","czech republic"],["Rumania","Romania","ro","rumanía"],["Rusia","Russia","ru"],["San Marino","San Marino","sm"],["Serbia","Serbia","rs"],["Suecia","Sweden","se"],["Suiza","Switzerland","ch"],["Turquía","Turkey","tr","turkiye"],["Ucrania","Ukraine","ua"],["Argentina","Argentina","ar"],["Bolivia","Bolivia","bo"],["Brasil","Brazil","br"],["Chile","Chile","cl"],["Colombia","Colombia","co"],["Ecuador","Ecuador","ec"],["Paraguay","Paraguay","py"],["Perú","Peru","pe"],["Uruguay","Uruguay","uy"],["Venezuela","Venezuela","ve"],["Canadá","Canada","ca"],["Costa Rica","Costa Rica","cr"],["Cuba","Cuba","cu"],["El Salvador","El Salvador","sv"],["Estados Unidos","United States","us","usa","eeuu","ee uu"],["Guatemala","Guatemala","gt"],["Haití","Haiti","ht"],["Honduras","Honduras","hn"],["Jamaica","Jamaica","jm"],["México","Mexico","mx"],["Nicaragua","Nicaragua","ni"],["Panamá","Panama","pa"],["República Dominicana","Dominican Republic","do"],["Trinidad y Tobago","Trinidad and Tobago","tt"],["Curazao","Curacao","cw"],["Surinam","Suriname","sr"],["Argelia","Algeria","dz"],["Angola","Angola","ao"],["Benín","Benin","bj"],["Burkina Faso","Burkina Faso","bf"],["Cabo Verde","Cape Verde","cv"],["Camerún","Cameroon","cm"],["Costa de Marfil","Ivory Coast","ci","cote d ivoire"],["Egipto","Egypt","eg"],["Gabón","Gabon","ga"],["Gambia","Gambia","gm"],["Ghana","Ghana","gh"],["Guinea","Guinea","gn"],["Guinea Ecuatorial","Equatorial Guinea","gq"],["Kenia","Kenya","ke"],["Libia","Libya","ly"],["Malí","Mali","ml"],["Marruecos","Morocco","ma"],["Mauritania","Mauritania","mr"],["Mozambique","Mozambique","mz"],["Namibia","Namibia","na"],["Nigeria","Nigeria","ng"],["RD Congo","DR Congo","cd","republica democratica del congo","congo dr"],["Congo","Congo","cg"],["Senegal","Senegal","sn"],["Sierra Leona","Sierra Leone","sl"],["Somalia","Somalia","so"],["Sudáfrica","South Africa","za"],["Sudán","Sudan","sd"],["Tanzania","Tanzania","tz"],["Togo","Togo","tg"],["Túnez","Tunisia","tn"],["Uganda","Uganda","ug"],["Zambia","Zambia","zm"],["Zimbabue","Zimbabwe","zw"],["Arabia Saudita","Saudi Arabia","sa","arabia saudi"],["Australia","Australia","au"],["China","China","cn"],["Corea del Sur","South Korea","kr","korea republic"],["Emiratos Árabes Unidos","United Arab Emirates","ae","emiratos"],["India","India","in"],["Irak","Iraq","iq"],["Irán","Iran","ir"],["Japón","Japan","jp"],["Jordania","Jordan","jo"],["Nueva Zelanda","New Zealand","nz"],["Qatar","Qatar","qa","catar"],["Uzbekistán","Uzbekistan","uz"]];
+const KAL_COUNTRY_INDEX = new Map();
+KAL_COUNTRIES.forEach((c) => [c[0], c[1], ...c.slice(3)].forEach((n) => KAL_COUNTRY_INDEX.set(crestNorm(n), c)));
+// Devuelve { es, en, flag } si el nombre es un país o su selección ("España", "Spain U21", "Sudan").
+function findCountryLocal(name) {
+  const full = crestNorm(name);
+  let c = KAL_COUNTRY_INDEX.get(full);
+  if (!c) {
+    const n = full
+      .replace(/^(seleccion|national team) (de |of )?/, "")
+      .replace(/\b(national|team|nt|women|femenil|femenina|femenino)\b/g, " ")
+      .replace(/\b(u|sub)\s?(17|19|20|21|23)\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    c = KAL_COUNTRY_INDEX.get(n);
+  }
+  return c ? { es: c[0], en: c[1], flag: c[2] } : null;
+}
+const nationFlagUrl = (name) => {
+  const c = findCountryLocal(name);
+  return c ? "https://flagcdn.com/w160/" + c.flag + ".png" : "";
+};

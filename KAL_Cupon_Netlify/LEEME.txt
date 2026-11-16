@@ -436,3 +436,14 @@ V16.7 — ANALISTA MÁS PRECISO (servidor/analista.mjs)
 - Calibración: se guarda la probabilidad que dio a cada selección; Estadísticas muestra "dio de media X % y acertaron Y %", y el Analista recibe ese dato para corregirse.
 - Costo: cada revisión cuesta algo más (más razonamiento y, en cupones largos, más búsquedas).
 Pruebas: 257.
+
+VERSIÓN 17 — EL PARTIDO EN VIVO (site/js/30-partido-en-vivo.js, site/js/29-paises.js)
+- Marcador por equipo: goles, córners y tarjetas de cada equipo (− / ＋ o tocar el número); el total es la suma. El resultado se ve en la cabecera del partido, con animación y aviso en cada gol.
+- Mercados de un solo equipo ("Total de goles - Senegal", "1 total de goles") usan el contador de ese equipo.
+- "🏁 Terminó el partido": pide confirmar el marcador final y marca solos 1X2, doble oportunidad, ambos marcan, apuesta sin empate y "equipo marcará", además de las líneas. No toca mercados de mitades, hándicap ni marcador exacto.
+- El mismo pick escrito distinto ("Empate o 2", "Empate o Senegal", "X2") se ve como un solo mercado y se marca en todos los cupones.
+- Tocar de nuevo un estado ya marcado (Ganado/Perdido/Nulo) lo devuelve a pendiente.
+- "🤖 Analizar este partido" en la ficha: el Analista revisa solo los mercados pendientes de ese partido; el análisis se guarda en el partido y cada mercado muestra "🤖 ≈ 72 % · Media · eslabón débil".
+- Banderas automáticas cuando los dos equipos son selecciones (lista de países compartida con el servidor; se regenera con: node herramientas/generar-paises.mjs).
+- Correcciones: "Copa de Naciones Africanas,Cla" → "Copa de Naciones Africanas, Clasificación" (cupones guardados y nuevos).
+Pruebas: 271.

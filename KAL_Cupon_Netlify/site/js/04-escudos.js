@@ -175,6 +175,15 @@ function applySavedCrests(f) {
   if (!f.countryFlag) f.countryFlag = dir[savedCrestKey("country", f.countryCode || f.country)]?.url || "";
   if (!f.homeCrest) f.homeCrest = dir[savedCrestKey("team", f.home)]?.url || "";
   if (!f.awayCrest) f.awayCrest = dir[savedCrestKey("team", f.away)]?.url || "";
+  // Partido entre selecciones: si falta un escudo, se usa la bandera del país.
+  if ((!f.homeCrest || !f.awayCrest) && typeof nationFlagUrl === "function") {
+    const h = nationFlagUrl(f.home),
+      a = nationFlagUrl(f.away);
+    if (h && a) {
+      if (!f.homeCrest) f.homeCrest = h;
+      if (!f.awayCrest) f.awayCrest = a;
+    }
+  }
   if (!f.leagueCrest) f.leagueCrest = dir[savedCrestKey("league", f.competition || f.league)]?.url || "";
   if (!f.country) {
     f.country =

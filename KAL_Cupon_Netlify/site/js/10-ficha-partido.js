@@ -250,6 +250,7 @@ function matchMarketCard(x) {
     "</strong>" +
     (x.m.pick ? "<b>" + esc(x.m.pick) + "</b>" : "") +
     (x.m.earlyPayout ? '<span class="mk-tag">⚡ Pago anticipado</span>' : "") +
+    aiChipHtml(x.ai || x.m.ai) +
     '</div><span class="mk-odd">' +
     (odd > 1 ? esc(String(odd.toFixed(2))) : "—") +
     "</span></div>" +
@@ -310,6 +311,7 @@ function renderMatchMarkets(merged) {
       : "") +
     finishMatchButton(all[0].f, pending) +
     liveBoardHtml(all[0].f) +
+    matchAiHtml(all[0].f) +
     (pending.length
       ? pending.map(matchMarketCard).join("")
       : '<div class="empty small"><strong>Todo marcado ✓</strong>No quedan mercados pendientes en este partido.</div>') +
@@ -895,13 +897,14 @@ function renderMatchDetail(ref = currentMatchRef) {
         ? [
             "linea",
             kind.type,
+            kind.side || "",
             kind.stat || "",
             kind.playerKey || "",
             kind.incl ? "s" : "",
             info.dir,
             info.line,
           ].join("|")
-        : k;
+        : outcomeKey(outcomeSpec(x.m, x.f)) || k;
     if (!merged.has(g)) merged.set(g, { key: k, keys: [], f: x.f, m: x.m, coupons: new Set() });
     const e = merged.get(g);
     if (!e.keys.includes(k)) e.keys.push(k);
@@ -910,6 +913,7 @@ function renderMatchDetail(ref = currentMatchRef) {
       x.m.settlement === e.m.settlement
     )
       e.m = x.m;
+    if (x.m.ai && !e.ai) e.ai = x.m.ai;
     e.coupons.add(x.c.id);
   });
   merged.forEach((e) => (e.statusKey = e.keys.join("||")));
@@ -946,7 +950,9 @@ function renderMatchDetail(ref = currentMatchRef) {
     crestHTML(f.homeCrest, f.home) +
     "<strong>" +
     esc(f.home) +
-    '</strong></div><span class="hero-vs">VS</span><div class="hero-team">' +
+    "</strong></div>" +
+    heroScoreHtml(f) +
+    '<div class="hero-team">' +
     crestHTML(f.awayCrest, f.away) +
     "<strong>" +
     esc(f.away) +

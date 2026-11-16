@@ -34,18 +34,10 @@ function statKind(m, f, info = parseLine(m, f)) {
           ? "cards"
           : null;
   if (!type) return null;
-  // De un solo equipo: nombre del equipo en el mercado, "1 total", "2 total", "local", "visitante"…
-  const x = crestNorm((m.market || "") + " " + (m.pick || "")),
-    team = (t) => {
-      const n = crestNorm(t);
-      return n && (x.includes(n) || n.split(" ").some((w) => w.length >= 5 && x.split(" ").includes(w)));
-    };
-  if (
-    /^(1|2) (total|marcara|anotara)|\blocal\b|\bvisitante\b|\bequipo\b/.test(x) ||
-    team(f.home) ||
-    team(f.away)
-  )
-    return null;
+  // De un solo equipo ("Total de goles - Como", "1 total de goles"): usa el contador de ese equipo.
+  const side = marketSide(m, f);
+  if (side === "?") return null; // no se sabe de cuál: contador propio
+  if (side) return { type, side };
   return { type };
 }
 
@@ -65,7 +57,8 @@ const shotsOf = (o) =>
       );
 const shotValue = (o, stat) => (!o ? 0 : stat === "onTarget" ? Number(o.onTarget) || 0 : shotsOf(o));
 function lineValueFromStats(st, kind) {
-  if (kind.type !== "player") return Number(st[kind.type]) || 0;
+  if (kind.type !== "player")
+    return kind.side ? teamStat(st, kind.side, kind.type) : Number(st[kind.type]) || 0;
   const p = st.players?.[kind.playerKey];
   if (!p) return 0;
   return shotValue(p, kind.stat) + (kind.incl && p.sub ? shotValue(p.sub, kind.stat) : 0);
@@ -85,7 +78,9 @@ function statStep(fk, target, delta) {
   st.players = st.players || {};
   st.auto = st.auto || {};
   const [kind, pk, who, stat] = target.split(":"); // "goals" | "player:<clave>:main|sub:onTarget|shots"
-  if (kind !== "player") st[kind] = Math.max(0, (Number(st[kind]) || 0) + delta);
+  if (teamStatStep(st, kind, pk, delta, fixtureByKey(fk))) {
+    // contador de un equipo ("goals:home"): ya sumó también al total
+  } else if (kind !== "player") st[kind] = Math.max(0, (Number(st[kind]) || 0) + delta);
   else {
     const p = (st.players[pk] = st.players[pk] || { onTarget: 0, shots: 0 });
     const o = who === "sub" ? p.sub : p;
@@ -298,19 +293,21 @@ function linesFor(fk, filter) {
         const info = parseLine(m, f),
           kind = info && statKind(m, f, info);
         if (!kind || !filter(kind)) return;
-        const id = [kind.stat || kind.type, kind.incl ? "s" : "", info.dir, info.line].join("|");
+        const id = [kind.stat || kind.type, kind.side || "", kind.incl ? "s" : "", info.dir, info.line].join(
+          "|",
+        );
         if (seen.has(id)) return;
         seen.add(id);
         const total = lineValueFromStats(st, kind),
           s = m.settlement || "pending";
-        rows.push({ info, kind, total, s });
+        rows.push({ info, kind, total, s, f });
       });
     }),
   );
   rows.sort((a, b) => a.info.line - b.info.line);
   return rows
     .map(
-      ({ info, kind, total, s }) =>
+      ({ info, kind, total, s, f }) =>
         '<span class="lb-line is-' +
         (s === "won" ? "won" : s === "lost" ? "lost" : "pending") +
         '">' +
@@ -319,6 +316,7 @@ function linesFor(fk, filter) {
         (info.dir === "over" ? "+" : "−") +
         info.line +
         (kind.incl ? " (con suplente)" : kind.type === "player" ? " (solo él)" : "") +
+        (kind.side ? " " + esc(kind.side === "home" ? f.home : f.away) : "") +
         (s === "pending"
           ? " · " + total + "/" + (info.dir === "over" ? info.goal : "≤" + (info.goal - 1))
           : "") +
@@ -341,7 +339,7 @@ function liveBoardHtml(f) {
     }),
   );
   const players = statsPlayers(fk);
-  if (!has.goals && !has.corners && !has.cards && !players.size) return "";
+  has.goals = true; // el marcador del partido siempre se puede llevar
   const editable = true;
   let html =
     '<section class="live-board"><div class="lb-head"><b>📊 Marcador en vivo</b><small>Un solo conteo para todos tus cupones de este partido</small></div>';
@@ -350,20 +348,10 @@ function liveBoardHtml(f) {
     ["corners", "⛳ Córners", has.corners],
     ["cards", "🟨 Tarjetas", has.cards],
   ].filter((x) => x[2]);
-  if (teamStats.length)
-    html +=
-      '<div class="lb-team">' +
-      teamStats
-        .map(
-          ([type, label]) =>
-            '<div class="lb-stat">' +
-            statCounter(fk, type, label, Number(st[type]) || 0, editable) +
-            '<div class="lb-lines">' +
-            linesFor(fk, (k) => k.type === type) +
-            "</div></div>",
-        )
-        .join("") +
-      "</div>";
+  html +=
+    '<div class="lb-team">' +
+    teamStats.map(([type, label]) => teamRowHtml(fk, f, st, type, label)).join("") +
+    "</div>";
   for (const [pk, pl] of players) {
     const p = st.players?.[pk] || { onTarget: 0, shots: 0 };
     // Solo los contadores que usan sus líneas: "Remates" si hay líneas de remates, "Remates a puerta" si hay
@@ -441,7 +429,7 @@ function statSet(fk, target) {
   const st = db.stats?.[fk] || {};
   const [kind, pk, who, stat] = target.split(":");
   let cur;
-  if (kind !== "player") cur = Number(st[kind]) || 0;
+  if (kind !== "player") cur = SIDES.includes(pk) ? teamStat(st, pk, kind) : Number(st[kind]) || 0;
   else {
     const p = st.players?.[pk],
       o = who === "sub" ? p?.sub : p;

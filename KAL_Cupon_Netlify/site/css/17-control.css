@@ -478,3 +478,122 @@
 .coupon-ai .analyst-md {
   margin-top: 8px;
 }
+/* Marcador por equipo, marcador en la cabecera y Analista del partido (V17) */
+.lb-stat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+}
+.lb-stat-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.lb-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+.lb-side {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+.lb-team-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lb-team-name em {
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-team-name .team-crest,
+.lb-team-name .team-fallback {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  font-size: 9px;
+}
+.lb-counter.lb-compact > span:empty {
+  display: none;
+}
+.lb-rest {
+  margin-top: 4px;
+}
+.hero-score {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.hero-score.goal-pop {
+  animation: kal-goal-pop 0.9s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+@keyframes kal-goal-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  45% {
+    transform: scale(1.5);
+    text-shadow: 0 0 22px var(--gold);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.match-ai {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel2);
+}
+.match-ai-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.match-ai .analyst-md,
+.match-ai-saved {
+  margin-top: 8px;
+}
+.match-ai-saved summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.ai-chip {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--panel);
+  color: var(--muted);
+}
+.ai-chip.is-Alta {
+  color: var(--green);
+}
+.ai-chip.is-Media {
+  color: var(--gold);
+}
+.ai-chip.is-Baja {
+  color: var(--red);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-score.goal-pop {
+    animation: none;
+  }
+}

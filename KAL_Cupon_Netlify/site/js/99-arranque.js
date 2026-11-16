@@ -16,6 +16,7 @@ cleanSavedPlayerNames();
 if (migrateEarlyPayout()) save();
 if (migrateInlineImages()) save();
 if (migrateProgressToStats()) save();
+if (migrateCompetitionNames()) save();
 indexSavedCrests();
 autoCompact();
 renderAll();

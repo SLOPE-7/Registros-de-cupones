@@ -605,7 +605,12 @@ document.body.addEventListener("click", (e) => {
   const g = e.target.closest("[data-go]");
   if (g) go(g.dataset.go);
   const st = e.target.closest("[data-status]");
-  if (st) setMarketStatus(st.dataset.status, st.dataset.value);
+  // Tocar otra vez el estado ya marcado lo devuelve a pendiente.
+  if (st)
+    setMarketStatus(
+      st.dataset.status,
+      st.classList.contains("selected") && st.dataset.value !== "pending" ? "pending" : st.dataset.value,
+    );
   const rm = e.target.closest("[data-remove]");
   if (rm && confirm("¿Eliminar este cupón?")) {
     const coupon = db.coupons.find((c) => c.id === rm.dataset.remove);

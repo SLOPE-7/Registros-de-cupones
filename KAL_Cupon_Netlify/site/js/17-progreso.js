@@ -262,15 +262,25 @@ function adjustProgress(key, delta, who = "main") {
 
 // "Terminó el partido": los "Más de" que no llegaron se pierden y los "Menos de" que no se pasaron se ganan.
 function finishMatch(fixtureKeyValue) {
+  // Mercados de resultado (1X2, doble oportunidad, ambos marcan…): se pide confirmar el marcador final.
+  const outcomes = pendingOutcomeMarkets(fixtureKeyValue),
+    fx = fixtureByKey(fixtureKeyValue);
+  const final = outcomes.size && fx ? askFinalScore(fixtureKeyValue, fx) : null;
   const open = openCouponIds(),
     todo = new Map();
+  if (final)
+    for (const [key, o] of outcomes)
+      todo.set(key, {
+        status: outcomeResult(o.spec, final.gh, final.ga),
+        label: o.m.market + " " + (o.m.pick || "") + " → " + final.gh + "-" + final.ga,
+      });
   db.coupons.forEach((c) =>
     c.fixtures.forEach((f) => {
       if (fixtureKey(f) !== fixtureKeyValue || !open.has(c.id)) return;
       f.markets.forEach((m) => {
         const info = parseLine(m, f),
           key = marketKey(f, m);
-        if (!info || (m.settlement || "pending") !== "pending" || todo.has(key)) return;
+        if (!info || outcomeSpec(m, f) || (m.settlement || "pending") !== "pending" || todo.has(key)) return;
         const total = lineValue(f, m, key);
         todo.set(key, {
           status:
@@ -281,17 +291,21 @@ function finishMatch(fixtureKeyValue) {
     }),
   );
   if (!todo.size) {
-    toast("No hay mercados de línea pendientes en este partido.");
+    if (final) save();
+    toast("No hay mercados que se puedan marcar solos en este partido.");
+    renderAll();
     return;
   }
-  const lines = [...todo.values()].map((t) => (t.status === "won" ? "✓ " : "✕ ") + t.label).join("\n");
+  const lines = [...todo.values()]
+    .map((t) => (t.status === "won" ? "✓ " : t.status === "void" ? "＝ " : "✕ ") + t.label)
+    .join("\n");
   if (!confirm("¿Terminó el partido? Se marcarán así:\n\n" + lines)) return;
   for (const [key, t] of todo) setMarketStatus(key, t.status);
   toast("Partido cerrado: " + todo.size + " mercado(s) marcados.");
 }
 
 function finishMatchButton(f, pending) {
-  if (currentMatchRef?.draft || !pending.some((x) => parseLine(x.m, x.f))) return "";
+  if (currentMatchRef?.draft || !pending.some((x) => parseLine(x.m, x.f) || outcomeSpec(x.m, x.f))) return "";
   return (
     '<button type="button" class="btn sm pg-finish" data-pg-finish="' +
     esc(fixtureKey(f)) +

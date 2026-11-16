@@ -358,10 +358,12 @@ function parseCoupon(raw) {
       text: `${String(dm[1]).padStart(2, "0")}/${String(dm[2]).padStart(2, "0")}${dm[3] ? "/" + dm[3] : ""}`,
     };
     time = `${String(dm[4]).padStart(2, "0")}:${dm[5]}`;
-    const prefix = line
-      .slice(0, dm.index)
-      .replace(/[•·\-]+$/, "")
-      .trim();
+    const prefix = fixCompetitionName(
+      line
+        .slice(0, dm.index)
+        .replace(/[•·\-]+$/, "")
+        .trim(),
+    );
     if (prefix && /,|league|liga|serie|bundesliga|premier|ligue|championship/i.test(prefix)) league = prefix;
     if (current) {
       current.date = date.text;
@@ -377,7 +379,7 @@ function parseCoupon(raw) {
     const parts = String(league || "")
         .split(",")
         .map((x) => x.trim()),
-      rawCompetition = parts.length > 1 ? parts.slice(1).join(",").trim() : String(league || ""),
+      rawCompetition = parts.length > 1 ? parts.slice(1).join(", ").trim() : String(league || ""),
       rawCountry = parts.length > 1 ? parts[0] : inferCompetitionCountry(rawCompetition);
     return {
       id: uid(),
@@ -436,7 +438,7 @@ function parseCoupon(raw) {
       continue;
     }
     if (LEAGUE_LINE_RE.test(line)) {
-      league = line;
+      league = typeof fixCompetitionName === "function" ? fixCompetitionName(line) : line;
       continue;
     }
     const vs = line.match(/^(.+?)\s+(?:vs\.?|versus|v)\s+(.+)$/i);
