@@ -294,7 +294,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "20.2");
+        localStorage.setItem("kal_version_vista", "20.3");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3997,6 +3997,27 @@ section("30. Enlace de compartir de Doradobet");
       r2.diagnostico.titulo === "DoradoBet" &&
       r2.diagnostico.direcciones.some((d) => /biahosted/.test(d)),
     JSON.stringify(r2).slice(0, 250),
+  );
+  const spa2 = async (u) =>
+    /virtualsoft/.test(u)
+      ? new Response(
+          'var c={"shareUrl":"https://api.vs.tech/v1/ticket/share/{code}","apiUrl":"https://api.vs.tech"};',
+          { status: 200 },
+        )
+      : new Response(
+          '<html><head><title>DoradoBet</title><script src="https://cdnconfigs.virtualsoft.tech/configs/files/config-x.js?v=1"></script><script src="https://evil.com/a.js"></script></head><body></body></html>',
+          { status: 200 },
+        );
+  const pedidas = [];
+  const r4 = await (
+    await E.manejar(req("secreto", msg), { env, fetchFn: async (u, o) => (pedidas.push(u), spa2(u)) })
+  ).json();
+  check(
+    "enlace: si no hay boleto, lee la configuración pública y devuelve los fragmentos con 'share' / 'ticket'",
+    r4.ok === false &&
+      r4.diagnostico.configuracion?.[0]?.fragmentos?.some((f) => /ticket\/share/.test(f)) &&
+      !pedidas.some((u) => /evil\.com/.test(u)),
+    JSON.stringify(r4.diagnostico.configuracion || null).slice(0, 250),
   );
   const salto = async () => new Response("", { status: 302, headers: { location: "https://evil.com/x" } });
   const r3 = await (await E.manejar(req("secreto", msg), { env, fetchFn: salto })).json();

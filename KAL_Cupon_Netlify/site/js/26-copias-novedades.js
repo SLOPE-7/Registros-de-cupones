@@ -205,8 +205,13 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "20.2";
+const APP_VERSION = "20.3";
 const NOVEDADES = [
+  {
+    v: "20.3",
+    titulo: "Enlace de Doradobet: diagnóstico ampliado",
+    items: ["🔗 Si el enlace no trae el boleto, el diagnóstico ahora incluye pistas de la configuración pública de la página."],
+  },
   {
     v: "20.2",
     titulo: "Pegar el enlace de Doradobet (prueba)",

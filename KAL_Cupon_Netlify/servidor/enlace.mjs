@@ -42,6 +42,56 @@ export function pareceBoleto(texto) {
   return /\bvs\.?\s/i.test(texto) && /\b\d{1,3}\.\d{2}\b/.test(texto) && texto.length > 80;
 }
 
+// Segunda ronda de diagnóstico: archivos .js públicos de configuración de la página (solo de estos sitios) y
+// los fragmentos donde aparecen palabras como "share", "ticket" o "coupon", para ver qué dirección usa la web.
+const HOSTS_CONFIG = new Set([...HOSTS, "cdnconfigs.virtualsoft.tech"]);
+export function scriptsPermitidos(html) {
+  const vistos = new Set();
+  for (const m of String(html).matchAll(/https:\/\/[^\s"'<>\\)]+?\.js(?:\?[^\s"'<>\\)]*)?/g)) {
+    try {
+      if (HOSTS_CONFIG.has(new URL(m[0]).hostname)) vistos.add(m[0]);
+    } catch {}
+    if (vistos.size >= 4) break;
+  }
+  return [...vistos];
+}
+export function fragmentosJs(js) {
+  const re =
+    /(share[_-]?code|sharedbet|shareticket|getshare|bet[_-]?share|ticket|coupon|betslip|apiurl|api_url|baseurl|endpoint)/gi;
+  const salida = [];
+  const vistos = new Set();
+  for (const m of String(js).matchAll(re)) {
+    const ini = Math.max(0, m.index - 70),
+      frag = js.slice(ini, m.index + m[0].length + 110).replace(/\s+/g, " ");
+    const clave = frag.slice(40, 90);
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    salida.push({ prioridad: /share/i.test(m[0]) ? 0 : 1, frag });
+  }
+  return salida
+    .sort((a, b) => a.prioridad - b.prioridad)
+    .slice(0, 12)
+    .map((x) => x.frag);
+}
+async function configuracion(html, fetchFn) {
+  const salida = [];
+  for (const url of scriptsPermitidos(html)) {
+    try {
+      const r = await fetchFn(url, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(10000) });
+      const js = (await r.text()).slice(0, 800_000);
+      salida.push({
+        archivo: url.slice(0, 120),
+        estado: r.status,
+        largo: js.length,
+        fragmentos: fragmentosJs(js),
+      });
+    } catch {
+      salida.push({ archivo: url.slice(0, 120), estado: 0 });
+    }
+  }
+  return salida;
+}
+
 function direcciones(html) {
   const vistas = new Set();
   for (const m of String(html).matchAll(/https?:\/\/[^\s"'<>\\)]+/g)) {
@@ -121,6 +171,7 @@ export async function manejar(req, { env, fetchFn = fetch }) {
       titulo: (pagina.html.match(/<title[^>]*>([^<]{0,120})/i)?.[1] || "").trim() || undefined,
       largo: pagina.html.length,
       direcciones: direcciones(pagina.html),
+      configuracion: ok ? undefined : await configuracion(pagina.html, fetchFn),
       muestra: texto.slice(0, 300),
     },
   });
