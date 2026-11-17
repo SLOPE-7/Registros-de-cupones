@@ -214,6 +214,7 @@ function saveCoupon() {
     notes: $("notes").value.trim(),
     confidence: Number($("couponConfidence").value) || null,
     reason: $("couponReason").value.trim().slice(0, 140),
+    tags: typeof currentDraftTags === "function" ? currentDraftTags() : existing?.tags || [],
     fixtures: JSON.parse(JSON.stringify(draftSelections)),
   };
   const analysisAttached = typeof attachPendingAnalysis === "function" && attachPendingAnalysis(c);
@@ -253,6 +254,7 @@ function saveCoupon() {
   $("notes").value = "";
   $("couponReason").value = "";
   setConfidence(0);
+  if (typeof resetDraftTags === "function") resetDraftTags();
   clearSlipHint();
   $("autoStakeTx").checked = false;
   draftSelections = [];

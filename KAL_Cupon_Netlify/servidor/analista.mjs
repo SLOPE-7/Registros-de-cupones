@@ -9,6 +9,7 @@
 //   {"t":"error","v":"…"}               terminó con un error que se puede mostrar tal cual
 
 export const MODELO = "claude-opus-5-5";
+export const MAX_IMAGEN = 4_000_000; // una captura reducida en base64
 export const MAX_CUERPO = 120_000; // caracteres; un historial resumido ocupa bastante menos
 const MAX_CONTINUACIONES = 3;
 
@@ -113,7 +114,16 @@ Lista: "- **Equipo A vs Equipo B** · mercado · selección · cuota aproximada 
 Partidos que no usaste y por qué.
 Cierra con una línea recordando que es un análisis orientativo, no una garantía.`;
 
-export const MODOS = ["historial", "cupon", "semana", "armar"];
+const SISTEMA_IMAGEN = `Eres un transcriptor. Recibes una captura de pantalla o foto de un boleto/cupón de apuestas deportivas.
+Tu única tarea es copiar el texto del boleto, tal cual se ve, en texto plano, una línea por dato, en el mismo orden de la imagen.
+Reglas:
+- Incluye todo lo que sea parte del boleto: tipo de apuesta (por ejemplo BB o Combinada), fechas y horas, equipos ("Equipo A vs. Equipo B"), competición, mercados, selecciones, cuotas, y al final cuota total, valor apostado, bono y ganancia total si aparecen.
+- No traduzcas, no resumas, no corrijas, no inventes nada y no añadas comentarios ni formato Markdown. Si un dato no se lee bien, copia lo que se alcance a leer.
+- Los números con coma decimal déjalos como se ven.
+- Si la imagen no es un boleto o cupón de apuestas, responde exactamente: NO_ES_CUPON`;
+
+export const MODOS = ["historial", "cupon", "semana", "armar", "imagen"];
+const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export function respuestaJson(status, cuerpo) {
   return new Response(JSON.stringify(cuerpo), {
@@ -158,7 +168,7 @@ export async function leerPeticion(req, env) {
       }),
     };
   const texto = await req.text();
-  if (texto.length > MAX_CUERPO)
+  if (texto.length > MAX_IMAGEN)
     return { error: respuestaJson(413, { error: "Hay demasiados datos para analizar de una vez." }) };
   let cuerpo;
   try {
@@ -168,8 +178,15 @@ export async function leerPeticion(req, env) {
   }
   const modo = cuerpo?.modo;
   if (!MODOS.includes(modo)) return { error: respuestaJson(400, { error: "Modo desconocido." }) };
+  if (modo !== "imagen" && texto.length > MAX_CUERPO)
+    return { error: respuestaJson(413, { error: "Hay demasiados datos para analizar de una vez." }) };
   const datos = cuerpo.datos && typeof cuerpo.datos === "object" ? cuerpo.datos : null;
   if (!datos) return { error: respuestaJson(400, { error: "Faltan los datos." }) };
+  if (modo === "imagen") {
+    if (!TIPOS_IMAGEN.includes(datos.tipo) || !/^[A-Za-z0-9+/=\s]{100,}$/.test(String(datos.imagen || "")))
+      return { error: respuestaJson(400, { error: "No pude leer la imagen. Prueba con otra captura." }) };
+    return { modo, datos: { imagen: datos.imagen.replace(/\s+/g, ""), tipo: datos.tipo, partidos: [] } };
+  }
   if (modo === "cupon" && !(typeof datos.cupon === "string" && datos.cupon.trim().length >= 10))
     return { error: respuestaJson(400, { error: "Pega el texto del cupón que quieres revisar." }) };
   if (modo === "armar" && !(typeof datos.partidos === "string" && datos.partidos.trim().length >= 10))
@@ -222,6 +239,23 @@ export function construirPeticion(modo, datos) {
         {
           role: "user",
           content: `Fecha de hoy: ${hoy}.\nMis últimos 7 días y mi historial general:\n\n${JSON.stringify(datos.semana ?? {})}`,
+        },
+      ],
+    };
+  }
+  if (modo === "imagen") {
+    return {
+      ...base,
+      max_tokens: 4000,
+      output_config: { effort: "low" },
+      system: SISTEMA_IMAGEN,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: datos.tipo, data: datos.imagen } },
+            { type: "text", text: "Copia el texto de este boleto." },
+          ],
         },
       ],
     };

@@ -694,3 +694,10 @@
 .odds-tool h4 { margin: 12px 0 6px; }
 .odds-row { display: flex; gap: 8px; margin: 6px 0; }
 .odds-row input, .odds-row select { flex: 1; min-width: 0; }
+
+/* V20 · captura de boletos y etiquetas */
+.img-status { flex-basis: 100%; }
+.tag-picker { flex-wrap: wrap; }
+.tag-chip.tag-new { opacity: 0.8; border-style: dashed; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.tag-pill { font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2, rgba(127, 127, 127, 0.15)); }

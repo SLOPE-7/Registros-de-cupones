@@ -254,6 +254,7 @@ $("clearBtn").addEventListener("click", () => {
     (id) => ($(id).value = ""),
   );
   setConfidence(0);
+  if (typeof resetDraftTags === "function") resetDraftTags();
   clearSlipHint();
   $("couponType").value = "auto";
   $("couponHouse").value = "";
@@ -655,6 +656,7 @@ document.body.addEventListener("click", (e) => {
       $("couponReason").value = c.reason || "";
       $("couponConfidence").value = c.confidence ? String(c.confidence) : "";
       renderConfidencePicker();
+      if (typeof loadDraftTags === "function") loadDraftTags(c.tags);
       $("autoStakeTx").checked = !!c.stakeTxId;
       draftDuplicateCount = 0;
       renderPreview();

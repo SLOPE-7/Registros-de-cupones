@@ -205,8 +205,18 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "19";
+const APP_VERSION = "20";
 const NOVEDADES = [
+  {
+    v: "20",
+    titulo: "Captura de boletos y etiquetas de estrategia",
+    items: [
+      "📷 Leer captura: elige la imagen de tu boleto y el Analista la convierte en cupón (necesita tu código de acceso).",
+      "📋 Pegar: pega el texto o la imagen que tengas copiada, con un toque.",
+      "🏷️ Etiquetas de estrategia en cada cupón (Remates, Goles, Combinada…), sugeridas solas al leer el boleto.",
+      "📊 En Estadísticas: acierto y rentabilidad por etiqueta.",
+    ],
+  },
   {
     v: "19",
     titulo: "Salud de tu banca y convertidor de cuotas",

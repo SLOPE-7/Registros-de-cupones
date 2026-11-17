@@ -470,3 +470,9 @@ VERSIÓN 19 — SALUD DE LA BANCA Y CONVERTIDOR DE CUOTAS (site/js/32-banca-y-cu
 - Estadísticas → "🧮 Convertidor de cuotas": decimal, americana, fraccional y probabilidad; y margen de la casa con las cuotas 1X2 de un partido.
 - Módulo independiente: se engancha a renderPerformance() sin cambiar el resto.
 Pruebas: 296.
+
+VERSIÓN 20 — CAPTURA DE BOLETOS Y ETIQUETAS (site/js/33-captura.js, 34-etiquetas.js, servidor/analista.mjs)
+- Nuevo cupón → "📷 Leer captura": la imagen se reduce en el teléfono (máx. 1600 px) y el Analista (Claude con visión) la transcribe; el texto pasa por el lector de siempre y revisas antes de guardar. Usa tu código de acceso y gasta un poco de crédito de Anthropic.
+- "📋 Pegar": toma del portapapeles una imagen o un texto. También se puede pegar una imagen dentro del cuadro de texto.
+- Etiquetas de estrategia por cupón (Remates, Goles, Córners, Tarjetas, Combinada, Selecciones, Seguro, Arriesgado + las tuyas): se sugieren solas, se editan al editar el cupón, salen en la tarjeta y en Estadísticas → "🏷️ Por etiqueta" (acierto, apostado, neto y ROI).
+Pruebas: ver sección 29.

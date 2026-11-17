@@ -201,6 +201,18 @@ const server = http.createServer((req, res) => {
       const send = (o) => res.write(JSON.stringify(o) + "\n");
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       send({ t: "estado", v: "Pensando…" });
+      if (body.modo === "imagen") {
+        await wait(80);
+        send({
+          t: "texto",
+          v: globalThis.__noCupon
+            ? "NO_ES_CUPON"
+            : fs.readFileSync(path.join(ROOT, "pruebas/previa-1.txt"), "utf8"),
+        });
+        send({ t: "fin", uso: { entrada: 900, salida: 120, busquedas: 0 } });
+        res.end();
+        return;
+      }
       if (body.modo === "cupon") {
         await wait(150);
         send({ t: "estado", v: "Buscando: Fenerbahce Liverpool lesiones" });
@@ -256,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "19");
+        localStorage.setItem("kal_version_vista", "20");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3719,6 +3731,161 @@ section("28. Salud de la banca y convertidor de cuotas");
   await tap(page, "[data-perf-period]");
   await page.waitForTimeout(200);
   check("tras cambiar el periodo los bloques nuevos siguen ahí", (await page.$$("#bankHealth")).length === 1);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("29. Captura de boletos y etiquetas de estrategia");
+{
+  const A = await import(path.join(ROOT, "servidor/analista.mjs"));
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  const b64 = "A".repeat(200_000);
+  const env = { ANTHROPIC_API_KEY: "k", ANALISTA_CLAVE: "secreto" };
+  const req = (body) =>
+    new Request("https://x/api/analista", {
+      method: "POST",
+      headers: { "x-kal-clave": "secreto" },
+      body: JSON.stringify(body),
+    });
+  const ok = await A.leerPeticion(req({ modo: "imagen", datos: { tipo: "image/jpeg", imagen: b64 } }), env);
+  check(
+    "servidor: acepta una captura grande (más de 120 000 caracteres) en modo imagen",
+    ok.modo === "imagen" && !ok.error,
+  );
+  const pr = A.construirPeticion("imagen", ok.datos);
+  const c0 = pr.messages[0].content;
+  check(
+    "servidor: manda la imagen a Claude como bloque de imagen, sin búsquedas web, para transcribir",
+    c0[0].type === "image" &&
+      c0[0].source.media_type === "image/jpeg" &&
+      !pr.tools &&
+      /NO_ES_CUPON/.test(pr.system),
+  );
+  const mala = await A.leerPeticion(req({ modo: "imagen", datos: { tipo: "text/html", imagen: b64 } }), env);
+  check("servidor: rechaza tipos que no son imagen", mala.error?.status === 400);
+  const grande = await A.leerPeticion(req({ modo: "cupon", datos: { cupon: "x".repeat(130_000) } }), env);
+  check("servidor: los demás modos siguen limitados a 120 000 caracteres", grande.error?.status === 413);
+
+  // --- cliente
+  const mk = (id, d, st, tags, stake = 10) => ({
+    id,
+    name: id,
+    created: new Date(Date.now() - d * 86400e3).toISOString(),
+    stake,
+    odds: 2,
+    payout: stake * 2,
+    tags,
+    fixtures: [
+      {
+        id: "f" + id,
+        home: "Real Madrid",
+        away: "Sevilla",
+        competition: "LaLiga",
+        league: "LaLiga",
+        dateISO: isoDay(Date.now() - d * 86400e3),
+        time: "14:00",
+        markets: [{ market: "Total de goles", pick: "Más de 1.5", odd: "2", builder: false, settlement: st }],
+      },
+    ],
+  });
+  const db0 = {
+    coupons: [
+      mk("a", 5, "won", ["Remates"]),
+      mk("b", 4, "lost", ["Remates"]),
+      mk("c", 3, "lost", ["Remates", "Combinada"]),
+      mk("d", 2, "won", ["Goles"]),
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => localStorage.setItem("kal_analista_v1", JSON.stringify({ clave: "secreto" })));
+  await tap(page, '[data-view="stats"]');
+  await page.waitForTimeout(300);
+  const tx = await page.$eval("#perfSection", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "Estadísticas: 'Por etiqueta' con Remates (3 cupones, 1 ganado) y Goles",
+    /Por etiqueta/.test(tx) && /Remates\s*3 cupones · 1 ganados/.test(tx) && /Goles\s*1 cupones/.test(tx),
+    tx.slice(tx.indexOf("Por etiqueta"), tx.indexOf("Por etiqueta") + 220),
+  );
+  await tap(page, '[data-view="saved"]');
+  await page.evaluate(() => {
+    couponFilter = "all";
+    renderCoupons();
+  });
+  await page.waitForTimeout(200);
+  const pills = await page.$$eval(".tag-pill", (e) => e.map((x) => x.innerText));
+  check(
+    "la tarjeta del cupón guardado muestra sus etiquetas",
+    pills.some((t) => /Remates/.test(t)) && pills.length >= 4,
+    pills.join("|"),
+  );
+  await tap(page, '[data-view="new"]');
+  await page.waitForTimeout(200);
+  check(
+    "Nuevo cupón tiene el selector de etiquetas y los botones de captura y portapapeles",
+    (await page.$$("#tagPicker .tag-chip")).length >= 9 &&
+      !!(await page.$("#photoBtn")) &&
+      !!(await page.$("#pasteBtn")),
+  );
+  // Leer desde captura
+  await page.setInputFiles("#photoFile", { name: "boleto.png", mimeType: "image/png", buffer: png });
+  await page.waitForFunction(() => /Senegal/.test($("preview").innerText), null, { timeout: 8000 });
+  await page.waitForTimeout(400);
+  const post = analystPosts[analystPosts.length - 1];
+  check(
+    "📷 Leer captura: envía la imagen reducida al Analista y rellena el cupón con el texto leído",
+    post.modo === "imagen" &&
+      post.datos.tipo === "image/jpeg" &&
+      post.datos.imagen.length > 100 &&
+      (await page.$eval("#preview", (e) => /Senegal/.test(e.innerText))),
+  );
+  const sug = await page.$$eval("#tagPicker .tag-chip.active", (e) => e.map((x) => x.innerText));
+  check(
+    "se sugieren etiquetas al leer el boleto (Goles y Combinada)",
+    sug.includes("Goles") && sug.includes("Combinada"),
+    sug.join("|"),
+  );
+  await tap(page, '#tagPicker [data-tag-toggle="Seguro"]');
+  await tap(page, '#tagPicker [data-tag-toggle="Goles"]');
+  const sug2 = await page.$$eval("#tagPicker .tag-chip.active", (e) => e.map((x) => x.innerText));
+  check(
+    "tocar una etiqueta la activa o la quita",
+    sug2.includes("Seguro") && !sug2.includes("Goles"),
+    sug2.join("|"),
+  );
+  await page.fill("#stake", "10");
+  await tap(page, "#saveBtn");
+  await page.waitForTimeout(400);
+  const tags = await page.evaluate(() => db.coupons[0].tags);
+  check(
+    "al guardar, el cupón conserva sus etiquetas",
+    tags.includes("Seguro") && tags.includes("Combinada") && !tags.includes("Goles"),
+    JSON.stringify(tags),
+  );
+  check(
+    "tras guardar, el selector queda limpio para el siguiente cupón",
+    (await page.$$("#tagPicker .tag-chip.active")).length === 0,
+  );
+  // Imagen que no es un boleto
+  await tap(page, '[data-view="new"]');
+  await page.evaluate(() => ($("raw").value = ""));
+  globalThis.__noCupon = true;
+  const antes = "";
+  await page.setInputFiles("#photoFile", { name: "otra.png", mimeType: "image/png", buffer: png });
+  await page.waitForTimeout(900);
+  globalThis.__noCupon = false;
+  check(
+    "una imagen sin boleto no rellena nada y avisa",
+    (await page.$eval("#raw", (e) => e.value)) === antes &&
+      /no parece un boleto/.test(await page.$eval("#toast", (e) => e.textContent)),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
