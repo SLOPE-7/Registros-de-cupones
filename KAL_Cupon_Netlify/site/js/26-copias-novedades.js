@@ -205,19 +205,14 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "20.3";
+const APP_VERSION = "20.4";
 const NOVEDADES = [
   {
-    v: "20.3",
-    titulo: "Enlace de Doradobet: diagnóstico ampliado",
-    items: ["🔗 Si el enlace no trae el boleto, el diagnóstico ahora incluye pistas de la configuración pública de la página."],
-  },
-  {
-    v: "20.2",
-    titulo: "Pegar el enlace de Doradobet (prueba)",
+    v: "20.4",
+    titulo: "Enlace de Doradobet",
     items: [
-      "🔗 En Doradobet toca “Compartir enlace”, y en Nuevo cupón pega el mensaje: la app intenta traer el boleto sola.",
-      "Es una prueba: si Doradobet no entrega el boleto, la app te lo dice y muestra un diagnóstico para afinarlo.",
+      "🔗 El enlace de “Compartir enlace” de Doradobet no trae el boleto (su web lo pide a un servicio privado). Si lo pegas, la app te avisa y te lleva al texto o a la captura.",
+      "Lo más corto que sí funciona: copiar el texto del boleto y tocar 📋 Pegar, o 📷 Leer captura o PDF.",
     ],
   },
   {

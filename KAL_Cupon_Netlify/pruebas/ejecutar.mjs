@@ -33,7 +33,6 @@ const section = (t) => console.log("\n" + t);
 // ---------- servidor local ----------
 const posts = [];
 const analystPosts = [];
-const enlacePosts = [];
 const seen = [];
 const TYPES = {
   ".html": "text/html",
@@ -49,31 +48,6 @@ const server = http.createServer((req, res) => {
     res.writeHead(status, { "content-type": "application/json" });
     res.end(JSON.stringify(obj));
   };
-  if (url.pathname === "/api/enlace") {
-    let b = "";
-    req.on("data", (c) => (b += c));
-    req.on("end", () => {
-      enlacePosts.push({ clave: req.headers["x-kal-clave"], body: JSON.parse(b) });
-      if (globalThis.__enlaceFalla)
-        return sendJson({
-          ok: false,
-          texto: "",
-          diagnostico: {
-            estado: 200,
-            titulo: "DoradoBet",
-            largo: 5000,
-            direcciones: ["https://api.x/y"],
-            muestra: "",
-          },
-        });
-      sendJson({
-        ok: true,
-        texto: fs.readFileSync(path.join(ROOT, "pruebas/previa-1.txt"), "utf8"),
-        diagnostico: {},
-      });
-    });
-    return;
-  }
   if (url.pathname === "/api/escudos") {
     seen.push("escudos:" + url.searchParams.get("home"));
     return sendJson({
@@ -294,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "20.3");
+        localStorage.setItem("kal_version_vista", "20.4");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3941,94 +3915,10 @@ section("29. Captura de boletos y etiquetas de estrategia");
   await ctx.close();
 }
 
-section("30. Enlace de compartir de Doradobet");
+section("30. Enlace de compartir de Doradobet (aviso)");
 {
-  const E = await import(path.join(ROOT, "servidor/enlace.mjs"));
   const msg =
     "¡Vea los partidos en mi boleto de apuestas en doradobet.com y haga las mismas apuestas con un solo clic!\nhttps://doradobet.com/deportes?shareCode=83RY6YV5AHN";
-  check(
-    "enlace: encuentra el código dentro del mensaje de 'Compartir enlace'",
-    E.leerEnlace(msg)?.codigo === "83RY6YV5AHN",
-  );
-  check(
-    "enlace: ignora otros sitios",
-    E.leerEnlace("https://evil.com/?shareCode=83RY6YV5AHN") === null &&
-      E.leerEnlace("https://doradobet.com.evil.com/deportes?shareCode=83RY6YV5AHN") === null,
-  );
-  const html =
-    "<html><head><title>Boleto</title><script>var x='Fake vs Fake 9.99'</script></head><body><div>Japón vs. Paraguay</div><div>Total de goles: Más de 1.5</div><div>Cuotas: 1.22</div><div>Valor total L 5.00 &amp; más texto para pasar el largo mínimo de detección</div></body></html>";
-  check(
-    "enlace: convierte la página en texto sin scripts y reconoce un boleto",
-    E.htmlATexto(html).includes("Japón vs. Paraguay") &&
-      !E.htmlATexto(html).includes("Fake") &&
-      E.pareceBoleto(E.htmlATexto(html)),
-  );
-  const env = { ANALISTA_CLAVE: "secreto" };
-  const req = (clave, enlace) =>
-    new Request("https://x/api/enlace", {
-      method: "POST",
-      headers: { "x-kal-clave": clave },
-      body: JSON.stringify({ enlace }),
-    });
-  const llamadas = [];
-  const fetchOk = async (u, o) => {
-    llamadas.push(u);
-    return new Response(html, { status: 200, headers: { "content-type": "text/html" } });
-  };
-  const sinClave = await E.manejar(req("mal", msg), { env, fetchFn: fetchOk });
-  check("enlace: exige el código de acceso del Analista", sinClave.status === 401 && llamadas.length === 0);
-  const r1 = await (await E.manejar(req("secreto", msg), { env, fetchFn: fetchOk })).json();
-  check(
-    "enlace: página con boleto → ok y texto",
-    r1.ok === true &&
-      /Paraguay/.test(r1.texto) &&
-      llamadas[0] === "https://doradobet.com/deportes?shareCode=83RY6YV5AHN",
-    JSON.stringify(r1).slice(0, 200),
-  );
-  const spa = async () =>
-    new Response(
-      '<html><head><title>DoradoBet</title></head><body><div id="root"></div><script src="https://sb2.biahosted.net/api/app.js"></script></body></html>',
-      { status: 200 },
-    );
-  const r2 = await (await E.manejar(req("secreto", msg), { env, fetchFn: spa })).json();
-  check(
-    "enlace: página sin boleto → ok false con diagnóstico (título y direcciones)",
-    r2.ok === false &&
-      r2.diagnostico.titulo === "DoradoBet" &&
-      r2.diagnostico.direcciones.some((d) => /biahosted/.test(d)),
-    JSON.stringify(r2).slice(0, 250),
-  );
-  const spa2 = async (u) =>
-    /virtualsoft/.test(u)
-      ? new Response(
-          'var c={"shareUrl":"https://api.vs.tech/v1/ticket/share/{code}","apiUrl":"https://api.vs.tech"};',
-          { status: 200 },
-        )
-      : new Response(
-          '<html><head><title>DoradoBet</title><script src="https://cdnconfigs.virtualsoft.tech/configs/files/config-x.js?v=1"></script><script src="https://evil.com/a.js"></script></head><body></body></html>',
-          { status: 200 },
-        );
-  const pedidas = [];
-  const r4 = await (
-    await E.manejar(req("secreto", msg), { env, fetchFn: async (u, o) => (pedidas.push(u), spa2(u)) })
-  ).json();
-  check(
-    "enlace: si no hay boleto, lee la configuración pública y devuelve los fragmentos con 'share' / 'ticket'",
-    r4.ok === false &&
-      r4.diagnostico.configuracion?.[0]?.fragmentos?.some((f) => /ticket\/share/.test(f)) &&
-      !pedidas.some((u) => /evil\.com/.test(u)),
-    JSON.stringify(r4.diagnostico.configuracion || null).slice(0, 250),
-  );
-  const salto = async () => new Response("", { status: 302, headers: { location: "https://evil.com/x" } });
-  const r3 = await (await E.manejar(req("secreto", msg), { env, fetchFn: salto })).json();
-  check(
-    "enlace: no sigue redirecciones hacia otros sitios",
-    r3.ok === false && /otro sitio/.test(r3.diagnostico.aviso || ""),
-  );
-  const mal = await E.manejar(req("secreto", "hola"), { env, fetchFn: fetchOk });
-  check("enlace: sin enlace válido responde 400", mal.status === 400);
-
-  // --- cliente
   const { ctx, page } = await open({
     coupons: [],
     houses: [],
@@ -4037,32 +3927,22 @@ section("30. Enlace de compartir de Doradobet");
     actionHistory: [],
     statsMigrated: true,
   });
-  await page.evaluate(() => localStorage.setItem("kal_analista_v1", JSON.stringify({ clave: "secreto" })));
   await tap(page, '[data-view="new"]');
   await page.fill("#raw", msg);
   await tap(page, "#readBtn");
-  await page.waitForFunction(() => /Senegal/.test($("preview").innerText), null, { timeout: 8000 });
+  await page.waitForTimeout(250);
+  const t = await page.$eval("#toast", (e) => e.textContent);
   check(
-    "pegar el mensaje de Doradobet y 'Leer y revisar' trae el boleto desde el enlace",
-    enlacePosts.length === 1 &&
-      enlacePosts[0].clave === "secreto" &&
-      /shareCode=83RY6YV5AHN/.test(enlacePosts[0].body.enlace),
+    "pegar solo el enlace de Doradobet avisa que no trae el boleto y no inventa un cupón",
+    /no trae el boleto/.test(t) && (await page.evaluate(() => draftSelections.length)) === 0,
+    t,
   );
-  await page.evaluate(() => {
-    draftSelections = [];
-    renderPreview();
-  });
-  globalThis.__enlaceFalla = true;
-  await page.fill("#raw", msg);
+  await page.fill("#raw", "Senegal vs. Sudan\n12/11/2026 • 13:00\n1.16\nTotal de goles\nMás de 1.5\n" + msg);
   await tap(page, "#readBtn");
-  await page.waitForSelector("#linkDiag:not([hidden])", { timeout: 6000 });
-  const diag = await page.$eval("#linkDiag", (e) => e.textContent);
-  globalThis.__enlaceFalla = false;
-  check("hay un botón para copiar el diagnóstico", (await page.$("#linkDiagCopy:not([hidden])")) !== null);
+  await page.waitForTimeout(250);
   check(
-    "si el enlace no entrega el boleto, la app lo dice y muestra el diagnóstico",
-    /no entregó el boleto/.test(diag) && /DoradoBet/.test(diag),
-    diag.slice(0, 120),
+    "si el texto trae el boleto además del enlace, se lee normal",
+    (await page.evaluate(() => draftSelections.length)) >= 1,
   );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();

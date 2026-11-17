@@ -486,3 +486,6 @@ VERSIÓN 20.2 — ENLACE DE COMPARTIR DE DORADOBET (servidor/enlace.mjs) · PRUE
 - Si la página no lo entrega (es lo probable si carga los datos con JavaScript), la app lo dice y muestra un diagnóstico corto (estado, título, direcciones de la página) para afinarlo.
 
 VERSIÓN 20.3 — el diagnóstico del enlace de Doradobet incluye, si no hay boleto, fragmentos de los archivos de configuración públicos de la página (solo doradobet.com y cdnconfigs.virtualsoft.tech).
+
+VERSIÓN 20.4 — se retira la prueba del enlace de Doradobet (servidor/enlace.mjs eliminado).
+- La página de "Compartir enlace" de Doradobet es una carcasa; el boleto se pide a una API privada de Virtualsoft que no se puede leer desde un servidor. Si pegas solo ese enlace, la app lo avisa y sugiere pegar el texto del boleto o usar 📷 Leer captura o PDF.

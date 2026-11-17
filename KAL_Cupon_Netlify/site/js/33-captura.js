@@ -76,69 +76,13 @@ async function readFromImage(blob) {
   }
 }
 
-// ---------- Enlace de compartir de Doradobet ----------
+// El enlace de compartir de Doradobet (…?shareCode=…) no trae el boleto: su web lo pide con una API privada.
 const SHARE_RE = /https?:\/\/(?:www\.)?doradobet\.com\/[^\s"'<>]*?[?&]shareCode=[A-Za-z0-9]{6,24}/i;
-let linkBusy = false;
-function showLinkDiag(diag) {
-  let el = $("linkDiag");
-  if (!el) {
-    $("imgReadStatus").insertAdjacentHTML(
-      "afterend",
-      '<pre class="small link-diag" id="linkDiag" hidden></pre><button type="button" class="btn sm" id="linkDiagCopy" hidden>📋 Copiar diagnóstico</button>',
-    );
-    el = $("linkDiag");
-    $("linkDiagCopy").addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText($("linkDiag").textContent);
-        toast("Diagnóstico copiado. Pégalo en el chat.");
-      } catch {
-        toast("No se pudo copiar. Mantén pulsado el texto para copiarlo.");
-      }
-    });
-  }
-  el.hidden = !diag;
-  $("linkDiagCopy").hidden = !diag;
-  el.textContent = diag
-    ? "Doradobet no entregó el boleto como texto desde ese enlace. Usa 📷 Leer captura o PDF, o pega el texto. " +
-      "Si quieres que lo afine, enséñale esto a Claude:\n" +
-      JSON.stringify(diag, null, 1)
-    : "";
-}
-async function readFromLink(text) {
-  if (linkBusy) return;
-  const clave = analystState().clave || "";
-  if (!clave) {
-    toast("Primero escribe el código de acceso del Analista (en Analista → ⚙ Configurar).");
-    return;
-  }
-  linkBusy = true;
-  showLinkDiag(null);
-  setImgStatus("🔗 Buscando el boleto en el enlace…");
-  try {
-    const r = await fetch("/api/enlace", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-kal-clave": clave },
-      body: JSON.stringify({ enlace: text }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      toast(j.error || "No pude consultar el enlace (error " + r.status + ").");
-      return;
-    }
-    if (j.ok && j.texto) {
-      $("raw").value = j.texto;
-      readText();
-      if (!draftSelections.length) showLinkDiag(j.diagnostico);
-      else toast("Boleto traído desde el enlace. Revisa los datos antes de guardar.");
-    } else {
-      showLinkDiag(j.diagnostico || { error: "sin respuesta" });
-    }
-  } catch {
-    toast("Sin conexión con el servidor. Revisa tu internet.");
-  } finally {
-    linkBusy = false;
-    setImgStatus("");
-  }
+const soloEnlace = (t) => SHARE_RE.test(t) && !/\bvs\.?\s/i.test(t);
+function avisoEnlace() {
+  toast(
+    "El enlace de Doradobet no trae el boleto. Copia el texto del boleto y pégalo, o usa 📷 Leer captura o PDF.",
+  );
 }
 
 async function pasteFromClipboard() {
@@ -152,14 +96,14 @@ async function pasteFromClipboard() {
       for (const it of items) {
         if (it.types.includes("text/plain")) {
           const txt = await (await it.getType("text/plain")).text();
-          if (SHARE_RE.test(txt)) return readFromLink(txt);
+          if (soloEnlace(txt)) return avisoEnlace();
           $("raw").value = txt;
           return readText();
         }
       }
     } else if (navigator.clipboard?.readText) {
       const txt = await navigator.clipboard.readText();
-      if (SHARE_RE.test(txt)) return readFromLink(txt);
+      if (soloEnlace(txt)) return avisoEnlace();
       $("raw").value = txt;
       return readText();
     }
@@ -186,23 +130,22 @@ async function pasteFromClipboard() {
     if (f) readFromImage(f);
   });
   $("pasteBtn").addEventListener("click", pasteFromClipboard);
-  // Si el texto del cuadro es el enlace de Doradobet, "Leer y revisar" lo consulta en lugar de leerlo como boleto.
+  // Si en el cuadro solo hay el enlace de Doradobet, "Leer y revisar" avisa en lugar de buscar partidos.
   document.addEventListener(
     "click",
     (e) => {
-      if (!e.target.closest("#readBtn") || !SHARE_RE.test($("raw").value)) return;
+      if (!e.target.closest("#readBtn") || !soloEnlace($("raw").value)) return;
       e.stopImmediatePropagation();
       e.preventDefault();
-      readFromLink($("raw").value);
+      avisoEnlace();
     },
     true,
   );
   $("raw").addEventListener("paste", (e) => {
     const pegado = e.clipboardData?.getData("text") || "";
-    if (SHARE_RE.test(pegado)) {
+    if (soloEnlace(pegado)) {
       e.preventDefault();
-      $("raw").value = pegado;
-      readFromLink(pegado);
+      avisoEnlace();
       return;
     }
     const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith("image/"));

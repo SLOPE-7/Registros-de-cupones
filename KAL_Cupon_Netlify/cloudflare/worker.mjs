@@ -13,7 +13,6 @@ import jugadores from "../servidor/jugadores.mjs";
 import catalogo from "../servidor/catalogo.mjs";
 import imagenes from "../servidor/imagenes.mjs";
 import { manejar as analista } from "../servidor/analista.mjs";
-import { manejar as enlace } from "../servidor/enlace.mjs";
 import { avisosHandler, enviarAvisos } from "./avisos.mjs";
 import { datosPartido } from "./datos-partido.mjs";
 import { buscarLogos } from "../servidor/buscar-logos.mjs";
@@ -57,7 +56,6 @@ const FUNCIONES = { escudos, logo, partido, jugadores, catalogo, imagenes };
 async function api(nombre, request, env) {
   if (FUNCIONES[nombre]) return FUNCIONES[nombre](request);
   if (nombre === "avisos") return avisosHandler(request, almacen(env));
-  if (nombre === "enlace") return enlace(request, { env: { ANALISTA_CLAVE: env.ANALISTA_CLAVE } });
   if (nombre === "buscar-logo")
     return buscarLogos(request, {
       footballDataKey: env.FOOTBALL_DATA_KEY,
