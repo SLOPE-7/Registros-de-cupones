@@ -84,11 +84,20 @@ function showLinkDiag(diag) {
   if (!el) {
     $("imgReadStatus").insertAdjacentHTML(
       "afterend",
-      '<pre class="small link-diag" id="linkDiag" hidden></pre>',
+      '<pre class="small link-diag" id="linkDiag" hidden></pre><button type="button" class="btn sm" id="linkDiagCopy" hidden>📋 Copiar diagnóstico</button>',
     );
     el = $("linkDiag");
+    $("linkDiagCopy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText($("linkDiag").textContent);
+        toast("Diagnóstico copiado. Pégalo en el chat.");
+      } catch {
+        toast("No se pudo copiar. Mantén pulsado el texto para copiarlo.");
+      }
+    });
   }
   el.hidden = !diag;
+  $("linkDiagCopy").hidden = !diag;
   el.textContent = diag
     ? "Doradobet no entregó el boleto como texto desde ese enlace. Usa 📷 Leer captura o PDF, o pega el texto. " +
       "Si quieres que lo afine, enséñale esto a Claude:\n" +

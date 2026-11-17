@@ -4058,6 +4058,7 @@ section("30. Enlace de compartir de Doradobet");
   await page.waitForSelector("#linkDiag:not([hidden])", { timeout: 6000 });
   const diag = await page.$eval("#linkDiag", (e) => e.textContent);
   globalThis.__enlaceFalla = false;
+  check("hay un botón para copiar el diagnóstico", (await page.$("#linkDiagCopy:not([hidden])")) !== null);
   check(
     "si el enlace no entrega el boleto, la app lo dice y muestra el diagnóstico",
     /no entregó el boleto/.test(diag) && /DoradoBet/.test(diag),
