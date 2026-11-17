@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "18.1";
+const APP_VERSION = "19";
 const NOVEDADES = [
+  {
+    v: "19",
+    titulo: "Salud de tu banca y convertidor de cuotas",
+    items: [
+      "🩺 En Estadísticas: yield, últimos 20 cupones, caída máxima, rachas y cuánto estás por debajo de tu mejor momento.",
+      "🧮 Convertidor de cuotas: decimal, americana, fraccional y probabilidad.",
+      "📉 Margen de la casa: escribe las cuotas de un partido y ves cuánto se queda la casa y las probabilidades reales.",
+    ],
+  },
   {
     v: "18.1",
     titulo: "Goleadores y jugadores en el partido en vivo",

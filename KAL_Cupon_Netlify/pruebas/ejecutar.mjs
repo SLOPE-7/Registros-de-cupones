@@ -256,7 +256,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "18.1");
+        localStorage.setItem("kal_version_vista", "19");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3633,6 +3633,92 @@ section("27. Registros propios de equipos y jugadores (promedios y goleadores)")
       /misRegistros/.test(pr.system) &&
       /club y selección/.test(pr.system),
   );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("28. Salud de la banca y convertidor de cuotas");
+{
+  const day = (n) => isoDay(Date.now() - n * 86400e3);
+  const cp = (id, d, st) => ({
+    id,
+    name: id,
+    created: new Date(Date.now() - d * 86400e3).toISOString(),
+    stake: 10,
+    odds: 2,
+    payout: 20,
+    fixtures: [
+      {
+        id: "f" + id,
+        home: "Real Madrid",
+        away: "Sevilla",
+        competition: "LaLiga",
+        league: "LaLiga",
+        dateISO: day(d),
+        time: "14:00",
+        markets: [{ market: "Total de goles", pick: "Más de 1.5", odd: "2", builder: false, settlement: st }],
+      },
+    ],
+  });
+  const db0 = {
+    coupons: [
+      cp("a", 6, "won"),
+      cp("b", 5, "won"),
+      cp("c", 4, "lost"),
+      cp("d", 3, "lost"),
+      cp("e", 2, "lost"),
+      cp("f", 1, "won"),
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  const h = await page.evaluate(() => bankHealth());
+  check(
+    "salud de la banca: caída máxima 30, mejor racha 2, peor racha 3, racha actual de 1 ganado",
+    h &&
+      h.maxDd === 30 &&
+      h.bestWin === 2 &&
+      h.worstLoss === 3 &&
+      h.cur.type === "w" &&
+      h.cur.n === 1 &&
+      h.underPeak === 20,
+    JSON.stringify(h),
+  );
+  await tap(page, '[data-view="stats"]');
+  await page.waitForTimeout(300);
+  const txt = await page.$eval("#perfSection", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "Estadísticas muestra la salud de la banca y el convertidor de cuotas",
+    /Salud de tu banca/.test(txt) && /Convertidor de cuotas/.test(txt) && /Caída máxima/.test(txt),
+    txt.slice(0, 200),
+  );
+  await page.selectOption("#oddsFmt", "us");
+  await page.fill("#oddsIn", "-120");
+  const o1 = await page.$eval("#oddsOut", (e) => e.innerText);
+  check(
+    "convierte −120 americano a decimal 1.83 y 54.5 % de probabilidad",
+    /1\.83/.test(o1) && /54\.5/.test(o1),
+    o1,
+  );
+  await page.selectOption("#oddsFmt", "frac");
+  await page.fill("#oddsIn", "5/4");
+  const o2 = await page.$eval("#oddsOut", (e) => e.innerText);
+  check("fracción 5/4 → decimal 2.25 y americana +125", /2\.25/.test(o2) && /\+125/.test(o2), o2);
+  await page.fill("#oddsIn", "abc");
+  const o3 = await page.$eval("#oddsOut", (e) => e.innerText);
+  check("una cuota ilegible no rompe nada", /No entiendo/.test(o3), o3);
+  await page.fill("#mgA", "2.10");
+  await page.fill("#mgB", "3.30");
+  await page.fill("#mgC", "3.40");
+  const mg = await page.$eval("#mgOut", (e) => e.innerText);
+  check("margen de la casa de 2.10 / 3.30 / 3.40 ≈ 7.3 %", /7\.3 %/.test(mg), mg);
+  await tap(page, "[data-perf-period]");
+  await page.waitForTimeout(200);
+  check("tras cambiar el periodo los bloques nuevos siguen ahí", (await page.$$("#bankHealth")).length === 1);
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

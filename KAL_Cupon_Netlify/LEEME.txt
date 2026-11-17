@@ -464,3 +464,9 @@ VERSIÓN 18.1 — GOLEADORES Y JUGADORES EN EL MARCADOR EN VIVO
 - "＋ Goleador" siempre visible; si faltan goleadores por asignar aparece "＋ ¿Quién anotó? (n)".
 - Los jugadores seguidos y los goleadores entran en los registros (promedios por club/selección y competición) y en lo que recibe el Analista.
 Pruebas: 289.
+
+VERSIÓN 19 — SALUD DE LA BANCA Y CONVERTIDOR DE CUOTAS (site/js/32-banca-y-cuotas.js)
+- Estadísticas → "🩺 Salud de tu banca": yield, últimos 20 cupones, caída máxima, bajo tu máximo, mejor/peor racha y racha actual.
+- Estadísticas → "🧮 Convertidor de cuotas": decimal, americana, fraccional y probabilidad; y margen de la casa con las cuotas 1X2 de un partido.
+- Módulo independiente: se engancha a renderPerformance() sin cambiar el resto.
+Pruebas: 296.

@@ -685,3 +685,12 @@
 .lb-player-head small.muted {
   font-weight: 500;
 }
+
+/* V19 · salud de la banca y convertidor de cuotas */
+.bh-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+.bh-cell { background: var(--surface-2, rgba(127, 127, 127, 0.1)); border-radius: 10px; padding: 8px 10px; }
+.bh-cell small { display: block; opacity: 0.7; }
+.bh-cell b { font-size: 1.05rem; }
+.odds-tool h4 { margin: 12px 0 6px; }
+.odds-row { display: flex; gap: 8px; margin: 6px 0; }
+.odds-row input, .odds-row select { flex: 1; min-width: 0; }
