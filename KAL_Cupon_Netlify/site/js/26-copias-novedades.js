@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "20.4";
+const APP_VERSION = "21";
 const NOVEDADES = [
+  {
+    v: "21",
+    titulo: "Nuevo comienzo",
+    items: [
+      "🌱 En Ajustes: “Empezar de cero con mi banca”. Guarda una copia, borra cupones, casas y movimientos, y deja la banca nueva con reglas claras.",
+      "Conserva escudos, logos, banderas, fotos de jugadores y tus registros de partidos.",
+      "Reglas sanas por defecto: unidad del 1 % de la banca, máximo 3 selecciones, pausa tras 2 perdidos seguidos y presupuesto mensual del 30 %.",
+    ],
+  },
   {
     v: "20.4",
     titulo: "Enlace de Doradobet",

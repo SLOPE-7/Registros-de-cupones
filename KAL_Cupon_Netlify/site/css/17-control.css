@@ -701,3 +701,7 @@
 .tag-chip.tag-new { opacity: 0.8; border-style: dashed; }
 .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .tag-pill { font-size: 0.78rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2, rgba(127, 127, 127, 0.15)); }
+
+/* V21 · nuevo comienzo */
+.reset-sheet { max-height: 90vh; overflow-y: auto; }
+.reset-check { display: block; margin-top: 8px; }

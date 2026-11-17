@@ -200,6 +200,7 @@ function importBackup(file) {
         progress: incoming.progress && typeof incoming.progress === "object" ? incoming.progress : {},
         stats: incoming.stats && typeof incoming.stats === "object" ? incoming.stats : {},
         statsMigrated: !!incoming.statsMigrated,
+        ...(Array.isArray(incoming.tagList) ? { tagList: incoming.tagList } : {}),
       };
       if (obj.logos) mergeLogoStores(obj.logos);
       indexSavedCrests();
@@ -690,6 +691,7 @@ try {
       progress: d.progress && typeof d.progress === "object" ? d.progress : {},
       stats: d.stats && typeof d.stats === "object" ? d.stats : {},
       statsMigrated: !!d.statsMigrated,
+      ...(Array.isArray(d.tagList) ? { tagList: d.tagList } : {}),
       savedAt: d.savedAt || null,
     };
   } else {

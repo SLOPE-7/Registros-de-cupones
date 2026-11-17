@@ -268,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "20.4");
+        localStorage.setItem("kal_version_vista", "21");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3946,6 +3946,153 @@ section("30. Enlace de compartir de Doradobet (aviso)");
   );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
+}
+
+section("31. Nuevo comienzo (reinicio de banca, casas y cupones)");
+{
+  const day = (n) => isoDay(Date.now() - n * 86400e3);
+  const cp = (id, st) => ({
+    id,
+    name: id,
+    created: new Date().toISOString(),
+    stake: 10,
+    odds: 2,
+    payout: 20,
+    houseId: "H1",
+    fixtures: [
+      {
+        id: "f" + id,
+        home: "Real Madrid",
+        away: "Sevilla",
+        competition: "LaLiga",
+        league: "LaLiga",
+        dateISO: day(2),
+        time: "14:00",
+        markets: [{ market: "Total de goles", pick: "Más de 1.5", odd: "2", builder: false, settlement: st }],
+      },
+    ],
+  });
+  const db0 = {
+    coupons: [cp("a", "lost"), cp("b", "lost"), cp("c", "won")],
+    houses: [{ id: "H1", name: "Hondubet", initial: 500 }],
+    transactions: [{ id: "T1", houseId: "H1", delta: -10, couponId: "a", date: new Date().toISOString() }],
+    resultHistory: [{ id: "x" }],
+    actionHistory: [],
+    settings: { budget: 99, banca: { monto: 5000, unidadPct: 5, maxSel: 9, pausaTras: 7 } },
+    stats: {
+      k1: {
+        goals: 2,
+        corners: 5,
+        cards: 1,
+        final: true,
+        teams: { home: { goals: 1 }, away: { goals: 1 } },
+        players: {},
+        scorers: [],
+      },
+    },
+    tagList: ["Mía"],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "kal_saved_crest_directory_v1",
+      JSON.stringify({ "real madrid": { url: "https://x/rm.png" } }),
+    );
+    localStorage.setItem("kal_images_v1", JSON.stringify({ a: "data:image/png;base64,AAAA" }));
+    localStorage.setItem("kal_budget_alert_2026-11", "over");
+  });
+  await tap(page, '[data-view="settings"]');
+  await tap(page, "[data-fresh-start]");
+  await page.waitForSelector("#rsGo");
+  check(
+    "el asistente muestra qué se conserva y qué se borra",
+    /Se conserva/.test(await page.$eval(".reset-sheet", (e) => e.innerText)) &&
+      /Escudos, logos/.test(await page.$eval(".reset-sheet", (e) => e.innerText)),
+  );
+  check(
+    "el botón de empezar está bloqueado hasta poner banca y escribir EMPEZAR",
+    await page.$eval("#rsGo", (e) => e.disabled),
+  );
+  await page.fill("#rsMonto1", "1000");
+  await page.fill("#rsCasa2", "Hondubet");
+  await page.fill("#rsMonto2", "500");
+  const resumen = await page.$eval("#rsResumen", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "el resumen calcula la unidad: banca L 1,500 → 1 unidad = L 15.00 (1 %) y presupuesto L 450",
+    /1,500/.test(resumen) && /15\.00/.test(resumen) && /450/.test(resumen),
+    resumen,
+  );
+  await page.fill("#rsConfirm", "hola");
+  check("sigue bloqueado con otra palabra", await page.$eval("#rsGo", (e) => e.disabled));
+  await page.fill("#rsConfirm", "empezar");
+  check("con 'empezar' y la banca se habilita", !(await page.$eval("#rsGo", (e) => e.disabled)));
+  await tap(page, "#rsGo");
+  await page.waitForFunction(() => db.coupons.length === 0 && db.houses.length === 2, null, {
+    timeout: 8000,
+  });
+  const r = await page.evaluate(async () => ({
+    cupones: db.coupons.length,
+    tx: db.transactions.length,
+    hist: db.resultHistory.length,
+    casas: db.houses.map((h) => h.name + ":" + h.initial).join(","),
+    banca: bankrollAmount(),
+    unidad: unitStake(),
+    cfg: db.settings.banca,
+    presupuesto: db.settings.budget,
+    stats: Object.keys(db.stats || {}).length,
+    tags: db.tagList,
+    escudos: localStorage.getItem("kal_saved_crest_directory_v1"),
+    fotos: localStorage.getItem("kal_images_v1"),
+    aviso: localStorage.getItem("kal_budget_alert_2026-11"),
+    copias: (await snapshots()).map((s) => s.motivo + ":" + s.cupones),
+  }));
+  check(
+    "se borraron cupones, movimientos e historial",
+    r.cupones === 0 && r.tx === 0 && r.hist === 0,
+    JSON.stringify(r),
+  );
+  check(
+    "las casas nuevas tienen la banca: Doradobet 1000 y Hondubet 500",
+    r.casas === "Doradobet:1000,Hondubet:500" && r.banca === 1500,
+    r.casas,
+  );
+  check(
+    "la banca queda con reglas sanas: unidad 1 % (L 15), 3 selecciones, pausa tras 2, presupuesto L 450",
+    r.unidad === 15 &&
+      r.cfg.unidadPct === 1 &&
+      r.cfg.maxSel === 3 &&
+      r.cfg.pausaTras === 2 &&
+      r.presupuesto === 450,
+    JSON.stringify(r.cfg),
+  );
+  check(
+    "se conservan escudos, fotos, etiquetas y registros de partidos",
+    /real madrid/.test(r.escudos) && !!r.fotos && r.tags[0] === "Mía" && r.stats === 1,
+  );
+  check("se limpiaron los avisos del presupuesto anterior", r.aviso === null);
+  check(
+    "quedó una copia automática con los 3 cupones antes de borrar",
+    r.copias.some((c) => /Antes de nuevo comienzo:3/.test(c)),
+    r.copias.join("|"),
+  );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+
+  // Borrar también los registros de partidos
+  const t2 = await open(db0);
+  await tap(t2.page, '[data-view="settings"]');
+  await tap(t2.page, "[data-fresh-start]");
+  await t2.page.fill("#rsMonto1", "200");
+  await t2.page.check("#rsStats");
+  await t2.page.fill("#rsConfirm", "EMPEZAR");
+  await tap(t2.page, "#rsGo");
+  await t2.page.waitForFunction(() => db.coupons.length === 0, null, { timeout: 8000 });
+  check(
+    "si lo pides, también borra los registros de partidos",
+    (await t2.page.evaluate(() => Object.keys(db.stats || {}).length)) === 0,
+  );
+  await t2.ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------
