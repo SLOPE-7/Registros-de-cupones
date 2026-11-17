@@ -480,3 +480,7 @@ Pruebas: ver sección 29.
 VERSIÓN 20.1 — LEER EL PDF DEL BOLETO
 - "📷 Leer captura o PDF" acepta también PDF (hasta 2.5 MB). En Doradobet: cupón → 🖨️ → compartir → Guardar en Archivos; en KAL eliges ese PDF. El boleto imprimible trae todos los partidos, cuota total, valor apostado, bono y ganancia en una sola hoja.
 - El transcriptor no copia datos personales del cliente (usuario, número de cliente, afiliado, IB, saldo).
+
+VERSIÓN 20.2 — ENLACE DE COMPARTIR DE DORADOBET (servidor/enlace.mjs) · PRUEBA
+- En Doradobet: "Compartir enlace"; en KAL, Nuevo cupón: pegar el mensaje y tocar "Leer y revisar" (o 📋 Pegar). El servidor consulta la página de doradobet.com (solo ese sitio, mismo código de acceso que el Analista) y, si trae el boleto como texto, lo lee con el lector de siempre.
+- Si la página no lo entrega (es lo probable si carga los datos con JavaScript), la app lo dice y muestra un diagnóstico corto (estado, título, direcciones de la página) para afinarlo.

@@ -134,7 +134,7 @@ export function respuestaJson(status, cuerpo) {
 }
 
 // Compara en tiempo constante para no dar pistas sobre la clave por el tiempo de respuesta.
-function mismoTexto(a, b) {
+export function mismoTexto(a, b) {
   const x = new TextEncoder().encode(String(a)),
     y = new TextEncoder().encode(String(b));
   let diff = x.length ^ y.length;

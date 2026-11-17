@@ -205,8 +205,16 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "20.1";
+const APP_VERSION = "20.2";
 const NOVEDADES = [
+  {
+    v: "20.2",
+    titulo: "Pegar el enlace de Doradobet (prueba)",
+    items: [
+      "🔗 En Doradobet toca “Compartir enlace”, y en Nuevo cupón pega el mensaje: la app intenta traer el boleto sola.",
+      "Es una prueba: si Doradobet no entrega el boleto, la app te lo dice y muestra un diagnóstico para afinarlo.",
+    ],
+  },
   {
     v: "20.1",
     titulo: "Leer el boleto desde un PDF",
