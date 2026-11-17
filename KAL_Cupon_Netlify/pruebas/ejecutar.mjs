@@ -268,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "20");
+        localStorage.setItem("kal_version_vista", "20.1");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3764,6 +3764,15 @@ section("29. Captura de boletos y etiquetas de estrategia");
       !pr.tools &&
       /NO_ES_CUPON/.test(pr.system),
   );
+  const okPdf = await A.leerPeticion(
+    req({ modo: "imagen", datos: { tipo: "application/pdf", imagen: b64 } }),
+    env,
+  );
+  const bloque = A.construirPeticion("imagen", okPdf.datos).messages[0].content[0];
+  check(
+    "servidor: acepta el PDF del boleto y lo manda a Claude como documento",
+    bloque.type === "document" && bloque.source.media_type === "application/pdf",
+  );
   const mala = await A.leerPeticion(req({ modo: "imagen", datos: { tipo: "text/html", imagen: b64 } }), env);
   check("servidor: rechaza tipos que no son imagen", mala.error?.status === 400);
   const grande = await A.leerPeticion(req({ modo: "cupon", datos: { cupon: "x".repeat(130_000) } }), env);
@@ -3872,6 +3881,22 @@ section("29. Captura de boletos y etiquetas de estrategia");
   check(
     "tras guardar, el selector queda limpio para el siguiente cupón",
     (await page.$$("#tagPicker .tag-chip.active")).length === 0,
+  );
+  // PDF del boleto
+  await tap(page, '[data-view="new"]');
+  await page.evaluate(() => {
+    draftSelections = [];
+    renderPreview();
+  });
+  const pdf = Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.alloc(400, 0x41)]);
+  await page.setInputFiles("#photoFile", { name: "boleto.pdf", mimeType: "application/pdf", buffer: pdf });
+  await page.waitForFunction(() => /Senegal/.test($("preview").innerText), null, { timeout: 8000 });
+  const postPdf = analystPosts[analystPosts.length - 1];
+  check(
+    "📄 Leer PDF: envía el PDF tal cual al Analista y rellena el cupón",
+    postPdf.modo === "imagen" &&
+      postPdf.datos.tipo === "application/pdf" &&
+      postPdf.datos.imagen.startsWith("JVBERi0"),
   );
   // Imagen que no es un boleto
   await tap(page, '[data-view="new"]');

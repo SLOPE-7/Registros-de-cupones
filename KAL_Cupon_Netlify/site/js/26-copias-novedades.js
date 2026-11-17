@@ -205,8 +205,16 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "20";
+const APP_VERSION = "20.1";
 const NOVEDADES = [
+  {
+    v: "20.1",
+    titulo: "Leer el boleto desde un PDF",
+    items: [
+      "📄 “Leer captura o PDF” ahora acepta el PDF del boleto de Doradobet: toca 🖨️ en tu cupón → compartir → Guardar en Archivos, y elígelo en la app.",
+      "Trae todo el boleto en una hoja (todos los partidos, cuota total, valor apostado, bono y ganancia), sin hacer scroll.",
+    ],
+  },
   {
     v: "20",
     titulo: "Captura de boletos y etiquetas de estrategia",

@@ -20,6 +20,17 @@ async function shrinkImage(blob) {
   return { tipo: "image/jpeg", imagen: url.slice(url.indexOf(",") + 1) };
 }
 
+async function pdfPayload(blob) {
+  if (blob.size > 2_500_000) throw new Error("pdf-grande");
+  const url = await new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(r.result);
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(blob);
+  });
+  return { tipo: "application/pdf", imagen: url.slice(url.indexOf(",") + 1) };
+}
+
 function setImgStatus(txt) {
   const el = $("imgReadStatus");
   if (el) {
@@ -33,12 +44,16 @@ async function readFromImage(blob) {
   if (imgReading) return;
   imgReading = true;
   try {
-    setImgStatus("🖼️ Preparando la imagen…");
+    setImgStatus("🖼️ Preparando el archivo…");
     let pic;
     try {
-      pic = await shrinkImage(blob);
-    } catch {
-      toast("No pude abrir esa imagen. Prueba con una captura de pantalla.");
+      pic = blob.type === "application/pdf" ? await pdfPayload(blob) : await shrinkImage(blob);
+    } catch (e) {
+      if (e.message === "pdf-grande") {
+        toast("Ese PDF pesa demasiado (máximo 2.5 MB). Prueba con una captura.");
+        return;
+      }
+      toast("No pude abrir ese archivo. Prueba con una captura de pantalla.");
       return;
     }
     setImgStatus("🤖 Leyendo el boleto…");
@@ -47,12 +62,12 @@ async function readFromImage(blob) {
       .replace(/^```[a-z]*\n?|```$/g, "")
       .trim();
     if (!txt || /NO_ES_CUPON/.test(txt)) {
-      toast("Esa imagen no parece un boleto de apuestas.");
+      toast("Ese archivo no parece un boleto de apuestas.");
       return;
     }
     $("raw").value = txt;
     readText();
-    toast("Boleto leído desde la imagen. Revisa los datos antes de guardar.");
+    toast("Boleto leído. Revisa los datos antes de guardar.");
   } catch (e) {
     toast(e.message || "No se pudo leer la imagen.");
   } finally {
@@ -90,9 +105,9 @@ async function pasteFromClipboard() {
   if (!row) return;
   row.insertAdjacentHTML(
     "beforeend",
-    '<button type="button" class="btn" id="photoBtn">📷 Leer captura</button>' +
+    '<button type="button" class="btn" id="photoBtn">📷 Leer captura o PDF</button>' +
       '<button type="button" class="btn" id="pasteBtn">📋 Pegar</button>' +
-      '<input id="photoFile" type="file" accept="image/*" hidden>' +
+      '<input id="photoFile" type="file" accept="image/*,application/pdf" hidden>' +
       '<div class="small muted img-status" id="imgReadStatus" hidden aria-live="polite"></div>',
   );
   $("photoBtn").addEventListener("click", () => $("photoFile").click());

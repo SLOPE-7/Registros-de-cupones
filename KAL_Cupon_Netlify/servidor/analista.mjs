@@ -114,16 +114,17 @@ Lista: "- **Equipo A vs Equipo B** · mercado · selección · cuota aproximada 
 Partidos que no usaste y por qué.
 Cierra con una línea recordando que es un análisis orientativo, no una garantía.`;
 
-const SISTEMA_IMAGEN = `Eres un transcriptor. Recibes una captura de pantalla o foto de un boleto/cupón de apuestas deportivas.
+const SISTEMA_IMAGEN = `Eres un transcriptor. Recibes una captura de pantalla, una foto o un PDF de un boleto/cupón de apuestas deportivas.
 Tu única tarea es copiar el texto del boleto, tal cual se ve, en texto plano, una línea por dato, en el mismo orden de la imagen.
 Reglas:
 - Incluye todo lo que sea parte del boleto: tipo de apuesta (por ejemplo BB o Combinada), fechas y horas, equipos ("Equipo A vs. Equipo B"), competición, mercados, selecciones, cuotas, y al final cuota total, valor apostado, bono y ganancia total si aparecen.
 - No traduzcas, no resumas, no corrijas, no inventes nada y no añadas comentarios ni formato Markdown. Si un dato no se lee bien, copia lo que se alcance a leer.
 - Los números con coma decimal déjalos como se ven.
+- No copies datos personales del cliente (nombre de usuario, número de cliente, afiliado, IB, saldo).
 - Si la imagen no es un boleto o cupón de apuestas, responde exactamente: NO_ES_CUPON`;
 
 export const MODOS = ["historial", "cupon", "semana", "armar", "imagen"];
-const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 
 export function respuestaJson(status, cuerpo) {
   return new Response(JSON.stringify(cuerpo), {
@@ -253,7 +254,9 @@ export function construirPeticion(modo, datos) {
         {
           role: "user",
           content: [
-            { type: "image", source: { type: "base64", media_type: datos.tipo, data: datos.imagen } },
+            datos.tipo === "application/pdf"
+              ? { type: "document", source: { type: "base64", media_type: datos.tipo, data: datos.imagen } }
+              : { type: "image", source: { type: "base64", media_type: datos.tipo, data: datos.imagen } },
             { type: "text", text: "Copia el texto de este boleto." },
           ],
         },

@@ -476,3 +476,7 @@ VERSIÓN 20 — CAPTURA DE BOLETOS Y ETIQUETAS (site/js/33-captura.js, 34-etique
 - "📋 Pegar": toma del portapapeles una imagen o un texto. También se puede pegar una imagen dentro del cuadro de texto.
 - Etiquetas de estrategia por cupón (Remates, Goles, Córners, Tarjetas, Combinada, Selecciones, Seguro, Arriesgado + las tuyas): se sugieren solas, se editan al editar el cupón, salen en la tarjeta y en Estadísticas → "🏷️ Por etiqueta" (acierto, apostado, neto y ROI).
 Pruebas: ver sección 29.
+
+VERSIÓN 20.1 — LEER EL PDF DEL BOLETO
+- "📷 Leer captura o PDF" acepta también PDF (hasta 2.5 MB). En Doradobet: cupón → 🖨️ → compartir → Guardar en Archivos; en KAL eliges ese PDF. El boleto imprimible trae todos los partidos, cuota total, valor apostado, bono y ganancia en una sola hoja.
+- El transcriptor no copia datos personales del cliente (usuario, número de cliente, afiliado, IB, saldo).
