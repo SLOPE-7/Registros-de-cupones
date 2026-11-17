@@ -705,3 +705,10 @@
 /* V21 · nuevo comienzo */
 .reset-sheet { max-height: 90vh; overflow-y: auto; }
 .reset-check { display: block; margin-top: 8px; }
+
+/* V21.1 · corregir resultado */
+.fix-sheet { max-height: 90vh; overflow-y: auto; }
+.fix-match h4 { margin: 12px 0 4px; }
+.fix-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127, 127, 127, 0.2); }
+.fix-name { min-width: 0; font-size: 0.9rem; }
+.fix-quick { margin: 8px 0; }

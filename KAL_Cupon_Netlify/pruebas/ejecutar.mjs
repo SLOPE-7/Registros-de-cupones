@@ -268,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "21");
+        localStorage.setItem("kal_version_vista", "21.1");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -4093,6 +4093,115 @@ section("31. Nuevo comienzo (reinicio de banca, casas y cupones)");
     (await t2.page.evaluate(() => Object.keys(db.stats || {}).length)) === 0,
   );
   await t2.ctx.close();
+}
+
+section("32. Corregir el resultado de un cupón guardado");
+{
+  const fx = (home, away, ms) => ({
+    id: home,
+    home,
+    away,
+    competition: "LaLiga",
+    league: "LaLiga",
+    dateISO: isoDay(Date.now() - 2 * 86400e3),
+    time: "14:00",
+    markets: ms.map(([m, p, st]) => ({ market: m, pick: p, odd: "1.5", builder: false, settlement: st })),
+  });
+  const cp = (id, fixtures, extra = {}) => ({
+    id,
+    name: "Cupón " + id,
+    created: new Date().toISOString(),
+    stake: 10,
+    odds: 3,
+    payout: 30,
+    fixtures,
+    ...extra,
+  });
+  const db0 = {
+    coupons: [
+      // Se marcó un mercado como perdido por error: el cupón sale perdido
+      cp("A", [
+        fx("Real Madrid", "Sevilla", [["Total de goles", "Más de 1.5", "won"]]),
+        fx("Betis", "Girona", [["Total de goles", "Más de 1.5", "lost"]]),
+        fx("Villarreal", "Getafe", [["Ambos equipos marcan", "Sí", "won"]]),
+      ]),
+      // Comparte el mercado de Betis con el cupón A
+      cp("B", [fx("Betis", "Girona", [["Total de goles", "Más de 1.5", "lost"]])]),
+      cp("C", [fx("Valencia", "Osasuna", [["Total de goles", "Más de 1.5", "won"]])], { cashoutGross: 4 }),
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  const st = () =>
+    page.evaluate(() => Object.fromEntries(db.coupons.map((c) => [c.id, calcCoupon(c).status])));
+  check(
+    "punto de partida: A y B perdidos, C con cash out",
+    JSON.stringify(await st()) === '{"A":"lost","B":"lost","C":"cashout"}',
+    JSON.stringify(await st()),
+  );
+  await tap(page, '[data-view="saved"]');
+  await page.evaluate(() => {
+    couponFilter = "all";
+    renderCoupons();
+  });
+  await page.waitForTimeout(200);
+  check(
+    "cada cupón guardado tiene el botón 'Corregir resultado'",
+    (await page.$$("[data-fix-result]")).length === 3,
+  );
+  await tap(page, '[data-fix-result="A"]');
+  await page.waitForSelector(".fix-sheet");
+  const txt = await page.$eval(".fix-sheet", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "el asistente lista los 3 partidos con sus mercados y el estado actual",
+    /Betis vs Girona/.test(txt) && /Villarreal vs Getafe/.test(txt) && /Perdido/.test(txt),
+    txt.slice(0, 160),
+  );
+  const key = await page.evaluate(() =>
+    marketKey(db.coupons[0].fixtures[1], db.coupons[0].fixtures[1].markets[0]),
+  );
+  await tap(page, `.fix-sheet [data-fix-key="${key}"][data-fix-value="won"]`);
+  await page.waitForTimeout(200);
+  check(
+    "marcar ✅ el mercado equivocado deja el cupón A ganado (y el B, que comparte ese mercado, también)",
+    JSON.stringify(await st()) === '{"A":"won","B":"won","C":"cashout"}',
+    JSON.stringify(await st()),
+  );
+  check(
+    "la ventana se actualiza sola y muestra 'Ganado'",
+    /ahora:\s*Ganado/.test(await page.$eval(".fix-sheet", (e) => e.innerText.replace(/\s+/g, " "))),
+  );
+  check(
+    "el cambio quedó en el historial de resultados",
+    (await page.evaluate(() => db.resultHistory.length)) === 1,
+  );
+  await tap(page, '.fix-sheet [data-fix-all="pending"]');
+  await page.waitForTimeout(200);
+  check(
+    "'Todo pendiente' devuelve el cupón A a pendiente",
+    (await st()).A === "pending",
+    JSON.stringify(await st()),
+  );
+  await tap(page, '.fix-sheet [data-fix-all="won"]');
+  await page.waitForTimeout(200);
+  check("'Todo ganado' lo marca ganado", (await st()).A === "won", JSON.stringify(await st()));
+  await tap(page, "[data-fix-close]");
+  check("'Listo' cierra la ventana", (await page.$(".fix-sheet")) === null);
+  await tap(page, '[data-fix-result="C"]');
+  await page.waitForSelector("[data-fix-cashout]");
+  await tap(page, "[data-fix-cashout]");
+  await page.waitForTimeout(200);
+  check(
+    "quitar el cash out hace que C vuelva a salir de sus mercados (ganado)",
+    (await st()).C === "won",
+    JSON.stringify(await st()),
+  );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

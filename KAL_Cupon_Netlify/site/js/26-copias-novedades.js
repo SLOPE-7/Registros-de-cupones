@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "21";
+const APP_VERSION = "21.1";
 const NOVEDADES = [
+  {
+    v: "21.1",
+    titulo: "Corregir el resultado de un cupón",
+    items: [
+      "🛠 En Cupones guardados, cada cupón tiene “Corregir resultado”: ves todos sus mercados y cambias cualquiera (ganado, perdido, nulo o pendiente), o marcas todo ganado o todo pendiente.",
+      "Sirve también para quitar un cash out puesto por error.",
+      "Los cambios quedan en el historial de resultados y se pueden deshacer.",
+    ],
+  },
   {
     v: "21",
     titulo: "Nuevo comienzo",

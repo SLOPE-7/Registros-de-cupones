@@ -494,3 +494,7 @@ VERSIÓN 21 — NUEVO COMIENZO (site/js/35-nuevo-comienzo.js)
 - Ajustes → "🌱 Empezar de cero con mi banca": asistente que (1) descarga un respaldo y guarda una copia en "Copias automáticas", (2) borra cupones, casas, movimientos, historial de resultados, banca y presupuesto anteriores, y (3) crea las casas con la banca nueva y reglas sanas: unidad 1 % (opciones 1, 1.5 o 2 %), máx. 3 selecciones, pausa tras 2 perdidos seguidos (la unidad baja a la mitad) y presupuesto mensual del 30 % de la banca.
 - Conserva escudos, logos, banderas, fotos de jugadores, tema, código del Analista, etiquetas y registros de partidos (casilla opcional para borrarlos también).
 - Pide escribir EMPEZAR para confirmar. Si te arrepientes: Ajustes → Copias automáticas.
+
+VERSIÓN 21.1 — CORREGIR EL RESULTADO DE UN CUPÓN (site/js/36-corregir-resultado.js)
+- Cupones guardados → "🛠 Corregir resultado" en cada cupón: lista todos sus mercados con ✅ ❌ 🟰 ↺, más "Todo ganado" y "Todo pendiente", y "Quitar el cash out" si lo tiene.
+- Usa setMarketStatus(): el cambio se aplica a todos los cupones que compartan ese mercado, queda en el historial de resultados y se puede deshacer (Mercados → Historial).
