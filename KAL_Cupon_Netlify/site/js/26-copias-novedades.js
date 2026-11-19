@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "23";
+const APP_VERSION = "23.1";
 const NOVEDADES = [
+  {
+    v: "23.1",
+    titulo: "Remates y suplente en la ficha del jugador",
+    items: [
+      "🎯 La ficha muestra por separado Remates, Remates y suplente, Remates a puerta y Remates a puerta y suplente, con la probabilidad y la cuota justa de cada línea.",
+      "Tu cuota de un mercado “y suplente / incl. suplente” se compara con la sección con suplente (antes se comparaba con la de sin suplente).",
+      "En la tabla de partidos aparece el nombre del suplente que anotaste.",
+    ],
+  },
   {
     v: "23",
     titulo: "Ficha del jugador",

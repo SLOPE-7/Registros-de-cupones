@@ -113,6 +113,7 @@ function buildRecords() {
         tipo: equipo ? (findCountryLocal(equipo) ? "selección" : "club") : "",
         rival: side ? f[side === "home" ? "away" : "home"] : "",
         ...(shotsKnown ? { remates: shots, aPuerta: onT } : {}),
+        ...(p?.sub?.name ? { suplente: p.sub.name } : {}),
         ...(shotsKnown && p?.sub
           ? { rematesConSup: shots + shotsOf(p.sub), aPuertaConSup: onT + (Number(p.sub.onTarget) || 0) }
           : {}),

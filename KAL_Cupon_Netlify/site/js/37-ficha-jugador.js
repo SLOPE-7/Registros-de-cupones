@@ -5,20 +5,22 @@
 "use strict";
 
 const PC_STATS = [
+  { id: "remates", label: "Remates", icon: "🎯", field: "remates", lines: [0.5, 1.5, 2.5, 3.5] },
   {
-    id: "remates",
-    label: "Remates",
+    id: "rematesSup",
+    label: "Remates y suplente",
     icon: "🎯",
-    field: "remates",
-    sub: "rematesConSup",
+    field: "rematesConSup",
+    base: "remates",
     lines: [0.5, 1.5, 2.5, 3.5],
   },
+  { id: "aPuerta", label: "Remates a puerta", icon: "🥅", field: "aPuerta", lines: [0.5, 1.5, 2.5] },
   {
-    id: "aPuerta",
-    label: "Remates a puerta",
+    id: "aPuertaSup",
+    label: "Remates a puerta y suplente",
     icon: "🥅",
-    field: "aPuerta",
-    sub: "aPuertaConSup",
+    field: "aPuertaConSup",
+    base: "aPuerta",
     lines: [0.5, 1.5, 2.5],
   },
   { id: "goles", label: "Goleador (marca gol)", icon: "⚽", field: "goles", lines: [0.5] },
@@ -26,7 +28,7 @@ const PC_STATS = [
   { id: "paradas", label: "Paradas del portero", icon: "🧤", field: "paradas", lines: [1.5, 2.5, 3.5, 4.5] },
 ];
 const PC_STAT_OF = { onTarget: "aPuerta", shots: "remates", cards: "tarjetas", saves: "paradas" };
-let pcState = null; // { pk, fk, withSub }
+let pcState = null; // { pk, fk }
 
 // Nombre y foto del jugador, buscados en los mercados de tus cupones.
 function pcPlayerInfo(pk) {
@@ -75,21 +77,28 @@ function pcMine(pk, fk) {
 }
 
 // Probabilidad de cada línea según los últimos partidos registrados.
-function pcRows(p, withSub, mine) {
+// "Y suplente" suma al jugador que lo reemplaza; si en un partido no anotaste suplente, cuenta solo el jugador.
+function pcRows(p, mine) {
+  const matches = p?.matches || [];
+  const hasSubData = (s) => matches.some((m) => m[s.field] != null);
+  const subShown = new Set(PC_STATS.filter((s) => s.base && hasSubData(s)).map((s) => s.base));
   return PC_STATS.map((s) => {
-    const vals = (p?.matches || [])
-      .map((m) => (withSub && s.sub ? (m[s.sub] ?? m[s.field]) : m[s.field]))
+    if (s.base && !subShown.has(s.base)) return null;
+    const vals = matches
+      .map((m) => (s.base ? (m[s.field] ?? m[s.base]) : m[s.field]))
       .filter((v) => v != null)
       .slice(0, REC_LAST);
-    const mineHere = mine.filter((x) => x.id === s.id);
+    // Tu mercado "incl. suplente" va a la sección con suplente (si existe); el resto, a la normal.
+    const mineHere = mine.filter((x) =>
+      s.base ? x.id === s.base && x.incl : x.id === s.id && !(x.incl && subShown.has(x.id)),
+    );
     if (!vals.length && !mineHere.length) return null;
     const lines = [...new Set([...s.lines, ...mineHere.map((x) => x.line)])]
-      .sort((a, b) => a - b)
+      .sort((x, y) => x - y)
       .map((line) => {
         const hits = vals.filter((v) => v > line).length,
-          prob = vals.length ? (hits + 1) / (vals.length + 2) : null,
-          mias = mineHere.filter((x) => x.line === line);
-        return { line, hits, prob, fair: prob ? 1 / prob : null, mias };
+          prob = vals.length ? (hits + 1) / (vals.length + 2) : null;
+        return { line, hits, prob, fair: prob ? 1 / prob : null, mias: mineHere.filter((x) => x.line === line) };
       });
     return { ...s, vals, lines };
   }).filter(Boolean);
@@ -134,12 +143,12 @@ function pcLineHtml(s, l, n) {
 }
 
 function pcHtml() {
-  const { pk, fk, withSub } = pcState,
+  const { pk, fk } = pcState,
     p = buildRecords().players.get(pk) || null,
     info = pcPlayerInfo(pk),
     name = p?.name || info.name || pk,
     mine = pcMine(pk, fk),
-    rows = pcRows(p, withSub, mine),
+    rows = pcRows(p, mine),
     sum = p ? playerSummary(p) : null,
     photo = resolveImage(info.photo),
     initials = String(name)
@@ -149,7 +158,6 @@ function pcHtml() {
       .join("")
       .toUpperCase(),
     comps = [...new Set((p?.matches || []).map((m) => m.competicion).filter(Boolean))].slice(0, 2);
-  const hasSub = (p?.matches || []).some((m) => m.rematesConSup != null || m.aPuertaConSup != null);
   let html =
     '<div class="news-sheet pc-sheet"><div class="pc-head">' +
     (photo
@@ -175,13 +183,6 @@ function pcHtml() {
       '<div class="notice small">Todavía no tienes partidos registrados de ' +
       esc(name) +
       ". Anota sus remates, tarjetas o paradas en el marcador de cada partido (📇 aparece junto a su nombre) y aquí verás su probabilidad en cada línea.</div>";
-  if (hasSub)
-    html +=
-      '<div class="pc-toggle"><div class="chips" role="group" aria-label="Suplente"><button type="button" class="chip' +
-      (withSub ? "" : " active") +
-      '" data-pc-sub="0">Sin suplente</button><button type="button" class="chip' +
-      (withSub ? " active" : "") +
-      '" data-pc-sub="1">Con suplente</button></div><small class="muted">Con suplente suma también al jugador que lo reemplaza.</small></div>';
   html += rows.length
     ? rows
         .map(
@@ -194,6 +195,7 @@ function pcHtml() {
             (s.vals.length ? s.vals.join(" · ") + " (últimos " + s.vals.length + ")" : "sin registros") +
             (s.vals.length && s.vals.length < 3 ? " · pocos datos" : "") +
             "</small></div>" +
+            (s.base ? '<p class="small muted pc-note">Suma al jugador que lo reemplaza.</p>' : "") +
             s.lines.map((l) => pcLineHtml(s, l, s.vals.length)).join("") +
             "</section>",
         )
@@ -209,7 +211,7 @@ function pcHtml() {
         .map(
           (m) =>
             "<tr><td>" +
-            esc(String(m.fecha).slice(5) + " · " + (m.rival || "—")) +
+            esc(String(m.fecha).slice(5) + " · " + (m.rival || "—") + (m.suplente ? " · suplente: " + m.suplente : "")) +
             "</td><td>" +
             (m.remates ?? "—") +
             "</td><td>" +
@@ -238,7 +240,7 @@ function renderPlayerCard() {
   if (sheet) sheet.scrollTop = top;
 }
 function openPlayerCard(pk, fk) {
-  pcState = { pk, fk: fk || "", withSub: false };
+  pcState = { pk, fk: fk || "" };
   document.querySelector(".pc-wrap")?.remove();
   const w = document.createElement("div");
   w.className = "news-wrap pc-wrap";
@@ -263,11 +265,6 @@ document.addEventListener("click", (e) => {
   if (!pcState) return;
   if (e.target.closest("[data-pc-close]") || e.target.classList?.contains("pc-wrap"))
     return closePlayerCard();
-  const t = e.target.closest("[data-pc-sub]");
-  if (t) {
-    pcState.withSub = t.dataset.pcSub === "1";
-    renderPlayerCard();
-  }
 });
 
 // Clave del partido abierto (para saber qué mercados tuyos comparar).

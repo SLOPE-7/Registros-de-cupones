@@ -269,7 +269,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "23");
+        localStorage.setItem("kal_version_vista", "23.1");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -4595,7 +4595,8 @@ section("35. Ficha del jugador: tarjetas, paradas y probabilidades");
   const day = (n) => isoDay(Date.now() - n * 86400e3);
   const MB = "Remates - Kylian Mbappe (RMD)",
     MT = "Tarjetas - Kylian Mbappe (RMD)",
-    CP = "Paradas del portero - Thibaut Courtois (RMD)";
+    CP = "Paradas del portero - Thibaut Courtois (RMD)",
+    MA = "Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente";
   const mk = (market, pick, odd, st = "won") => ({ market, pick, odd, builder: false, settlement: st });
   const fx = (id, dias, markets) => ({
     id,
@@ -4614,6 +4615,7 @@ section("35. Ficha del jugador: tarjetas, paradas y probabilidades");
     mk(MB, "Más de 1.5", "1.90", "pending"),
     mk(MT, "Más de 0.5", "2.60", "pending"),
     mk(CP, "Más de 2.5", "1.80", "pending"),
+    mk(MA, "Más de 0.5", "1.50", "pending"),
   ]);
   const db0 = {
     coupons: [
@@ -4726,25 +4728,40 @@ section("35. Ficha del jugador: tarjetas, paradas y probabilidades");
   });
   check("ficha: se ve encima de la ventana del partido (no queda escondida detrás)", encima);
   check("ficha: lleva un aviso honesto de que es una estimación", /estimación con pocos datos/.test(ficha));
-  const antes = await page.$eval(".pc-sheet", (e) =>
-    e.innerText
-      .replace(/\s+/g, " ")
-      .match(/Más de 3\.5 (\d+) % ([\d.]+)/)
-      ?.slice(1)
-      .join(" "),
-  );
-  await tap(page, '[data-pc-sub="1"]');
-  const despues = await page.$eval(".pc-sheet", (e) =>
-    e.innerText
-      .replace(/\s+/g, " ")
-      .match(/Más de 3\.5 (\d+) % ([\d.]+)/)
-      ?.slice(1)
-      .join(" "),
+  const sec = (titulo) =>
+    page.$eval(
+      ".pc-sheet",
+      (e, t) => {
+        const x = [...e.querySelectorAll(".pc-stat")].find((y) =>
+          y.querySelector("b")?.textContent.includes(t),
+        );
+        return x ? x.innerText.replace(/\s+/g, " ") : "";
+      },
+      titulo,
+    );
+  const titulos = await page.$$eval(".pc-stat-head b", (e) =>
+    e.map((x) => x.textContent.replace(/^\S+\s/, "")),
   );
   check(
-    "«Con suplente» suma al reemplazo: más de 3.5 remates pasa de 29 % (3.50) a 43 % (2.33)",
-    antes === "29 3.50" && despues === "43 2.33",
-    antes + " → " + despues,
+    "ficha: secciones separadas Remates, Remates y suplente, Remates a puerta y Remates a puerta y suplente",
+    ["Remates", "Remates y suplente", "Remates a puerta", "Remates a puerta y suplente"].every((t) =>
+      titulos.includes(t),
+    ) && !(await page.$("[data-pc-sub]")),
+    titulos.join(" | "),
+  );
+  const sinSup = await sec("Remates");
+  const conSup = await sec("Remates y suplente");
+  check(
+    "«Remates y suplente» suma al reemplazo: más de 3.5 pasa de 29 % (3.50) a 43 % (2.33)",
+    /Más de 3\.5 29 % 3\.50 1\/5/.test(sinSup) && /Más de 3\.5 43 % 2\.33 2\/5/.test(conSup),
+    sinSup + " ||| " + conSup,
+  );
+  const apSup = await sec("Remates a puerta y suplente");
+  check(
+    "tu mercado «Remates a Puerta … Incl. suplente» (cuota 1.50) se compara con la sección CON suplente: 71 % → +7 % valor",
+    /Más de 0\.5 71 % 1\.40 4\/5 Tu cuota 1\.50 · \+7 % valor/.test(apSup) &&
+      !/Tu cuota 1\.50/.test(await sec("Remates a puerta")),
+    apSup,
   );
   await tap(page, "[data-pc-close]");
   check("la ficha se cierra", (await page.$(".pc-sheet")) === null);

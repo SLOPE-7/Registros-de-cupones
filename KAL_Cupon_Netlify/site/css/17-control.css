@@ -764,3 +764,4 @@ input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; vertical-
 /* La ficha del jugador se abre sobre la ventana del partido (capa 100). */
 .pc-wrap { z-index: 120; }
 .pg-mini-btn[data-player-card] { width: auto; padding: 2px 8px; white-space: nowrap; }
+.pc-note { margin: 0 0 4px; }

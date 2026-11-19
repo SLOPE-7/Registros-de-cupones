@@ -528,3 +528,7 @@ VERSIÓN 23 — FICHA DEL JUGADOR (site/js/37-ficha-jugador.js)
 - Si tienes un mercado suyo en ese partido, compara tu cuota con la justa (valor = probabilidad x cuota - 1).
 - Marcador: nuevos contadores por jugador "🟨 Tarjetas" y "🧤 Paradas" (statKind: stat cards / saves). Se marcan solos al llegar a la línea y entran en sus registros (campos tarjetas, paradas, rematesConSup, aPuertaConSup) y en lo que recibe el Analista.
 - Arreglo: «Tarjetas - Jugador» se leía como tarjetas de todo el partido porque PLAYER_MARKET_RE no reconocía tarjeta/parada/atajada/portero.
+
+VERSIÓN 23.1 — REMATES Y SUPLENTE EN LA FICHA DEL JUGADOR
+- La ficha ya no usa un interruptor: muestra secciones separadas "Remates", "Remates y suplente", "Remates a puerta" y "Remates a puerta y suplente" (las de suplente salen si anotaste algún suplente de ese jugador; en los partidos sin suplente anotado cuenta solo el jugador).
+- Tus mercados "incl. suplente" / "y suplente" se comparan con la sección con suplente. Los registros guardan el nombre del suplente (campo suplente).
