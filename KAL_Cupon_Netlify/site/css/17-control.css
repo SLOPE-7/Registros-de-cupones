@@ -765,3 +765,9 @@ input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; vertical-
 .pc-wrap { z-index: 120; }
 .pg-mini-btn[data-player-card] { width: auto; padding: 2px 8px; white-space: nowrap; }
 .pc-note { margin: 0 0 4px; }
+
+/* V24 · elegir partido y alias */
+.fd-picks { display: grid; gap: 6px; margin-top: 6px; }
+.fd-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font: inherit; cursor: pointer; }
+.fd-pick small { color: var(--muted); font-size: 12px; }
+.alias-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }

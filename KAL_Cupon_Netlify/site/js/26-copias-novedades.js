@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "23.1";
+const APP_VERSION = "24";
 const NOVEDADES = [
+  {
+    v: "24",
+    titulo: "Alias de equipos y partidos mejor encontrados",
+    items: [
+      "🔤 Si football-data.org no encuentra tu partido por el nombre, la ficha te muestra los partidos de ese día: toca el correcto y la app recuerda cómo llamas a cada equipo (alias).",
+      "Los alias se usan solos en las siguientes consultas (y en el Analista), y se ven o quitan en Ajustes → Alias de equipos.",
+      "Arreglo: ya no propone partidos que no tienen nada que ver (por ejemplo «Chelsea vs Leeds» para Mechelen vs Brugge).",
+    ],
+  },
   {
     v: "23.1",
     titulo: "Remates y suplente en la ficha del jugador",

@@ -55,6 +55,9 @@ function mergeDatabases(local, remote) {
     ...(resetAt ? { resetAt } : {}),
     ...(statsClearedAt ? { statsClearedAt } : {}),
     ...(tagList.length ? { tagList } : {}),
+    ...(Object.keys({ ...(remote.aliases || {}), ...(local.aliases || {}) }).length
+      ? { aliases: { ...(remote.aliases || {}), ...(local.aliases || {}) } }
+      : {}),
     statsMigrated: !!(local.statsMigrated || remote.statsMigrated),
     progress: (() => {
       const fresh = (v) => !resetAt || String(v?.updatedAt || "") > resetAt;

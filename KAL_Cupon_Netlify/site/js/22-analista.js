@@ -534,7 +534,11 @@ async function runAnalyst(modo, opts = {}) {
 function analystFixtureList(fixtures) {
   const seen = new Set();
   return (fixtures || [])
-    .map((f) => ({ local: f.home || "", visitante: f.away || "", fecha: scheduleISO(f) || "" }))
+    .map((f) => ({
+      local: (typeof fdAlias === "function" && fdAlias(f.home)) || f.home || "",
+      visitante: (typeof fdAlias === "function" && fdAlias(f.away)) || f.away || "",
+      fecha: scheduleISO(f) || "",
+    }))
     .filter(
       (x) =>
         x.local &&

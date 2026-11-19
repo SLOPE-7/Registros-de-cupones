@@ -203,6 +203,9 @@ function importBackup(file) {
         ...(typeof incoming.resetAt === "string" ? { resetAt: incoming.resetAt } : {}),
         ...(typeof incoming.statsClearedAt === "string" ? { statsClearedAt: incoming.statsClearedAt } : {}),
         ...(Array.isArray(incoming.tagList) ? { tagList: incoming.tagList } : {}),
+        ...(incoming.aliases && typeof incoming.aliases === "object" && !Array.isArray(incoming.aliases)
+          ? { aliases: incoming.aliases }
+          : {}),
       };
       if (obj.logos) mergeLogoStores(obj.logos);
       indexSavedCrests();
@@ -716,6 +719,9 @@ try {
       ...(typeof d.resetAt === "string" ? { resetAt: d.resetAt } : {}),
       ...(typeof d.statsClearedAt === "string" ? { statsClearedAt: d.statsClearedAt } : {}),
       ...(Array.isArray(d.tagList) ? { tagList: d.tagList } : {}),
+      ...(d.aliases && typeof d.aliases === "object" && !Array.isArray(d.aliases)
+        ? { aliases: d.aliases }
+        : {}),
       savedAt: d.savedAt || null,
     };
   } else {

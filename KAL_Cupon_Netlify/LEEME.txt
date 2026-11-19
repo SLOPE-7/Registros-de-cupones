@@ -532,3 +532,9 @@ VERSIÓN 23 — FICHA DEL JUGADOR (site/js/37-ficha-jugador.js)
 VERSIÓN 23.1 — REMATES Y SUPLENTE EN LA FICHA DEL JUGADOR
 - La ficha ya no usa un interruptor: muestra secciones separadas "Remates", "Remates y suplente", "Remates a puerta" y "Remates a puerta y suplente" (las de suplente salen si anotaste algún suplente de ese jugador; en los partidos sin suplente anotado cuenta solo el jugador).
 - Tus mercados "incl. suplente" / "y suplente" se comparan con la sección con suplente. Los registros guardan el nombre del suplente (campo suplente).
+
+VERSIÓN 24 — ALIAS DE EQUIPOS (site/js/25-datos-partido.js, cloudflare/datos-partido.mjs)
+- nameScore(): la sigla de 3 letras solo cuenta si es idéntica (antes se buscaba dentro de otras palabras: «Mechelen» parecía «Chelsea», «Tromsoe» parecía «Roma») y el parecido por prefijo exige que la palabra corta sea al menos el 60 % de la larga.
+- Si no se encuentra el partido, /api/datos-partido devuelve partidosDelDia (con "cerca" para los parecidos). La ficha los muestra; al tocar uno se envía matchId, el servidor orienta local/visitante y devuelve los nombres oficiales (partido.local.oficial / visitante.oficial) y la app guarda db.aliases[clave] = { mi, fd }.
+- Las consultas siguientes envían ah / aa (alias) y el servidor busca con esos nombres. El Analista también usa los alias.
+- Ajustes → "Alias de equipos": lista y permite quitar. Se sincronizan con la nube y entran en respaldos.

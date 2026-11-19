@@ -138,14 +138,49 @@ export function nameScore(query, team) {
     const qs = q.join(" "),
       cs = c.join(" ");
     if (qs === cs) return 1;
-    const inter = q.filter((t) =>
-      c.some((x) => x === t || (t.length >= 4 && x.length >= 4 && (x.startsWith(t) || t.startsWith(x)))),
-    );
+    // La sigla de 3 letras ("ROM", "CHE") solo vale si es idéntica: antes se buscaba dentro de otras palabras
+    // y "Tromsoe" parecía "Roma" y "Mechelen" parecía "Chelsea".
+    if (cand === team.tla) continue;
+    // Una palabra coincide si es igual o si una empieza por la otra y la corta es la mayor parte de la larga.
+    const same = (t, x) =>
+      x === t ||
+      (t.length >= 4 &&
+        x.length >= 4 &&
+        (x.startsWith(t) || t.startsWith(x)) &&
+        Math.min(t.length, x.length) / Math.max(t.length, x.length) >= 0.6);
+    const inter = q.filter((t) => c.some((x) => same(t, x)));
     let sc = inter.length / Math.max(q.length, c.length);
-    if (cs.includes(qs) || qs.includes(cs)) sc = Math.max(sc, 0.75);
+    // Todas las palabras del nombre más corto aparecen en el más largo ("PSV" en "PSV Eindhoven").
+    if (inter.length === Math.min(q.length, c.length)) sc = Math.max(sc, 0.75);
     best = Math.max(best, sc);
   }
   return best;
+}
+// Partidos del día ordenados por parecido con los equipos pedidos (para que elijas el tuyo).
+export function partidosDelDia(matches, home, away, max = 40) {
+  return (matches || [])
+    .map((m) => ({
+      m,
+      s: Math.max(
+        nameScore(home, m.homeTeam),
+        nameScore(home, m.awayTeam),
+        nameScore(away, m.homeTeam),
+        nameScore(away, m.awayTeam),
+      ),
+    }))
+    .sort(
+      (x, y) =>
+        (y.s >= 0.5) - (x.s >= 0.5) || y.s - x.s || String(x.m.utcDate).localeCompare(String(y.m.utcDate)),
+    )
+    .slice(0, max)
+    .map(({ m, s }) => ({
+      id: m.id,
+      local: m.homeTeam?.shortName || m.homeTeam?.name || "",
+      visitante: m.awayTeam?.shortName || m.awayTeam?.name || "",
+      competicion: m.competition?.name || "",
+      hora: m.utcDate,
+      cerca: s >= 0.5,
+    }));
 }
 // Por qué no se encontró el partido: ¿la liga no está en el plan o los nombres no coinciden?
 export function motivoNoEncontrado(matches, home, away) {
@@ -174,7 +209,7 @@ export function motivoNoEncontrado(matches, home, away) {
     home +
     " vs " +
     away +
-    "». Si es el mismo partido, corrige el nombre del equipo en el cupón."
+    "». Si es el mismo partido, elígelo abajo y la app recordará los nombres."
   );
 }
 export function findMatch(matches, home, away) {
@@ -377,7 +412,11 @@ export async function datosPartido(request, { token, store, fetchImpl = fetch })
   const u = new URL(request.url);
   const home = (u.searchParams.get("home") || "").slice(0, 80),
     away = (u.searchParams.get("away") || "").slice(0, 80),
-    date = u.searchParams.get("date") || "";
+    date = u.searchParams.get("date") || "",
+    // Alias guardados por ti (cómo se llama el equipo en football-data.org) y partido elegido a mano.
+    ah = (u.searchParams.get("ah") || "").slice(0, 80),
+    aa = (u.searchParams.get("aa") || "").slice(0, 80),
+    matchId = (u.searchParams.get("matchId") || "").replace(/\D/g, "").slice(0, 12);
   if (!home || !away || !/^\d{4}-\d{2}-\d{2}$/.test(date))
     return reply(400, { error: "Faltan los equipos o la fecha del partido." });
   if (!token)
@@ -392,11 +431,21 @@ export async function datosPartido(request, { token, store, fetchImpl = fetch })
       "/matches?dateFrom=" + shiftDay(date, -1) + "&dateTo=" + shiftDay(date, 1),
       opt(30 * 60000),
     );
-    const found = findMatch(day.matches, home, away);
+    const qh = ah || home,
+      qa = aa || away;
+    let found = findMatch(day.matches, qh, qa);
+    const forced = matchId && (day.matches || []).find((x) => String(x.id) === matchId);
+    if (forced) {
+      // Partido elegido a mano: se mira en qué orden lo escribió la casa.
+      const dir = nameScore(qh, forced.homeTeam) + nameScore(qa, forced.awayTeam),
+        swp = nameScore(qh, forced.awayTeam) + nameScore(qa, forced.homeTeam);
+      found = { m: forced, sc: 1, swapped: swp > dir };
+    }
     if (!found)
       return reply(200, {
         encontrado: false,
-        motivo: motivoNoEncontrado(day.matches, home, away),
+        motivo: motivoNoEncontrado(day.matches, qh, qa),
+        partidosDelDia: partidosDelDia(day.matches, qh, qa),
       });
     const m = found.m;
     // Si la casa puso los equipos al revés, se respeta el orden de la API.
@@ -422,8 +471,8 @@ export async function datosPartido(request, { token, store, fetchImpl = fetch })
         competicion: m.competition?.name,
         fecha: m.utcDate,
         estado: m.status,
-        local: { nombre: H.shortName || H.name, escudo: H.crest },
-        visitante: { nombre: A.shortName || A.name, escudo: A.crest },
+        local: { nombre: H.shortName || H.name, oficial: H.name, escudo: H.crest },
+        visitante: { nombre: A.shortName || A.name, oficial: A.name, escudo: A.crest },
       },
       tabla: st
         ? {

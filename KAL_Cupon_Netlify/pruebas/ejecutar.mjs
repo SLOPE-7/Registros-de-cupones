@@ -144,14 +144,40 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === "/api/datos-partido") {
     seen.push("datos:" + url.searchParams.get("home") + "|" + url.searchParams.get("date"));
+    seen.push("datosq:" + url.search);
+    const nij = url.searchParams.get("home") === "Nijmegen";
+    if (nij && !url.searchParams.get("matchId") && !url.searchParams.get("ah"))
+      return sendJson({
+        encontrado: false,
+        motivo:
+          "Encontré un partido parecido en football-data.org (NEC vs PSV) pero los nombres no coinciden.",
+        partidosDelDia: [
+          {
+            id: 501,
+            local: "NEC",
+            visitante: "PSV",
+            competicion: "Eredivisie",
+            hora: "2026-11-21T15:30:00Z",
+            cerca: true,
+          },
+          {
+            id: 502,
+            local: "Chelsea",
+            visitante: "Leeds United",
+            competicion: "Premier League",
+            hora: "2026-11-21T17:30:00Z",
+            cerca: false,
+          },
+        ],
+      });
     return sendJson({
       encontrado: true,
       alReves: false,
       fuente: "football-data.org",
       partido: {
         competicion: "UEFA Champions League",
-        local: { nombre: "Fenerbahçe" },
-        visitante: { nombre: "Liverpool" },
+        local: { nombre: nij ? "NEC" : "Fenerbahçe", oficial: nij ? "NEC" : "Fenerbahçe" },
+        visitante: { nombre: nij ? "PSV" : "Liverpool", oficial: nij ? "PSV" : "Liverpool" },
       },
       modelo: {
         lambdaLocal: 1.2,
@@ -269,7 +295,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "23.1");
+        localStorage.setItem("kal_version_vista", "24");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -4473,8 +4499,8 @@ section("34. Pestañas del partido y nombres de equipos");
   check("no confunde: «Inter vs Napoli» no está ese día", !D.findMatch(dia, "Inter", "Napoli"));
   const hint = D.motivoNoEncontrado(dia, "Cologne", "Hamburgo");
   check(
-    "si solo coincide un equipo, el mensaje lo dice y pide corregir el nombre",
-    /parecido/.test(hint) && /Köln|Bayern/.test(hint) && /corrige/.test(hint),
+    "si solo coincide un equipo, el mensaje lo dice y pide elegir el partido",
+    /parecido/.test(hint) && /Köln|Bayern/.test(hint) && /elígelo/.test(hint),
     hint,
   );
   check(
@@ -4806,6 +4832,210 @@ section("35. Ficha del jugador: tarjetas, paradas y probabilidades");
     "«Tus registros» tiene el botón 📇 Ficha de cada jugador",
     (await page.$$("#matchTabPanel [data-player-card]")).length >= 1,
   );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("36. Alias de equipos y partidos del día");
+{
+  const D = await import(path.join(ROOT, "cloudflare/datos-partido.mjs"));
+  const T = (id, name, shortName, tla) => ({ id, name, shortName, tla });
+  // --- los falsos parecidos de tus capturas
+  check(
+    "«KV Mechelen» ya no se parece a «Chelsea» (la sigla CHE estaba dentro de «mechelen»)",
+    D.nameScore("KV Mechelen", T(1, "Chelsea FC", "Chelsea", "CHE")) < 0.5,
+  );
+  check(
+    "«Tromsoe» ya no se parece a «Roma» (ROM dentro de «tromsoe»)",
+    D.nameScore("Tromsoe", T(2, "AS Roma", "Roma", "ROM")) < 0.5,
+  );
+  check("«Romania» no se confunde con «Roma»", D.nameScore("Romania", T(2, "AS Roma", "Roma", "ROM")) < 0.5);
+  check(
+    "lo que sí debe seguir coincidiendo: PSV / PSV Eindhoven, Atlético, Real Betis, sigla idéntica BVB",
+    D.nameScore("PSV", T(3, "PSV Eindhoven", "PSV", "PSV")) === 1 &&
+      D.nameScore("PSV", T(3, "PSV Eindhoven", "", "")) >= 0.75 &&
+      D.nameScore("Atlético de Madrid", T(4, "Club Atlético de Madrid", "Atleti", "ATM")) === 1 &&
+      D.nameScore("Real Betis", T(5, "Real Betis Balompié", "Real Betis", "BET")) === 1 &&
+      D.nameScore("BVB", T(6, "Borussia Dortmund", "Dortmund", "BVB")) === 1 &&
+      D.nameScore("Newcastle", T(7, "Newcastle United FC", "Newcastle", "NEW")) >= 0.75,
+  );
+
+  // --- un día de partidos como los devuelve football-data.org
+  const dia = [
+    {
+      id: 501,
+      utcDate: "2026-11-21T15:30:00Z",
+      status: "TIMED",
+      competition: { code: "DED", name: "Eredivisie" },
+      homeTeam: T(1, "NEC", "NEC", "NEC"),
+      awayTeam: T(2, "PSV", "PSV", "PSV"),
+      score: { fullTime: {} },
+    },
+    {
+      id: 502,
+      utcDate: "2026-11-21T17:30:00Z",
+      status: "TIMED",
+      competition: { code: "PL", name: "Premier League" },
+      homeTeam: T(3, "Chelsea FC", "Chelsea", "CHE"),
+      awayTeam: T(4, "Leeds United FC", "Leeds United", "LEE"),
+      score: { fullTime: {} },
+    },
+    {
+      id: 503,
+      utcDate: "2026-11-21T19:45:00Z",
+      status: "TIMED",
+      competition: { code: "SA", name: "Serie A" },
+      homeTeam: T(5, "Parma Calcio 1913", "Parma", "PAR"),
+      awayTeam: T(6, "AS Roma", "Roma", "ROM"),
+      score: { fullTime: {} },
+    },
+  ];
+  const fetchDia = async (url) =>
+    /matches\?dateFrom=2026-11-20&dateTo=2026-11-22/.test(url)
+      ? { ok: true, status: 200, json: async () => ({ matches: dia }) }
+      : { ok: false, status: 404, json: async () => ({}) };
+  const mem = new Map(),
+    store = { get: async (k) => mem.get(k) ?? null, put: async (k, v) => void mem.set(k, v) };
+  const pedir = async (q) =>
+    (
+      await D.datosPartido(
+        new Request("https://x/api/datos-partido?" + new URLSearchParams({ date: "2026-11-21", ...q })),
+        { token: "t", store, fetchImpl: fetchDia },
+      )
+    ).json();
+
+  const mech = await pedir({ home: "KV Mechelen", away: "Club Brugge KV" });
+  check(
+    "Mechelen vs Brugge: ya no inventa «Chelsea vs Leeds»; dice que la liga no está en el plan gratis",
+    mech.encontrado === false && /plan gratis/.test(mech.motivo) && !/parecido/.test(mech.motivo),
+    mech.motivo,
+  );
+  const trom = await pedir({ home: "Tromsoe", away: "Viking FK" });
+  check(
+    "Tromsoe vs Viking: ya no inventa «Parma vs Roma»",
+    trom.encontrado === false && /plan gratis/.test(trom.motivo),
+    trom.motivo,
+  );
+
+  const nij = await pedir({ home: "Nijmegen", away: "PSV" });
+  check(
+    "Nijmegen vs PSV: no coincide por nombre, pero propone «NEC vs PSV» como el más parecido",
+    nij.encontrado === false &&
+      /parecido/.test(nij.motivo) &&
+      nij.partidosDelDia[0].id === 501 &&
+      nij.partidosDelDia[0].cerca === true &&
+      nij.partidosDelDia.filter((x) => x.cerca).length === 1 &&
+      nij.partidosDelDia.length === 3,
+    JSON.stringify(nij.partidosDelDia),
+  );
+  const eleg = await pedir({ home: "Nijmegen", away: "PSV", matchId: "501" });
+  check(
+    "al elegir el partido (matchId) lo encuentra y devuelve los nombres oficiales para guardarlos",
+    eleg.encontrado === true &&
+      eleg.partido.local.oficial === "NEC" &&
+      eleg.partido.visitante.oficial === "PSV" &&
+      eleg.alReves === false,
+    JSON.stringify(eleg.partido),
+  );
+  const alias = await pedir({ home: "Nijmegen", away: "PSV", ah: "NEC", aa: "PSV" });
+  check(
+    "con el alias guardado (ah/aa) lo encuentra solo, sin elegir",
+    alias.encontrado === true && alias.partido.local.oficial === "NEC",
+  );
+  const alrev = await pedir({ home: "PSV", away: "Nijmegen", matchId: "501" });
+  check(
+    "si la casa puso los equipos al revés, lo detecta (alReves)",
+    alrev.encontrado === true && alrev.alReves === true,
+    JSON.stringify([alrev.encontrado, alrev.alReves]),
+  );
+
+  // --- ficha en el navegador
+  const fut = isoDay(Date.now() + 2 * 86400e3);
+  const db0 = {
+    coupons: [
+      {
+        id: "N1",
+        name: "N1",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 2,
+        payout: 10,
+        fixtures: [
+          {
+            id: "n",
+            home: "Nijmegen",
+            away: "PSV",
+            competition: "Eredivisie",
+            league: "Eredivisie",
+            dateISO: fut,
+            time: "09:30",
+            markets: [
+              {
+                market: "Total de goles",
+                pick: "Más de 1.5",
+                odd: "1.4",
+                builder: false,
+                settlement: "pending",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => openMatchDetails({ couponId: "N1", fixtureIndex: 0 }));
+  await tap(page, '[data-match-tab="datos"]');
+  await page.waitForSelector(".fd-pick", { timeout: 8000 });
+  const panel0 = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "sin coincidencia: la ficha pregunta «¿Es alguno de estos partidos?» y muestra «NEC vs PSV»",
+    /¿Es alguno de estos partidos\?/.test(panel0) && /NEC vs PSV/.test(panel0),
+    panel0.slice(0, 260),
+  );
+  check(
+    "los que no se parecen quedan escondidos en «Ver todos los partidos de ese día (1)»",
+    /Ver todos los partidos de ese día \(1\)/.test(panel0),
+  );
+  await tap(page, '[data-fd-pick="501"]');
+  await page.waitForSelector(".rs-pick", { timeout: 8000 });
+  const al = await page.evaluate(() => JSON.stringify(db.aliases));
+  check(
+    "al elegirlo, guarda el alias «Nijmegen» = «NEC»",
+    /"nijmegen":\{"mi":"Nijmegen","fd":"NEC"\}/.test(al),
+    al,
+  );
+  check(
+    "y la ficha ya muestra el resumen (1X2, xG…) con los nombres guardados",
+    /nombres guardados/.test(await page.$eval("#matchTabPanel", (e) => e.innerText)),
+  );
+  // siguiente consulta: usa el alias solo
+  const antes = seen.length;
+  await tap(page, "[data-reload-form]");
+  await page.waitForFunction(
+    () => /Probabilidad 1X2/.test(document.getElementById("matchTabPanel").innerText),
+    null,
+    { timeout: 8000 },
+  );
+  const q = seen.slice(antes).find((x) => x.startsWith("datosq:")) || "";
+  check(
+    "la siguiente consulta manda el alias (ah=NEC) y ya no pide elegir",
+    /ah=NEC/.test(q) && !(await page.$(".fd-pick")),
+    q,
+  );
+  // Ajustes: ver y quitar
+  await tap(page, "[data-match-close], .match-close, #matchModal .close");
+  await page.evaluate(() => closeMatchDetails());
+  await tap(page, '[data-view="settings"]');
+  const caja = await page.$eval("#aliasBox", (e) => e.innerText.replace(/\s+/g, " "));
+  check("Ajustes → Alias de equipos lista «Nijmegen» = «NEC»", /Nijmegen.*NEC/.test(caja), caja);
+  await tap(page, "[data-alias-del]");
+  check("y se puede quitar", (await page.evaluate(() => Object.keys(db.aliases || {}).length)) === 0);
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
