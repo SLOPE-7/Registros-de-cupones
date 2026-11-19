@@ -268,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "21.1");
+        localStorage.setItem("kal_version_vista", "21.2");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -4202,6 +4202,209 @@ section("32. Corregir el resultado de un cupón guardado");
   );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
+}
+
+section("33. Revisión general: datos incompletos, nube, service worker y accesibilidad");
+{
+  // --- el service worker precarga todos los archivos del sitio
+  const sw = fs.readFileSync(path.join(ROOT, "site/sw.js"), "utf8");
+  const archivos = [
+    ...fs
+      .readdirSync(path.join(ROOT, "site/js"))
+      .filter((f) => f.endsWith(".js"))
+      .map((f) => "/js/" + f),
+    ...fs
+      .readdirSync(path.join(ROOT, "site/css"))
+      .filter((f) => f.endsWith(".css"))
+      .map((f) => "/css/" + f),
+  ];
+  const faltan = archivos.filter((f) => !sw.includes("'" + f + "'"));
+  check(
+    "el service worker precarga todos los JS y CSS del sitio",
+    faltan.length === 0,
+    "faltan: " + faltan.join(", "),
+  );
+  check(
+    "las cabeceras de seguridad básicas están en _headers",
+    /nosniff/.test(fs.readFileSync(path.join(ROOT, "site/_headers"), "utf8")),
+  );
+
+  // --- datos incompletos (respaldos antiguos, fusiones): la app no se rompe
+  const dbRota = {
+    coupons: [
+      { id: "s1", name: "Sin partidos", created: new Date().toISOString(), stake: 5 },
+      {
+        id: "s2",
+        name: "Partido sin mercados",
+        created: new Date().toISOString(),
+        stake: 5,
+        fixtures: [{ id: "f", home: "A", away: "B" }],
+      },
+      {
+        id: "s3",
+        name: "Mercado vacío",
+        created: new Date().toISOString(),
+        stake: 5,
+        fixtures: [{ id: "g", home: "C", away: "D", markets: [{}, null] }],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const r0 = await open(dbRota);
+  for (const v of [
+    "home",
+    "new",
+    "calendar",
+    "markets",
+    "saved",
+    "houses",
+    "stats",
+    "analyst",
+    "logos",
+    "settings",
+  ]) {
+    await r0.page.evaluate((v) => go(v), v);
+    await r0.page.waitForTimeout(80);
+  }
+  const estados = await r0.page.evaluate(() =>
+    db.coupons.map((c) => calcCoupon(c).status + ":" + c.fixtures.length),
+  );
+  check(
+    "datos incompletos: todas las pantallas cargan sin errores",
+    !r0.page.errors.length,
+    r0.page.errors.join(" | "),
+  );
+  check(
+    "datos incompletos: los cupones quedan en una forma segura (lista de partidos y de mercados)",
+    estados.length === 3 && estados[0] === "pending:0",
+    estados.join(","),
+  );
+  await r0.ctx.close();
+
+  // --- el reinicio no se deshace con la fusión de la nube
+  const cp = (id) => ({
+    id,
+    name: id,
+    created: new Date().toISOString(),
+    stake: 10,
+    odds: 2,
+    payout: 20,
+    houseId: "H1",
+    fixtures: [
+      {
+        id: "f" + id,
+        home: "A" + id,
+        away: "B",
+        dateISO: isoDay(Date.now() - 2 * 86400e3),
+        time: "14:00",
+        markets: [{ market: "1x2", pick: "1", odd: "2", settlement: "won" }],
+      },
+    ],
+  });
+  const viejo = {
+    coupons: [cp("a"), cp("b")],
+    houses: [{ id: "H1", name: "Vieja", initial: 100 }],
+    transactions: [{ id: "T1", houseId: "H1", delta: -10, couponId: "a" }],
+    resultHistory: [],
+    actionHistory: [],
+    progress: { p1: { updatedAt: "2026-01-01T00:00:00.000Z", goals: 1 } },
+    stats: { s1: { updatedAt: "2026-01-01T00:00:00.000Z", goals: 2 } },
+    tagList: ["Remota"],
+    statsMigrated: true,
+  };
+  const r1 = await open(viejo);
+  await tap(r1.page, '[data-view="settings"]');
+  await tap(r1.page, "[data-fresh-start]");
+  await r1.page.fill("#rsMonto1", "500");
+  await r1.page.check("#rsStats");
+  await r1.page.fill("#rsConfirm", "EMPEZAR");
+  await tap(r1.page, "#rsGo");
+  await r1.page.waitForFunction(() => db.coupons.length === 0 && db.houses.length === 1, null, {
+    timeout: 8000,
+  });
+  const fus = await r1.page.evaluate((viejo) => {
+    const m = mergeDatabases(db, JSON.parse(JSON.stringify(viejo)));
+    return {
+      cupones: m.coupons.length,
+      casas: m.houses.map((h) => h.name).join(","),
+      tx: m.transactions.length,
+      progreso: Object.keys(m.progress).length,
+      stats: Object.keys(m.stats).length,
+      tags: m.tagList,
+    };
+  }, viejo);
+  check(
+    "tras el reinicio, fusionar con una nube vieja NO devuelve cupones, casas, movimientos, progreso ni registros",
+    fus.cupones === 0 && fus.casas === "Doradobet" && fus.tx === 0 && fus.progreso === 0 && fus.stats === 0,
+    JSON.stringify(fus),
+  );
+  check(
+    "la fusión une las etiquetas propias de los dos lados",
+    fus.tags.includes("Remota"),
+    JSON.stringify(fus.tags),
+  );
+  await r1.ctx.close();
+
+  // --- sin borrar registros: los registros de la nube se conservan; solo lo anterior desaparece
+  const r2 = await open(viejo);
+  await tap(r2.page, '[data-view="settings"]');
+  await tap(r2.page, "[data-fresh-start]");
+  await r2.page.fill("#rsMonto1", "500");
+  await r2.page.fill("#rsConfirm", "EMPEZAR");
+  await tap(r2.page, "#rsGo");
+  await r2.page.waitForFunction(() => db.coupons.length === 0, null, { timeout: 8000 });
+  const fus2 = await r2.page.evaluate(
+    (viejo) => Object.keys(mergeDatabases(db, JSON.parse(JSON.stringify(viejo))).stats).length,
+    viejo,
+  );
+  check("si no se pidió borrar los registros de partidos, se conservan", fus2 === 1, String(fus2));
+  await r2.ctx.close();
+
+  // --- el borrado general también deja marcas
+  const r3 = await open(viejo);
+  await tap(r3.page, '[data-view="settings"]');
+  await tap(r3.page, "#wipeBtn");
+  await r3.page.waitForFunction(() => db.coupons.length === 0, null, { timeout: 8000 });
+  const fus3 = await r3.page.evaluate(
+    (viejo) => mergeDatabases(db, JSON.parse(JSON.stringify(viejo))).coupons.length,
+    viejo,
+  );
+  check(
+    "'Borrar cupones y movimientos' tampoco se deshace con la fusión de la nube",
+    fus3 === 0,
+    String(fus3),
+  );
+  await r3.ctx.close();
+
+  // --- accesibilidad: cada campo del HTML tiene su etiqueta enlazada
+  const r4 = await open(baseDb());
+  const sinFor = await r4.page.evaluate(() =>
+    [...document.querySelectorAll(".field > label:not([for])")]
+      .filter(
+        (l) =>
+          l.nextElementSibling &&
+          /^(INPUT|SELECT|TEXTAREA)$/.test(l.nextElementSibling.tagName) &&
+          l.nextElementSibling.id,
+      )
+      .map((l) => l.textContent.trim()),
+  );
+  check(
+    "accesibilidad: todas las etiquetas de formulario están enlazadas a su campo",
+    sinFor.length === 0,
+    sinFor.join(" | "),
+  );
+  const tam = await r4.page.evaluate(() => {
+    go("new");
+    const c = document.getElementById("autoStakeTx");
+    const r = c.getBoundingClientRect();
+    return Math.round(r.width) + "x" + Math.round(r.height);
+  });
+  check("accesibilidad: las casillas miden al menos 20 px", tam === "20x20", tam);
+  await r4.ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

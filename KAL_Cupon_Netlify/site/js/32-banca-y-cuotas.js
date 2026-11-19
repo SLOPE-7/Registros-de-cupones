@@ -144,7 +144,7 @@ function oddsToolHtml() {
     '<input id="oddsIn" inputmode="decimal" placeholder="Escribe la cuota" aria-label="Cuota"></div>' +
     '<div id="oddsOut" class="small muted">Elige formato y escribe una cuota.</div>' +
     '<h4 class="small">Margen de la casa en un partido</h4>' +
-    '<div class="odds-row"><input id="mgA" inputmode="decimal" placeholder="Local"><input id="mgB" inputmode="decimal" placeholder="Empate"><input id="mgC" inputmode="decimal" placeholder="Visitante"></div>' +
+    '<div class="odds-row"><input id="mgA" inputmode="decimal" placeholder="Local" aria-label="Cuota del local"><input id="mgB" inputmode="decimal" placeholder="Empate" aria-label="Cuota del empate"><input id="mgC" inputmode="decimal" placeholder="Visitante" aria-label="Cuota del visitante"></div>' +
     '<div id="mgOut" class="small muted">' +
     marginHtml() +
     "</div></div>"

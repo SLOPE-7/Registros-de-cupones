@@ -5,6 +5,25 @@ const KEY = "kal_coupon_organizer_v2",
   DRAFT = "kal_coupon_v2_draft";
 const $ = (id) => document.getElementById(id);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+// Deja los cupones en una forma segura: un respaldo antiguo o una fusión de la nube puede traer cupones sin
+// lista de partidos, partidos sin lista de mercados o mercados sin estado, y eso rompía las pantallas.
+function sanitizeCoupons(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((c) => c && typeof c === "object")
+    .map((c) => {
+      if (!c.id) c.id = uid();
+      c.fixtures = (Array.isArray(c.fixtures) ? c.fixtures : [])
+        .filter((f) => f && typeof f === "object")
+        .map((f) => {
+          f.markets = (Array.isArray(f.markets) ? f.markets : []).filter((m) => m && typeof m === "object");
+          f.markets.forEach((m) => {
+            if (!m.settlement) m.settlement = "pending";
+          });
+          return f;
+        });
+      return c;
+    });
+}
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,

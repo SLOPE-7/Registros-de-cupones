@@ -108,12 +108,29 @@ async function runFreshStart() {
   try {
     await snapshotNow("Antes de nuevo comienzo");
   } catch {}
-  const now = new Date().toISOString(),
-    resto = { ...db };
-  ["coupons", "houses", "transactions", "resultHistory", "actionHistory", "settings"].forEach(
+  const now = new Date().toISOString();
+  // Marcas de borrado: así la sincronización con la nube no devuelve los cupones, casas y movimientos viejos.
+  markDeleted(
+    "coupons",
+    db.coupons.map((c) => c.id),
+  );
+  markDeleted(
+    "houses",
+    db.houses.map((h) => h.id),
+  );
+  markDeleted(
+    "transactions",
+    db.transactions.map((t) => t.id),
+  );
+  const resto = { ...db };
+  ["coupons", "houses", "transactions", "resultHistory", "actionHistory", "settings", "progress"].forEach(
     (k) => delete resto[k],
   );
-  if (f.borrarStats) delete resto.stats;
+  if (f.borrarStats) {
+    delete resto.stats;
+    resto.statsClearedAt = now;
+  }
+  resto.resetAt = now;
   db = {
     ...resto,
     coupons: [],

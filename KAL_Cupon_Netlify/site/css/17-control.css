@@ -712,3 +712,8 @@
 .fix-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(127, 127, 127, 0.2); }
 .fix-name { min-width: 0; font-size: 0.9rem; }
 .fix-quick { margin: 8px 0; }
+
+/* V21.2 · controles más fáciles de tocar */
+input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; vertical-align: middle; }
+.btn.sm { min-height: 32px; }
+.hn-close { min-width: 32px; min-height: 32px; }

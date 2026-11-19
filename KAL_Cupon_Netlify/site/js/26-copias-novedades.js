@@ -205,8 +205,19 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "21.1";
+const APP_VERSION = "21.2";
 const NOVEDADES = [
+  {
+    v: "21.2",
+    titulo: "Revisión general",
+    items: [
+      "🧱 La app ya no se rompe con respaldos antiguos o datos incompletos (cupones sin partidos o partidos sin mercados).",
+      "🌱 Nuevo comienzo y “Borrar cupones” ya no se deshacen solos con la sincronización: la nube no devuelve lo borrado.",
+      "📴 Funciona sin conexión con todas las funciones nuevas.",
+      "♿ Etiquetas enlazadas en los formularios, casillas y botones más grandes y mejor contraste en el tema claro.",
+      "🧹 Limpieza: código sin uso eliminado y cabeceras de seguridad añadidas.",
+    ],
+  },
   {
     v: "21.1",
     titulo: "Corregir el resultado de un cupón",

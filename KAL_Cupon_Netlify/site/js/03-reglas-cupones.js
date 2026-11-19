@@ -137,9 +137,6 @@ function marketKey(f, m) {
     norm(m.pick),
   ].join("|");
 }
-function fixtureCount(c) {
-  return c.fixtures.length;
-}
 function couponProgress(c) {
   const all = c.fixtures.flatMap((f) => f.markets),
     done = all.filter((m) => m.settlement !== "pending").length;
@@ -162,25 +159,4 @@ function populateMarketHouseFilter() {
     '<option value="">Todas las casas</option>' +
     db.houses.map((h) => `<option value="${esc(h.id)}">${esc(h.name)}</option>`).join("");
   if (db.houses.some((h) => h.id === selected)) el.value = selected;
-}
-function applyMarketFilters() {
-  const q = ($("marketSearch")?.value || "").trim().toLowerCase(),
-    date = ($("marketDateFilter")?.value || "").trim().toLowerCase(),
-    status = $("marketStatusFilter")?.value || "",
-    house = $("marketHouseFilter")?.value || "";
-  document.querySelectorAll("[data-market-card]").forEach((card) => {
-    const team = (card.dataset.team || "").toLowerCase().includes(q),
-      dateMatch = (card.dataset.date || "").toLowerCase().includes(date);
-    let hasVisible = false;
-    card.querySelectorAll("[data-market-row]").forEach((row) => {
-      const houses = (row.dataset.marketHouses || "").split("|");
-      const visible =
-        (!status ||
-          (status === "pending" ? row.dataset.marketActive === "1" : row.dataset.marketStatus === status)) &&
-        (!house || houses.includes(house));
-      row.classList.toggle("hidden", !visible);
-      if (visible) hasVisible = true;
-    });
-    card.classList.toggle("hidden", !(team && dateMatch && hasVisible));
-  });
 }

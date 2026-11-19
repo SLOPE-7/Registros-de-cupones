@@ -498,3 +498,14 @@ VERSIÓN 21 — NUEVO COMIENZO (site/js/35-nuevo-comienzo.js)
 VERSIÓN 21.1 — CORREGIR EL RESULTADO DE UN CUPÓN (site/js/36-corregir-resultado.js)
 - Cupones guardados → "🛠 Corregir resultado" en cada cupón: lista todos sus mercados con ✅ ❌ 🟰 ↺, más "Todo ganado" y "Todo pendiente", y "Quitar el cash out" si lo tiene.
 - Usa setMarketStatus(): el cambio se aplica a todos los cupones que compartan ese mercado, queda en el historial de resultados y se puede deshacer (Mercados → Historial).
+
+VERSIÓN 21.2 — REVISIÓN GENERAL
+- sanitizeCoupons() (01-nucleo.js): al cargar, importar o fusionar con la nube, cada cupón tiene lista de partidos, cada partido lista de mercados y cada mercado un estado. Antes un cupón sin "fixtures" rompía las pantallas.
+- Nuevo comienzo y "Borrar cupones": dejan marcas de borrado (db.deleted) y db.resetAt / db.statsClearedAt; mergeDatabases() ignora lo que la nube tenía antes de esas marcas (cupones, casas, movimientos, progreso y, si se pidió, registros de partidos). Antes la fusión podía devolver lo borrado.
+- La lista de precarga de sw.js incluye los archivos 32 a 36 (y hay una prueba que avisa si falta alguno).
+- Fusión con la nube: las etiquetas propias (tagList) se unen en lugar de perderse.
+- Accesibilidad: <label for>, aria-label en los campos de margen, casillas de 20 px, botones .sm de 32 px mínimo, texto atenuado del tema claro con contraste AA.
+- Eliminadas 4 funciones sin uso (fixtureCount, applyMarketFilters, matchStatValue, playerPhotoMarkup).
+- site/_headers: nosniff, Referrer-Policy, X-Frame-Options y Permissions-Policy.
+- La clave del aviso de presupuesto usa el mes local (antes UTC).
+- Limpieza del repositorio: se quitó el index.html antiguo de la raíz (la versión de una sola página de noviembre, que Cloudflare no sirve) y el ZIP (500 KB por versión que engordaba git; Cloudflare publica directamente desde GitHub). La raíz tiene .gitignore con *.zip.

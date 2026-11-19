@@ -190,7 +190,7 @@ function importBackup(file) {
         return;
       snapshotNow("Antes de importar");
       db = {
-        coupons: incoming.coupons || [],
+        coupons: sanitizeCoupons(incoming.coupons),
         houses: incoming.houses || [],
         transactions: incoming.transactions || [],
         resultHistory: Array.isArray(incoming.resultHistory) ? incoming.resultHistory : [],
@@ -200,6 +200,8 @@ function importBackup(file) {
         progress: incoming.progress && typeof incoming.progress === "object" ? incoming.progress : {},
         stats: incoming.stats && typeof incoming.stats === "object" ? incoming.stats : {},
         statsMigrated: !!incoming.statsMigrated,
+        ...(typeof incoming.resetAt === "string" ? { resetAt: incoming.resetAt } : {}),
+        ...(typeof incoming.statsClearedAt === "string" ? { statsClearedAt: incoming.statsClearedAt } : {}),
         ...(Array.isArray(incoming.tagList) ? { tagList: incoming.tagList } : {}),
       };
       if (obj.logos) mergeLogoStores(obj.logos);
@@ -293,7 +295,27 @@ $("wipeBtn").addEventListener("click", () => {
     )
   ) {
     snapshotNow("Antes de borrar");
-    db = { coupons: [], houses: [], transactions: [], resultHistory: [], actionHistory: [] };
+    markDeleted(
+      "coupons",
+      db.coupons.map((c) => c.id),
+    );
+    markDeleted(
+      "houses",
+      db.houses.map((h) => h.id),
+    );
+    markDeleted(
+      "transactions",
+      db.transactions.map((t) => t.id),
+    );
+    db = {
+      coupons: [],
+      houses: [],
+      transactions: [],
+      resultHistory: [],
+      actionHistory: [],
+      deleted: db.deleted,
+      resetAt: new Date().toISOString(),
+    };
     draftSelections = [];
     localStorage.removeItem(KEY);
     localStorage.removeItem(DRAFT);
@@ -681,7 +703,7 @@ try {
     const d = JSON.parse(saved);
     kalLoadedState = { found: true, savedAt: d.savedAt || null };
     db = {
-      coupons: Array.isArray(d.coupons) ? d.coupons : [],
+      coupons: sanitizeCoupons(d.coupons),
       houses: Array.isArray(d.houses) ? d.houses : [],
       transactions: Array.isArray(d.transactions) ? d.transactions : [],
       resultHistory: Array.isArray(d.resultHistory) ? d.resultHistory : [],
@@ -691,6 +713,8 @@ try {
       progress: d.progress && typeof d.progress === "object" ? d.progress : {},
       stats: d.stats && typeof d.stats === "object" ? d.stats : {},
       statsMigrated: !!d.statsMigrated,
+      ...(typeof d.resetAt === "string" ? { resetAt: d.resetAt } : {}),
+      ...(typeof d.statsClearedAt === "string" ? { statsClearedAt: d.statsClearedAt } : {}),
       ...(Array.isArray(d.tagList) ? { tagList: d.tagList } : {}),
       savedAt: d.savedAt || null,
     };

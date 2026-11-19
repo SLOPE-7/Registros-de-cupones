@@ -4,6 +4,14 @@ function mergeDatabases(local, remote) {
   const deleted = {};
   for (const k of ["coupons", "houses", "transactions"])
     deleted[k] = [...new Set([...(local.deleted?.[k] || []), ...(remote.deleted?.[k] || [])])].slice(-2000);
+  const latest = (a, b) =>
+    [a, b]
+      .filter((x) => typeof x === "string" && x)
+      .sort()
+      .pop() || "";
+  const resetAt = latest(local.resetAt, remote.resetAt),
+    statsClearedAt = latest(local.statsClearedAt, remote.statsClearedAt),
+    tagList = [...new Set([...(local.tagList || []), ...(remote.tagList || [])])];
   const stamp = (x) => Date.parse(x?.updated || x?.created || x?.date || 0) || 0;
   const merge = (a, b, kind) => {
     const gone = new Set(deleted[kind] || []),
@@ -33,18 +41,29 @@ function mergeDatabases(local, remote) {
     actionHistory: (local.actionHistory || []).slice(-100),
     deleted,
     stats: (() => {
-      const out = { ...(remote.stats || {}) };
-      Object.entries(local.stats || {}).forEach(([k, v]) => {
-        if (!out[k] || String(v?.updatedAt || "") >= String(out[k]?.updatedAt || "")) out[k] = v;
-      });
+      // Tras "borrar también mis registros" se ignora lo que la nube guardó antes de ese momento.
+      const cut = statsClearedAt,
+        fresh = (v) => !cut || String(v?.updatedAt || "") > cut;
+      const out = Object.fromEntries(Object.entries(remote.stats || {}).filter(([, v]) => fresh(v)));
+      Object.entries(local.stats || {})
+        .filter(([, v]) => fresh(v))
+        .forEach(([k, v]) => {
+          if (!out[k] || String(v?.updatedAt || "") >= String(out[k]?.updatedAt || "")) out[k] = v;
+        });
       return out;
     })(),
+    ...(resetAt ? { resetAt } : {}),
+    ...(statsClearedAt ? { statsClearedAt } : {}),
+    ...(tagList.length ? { tagList } : {}),
     statsMigrated: !!(local.statsMigrated || remote.statsMigrated),
     progress: (() => {
-      const out = { ...(remote.progress || {}) };
-      Object.entries(local.progress || {}).forEach(([k, v]) => {
-        if (!out[k] || String(v?.updatedAt || "") >= String(out[k]?.updatedAt || "")) out[k] = v;
-      });
+      const fresh = (v) => !resetAt || String(v?.updatedAt || "") > resetAt;
+      const out = Object.fromEntries(Object.entries(remote.progress || {}).filter(([, v]) => fresh(v)));
+      Object.entries(local.progress || {})
+        .filter(([, v]) => fresh(v))
+        .forEach(([k, v]) => {
+          if (!out[k] || String(v?.updatedAt || "") >= String(out[k]?.updatedAt || "")) out[k] = v;
+        });
       return out;
     })(),
     settings:
@@ -209,6 +228,7 @@ async function cloudPull() {
     delete remote._kalLogoTrash;
     delete remote._kalImages;
     db = mergeDatabases(db, remote);
+    db.coupons = sanitizeCoupons(db.coupons);
     localStorage.setItem(KEY, JSON.stringify(db));
     renderAll();
   }

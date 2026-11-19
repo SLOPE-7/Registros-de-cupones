@@ -131,10 +131,6 @@ function matchTabButton(id, label) {
     "</button>"
   );
 }
-function matchStatValue(stats, name) {
-  const item = (stats || []).find((x) => String(x.type).toLowerCase() === name.toLowerCase());
-  return item?.value === null || item?.value === undefined ? "—" : String(item.value);
-}
 function ownFormEstimate(pred, homeName, awayName, fallbackStats = []) {
   const form = (x) =>
     String(x || "")
@@ -674,18 +670,6 @@ function savedPlayerPhoto(key, fixture, market) {
   if (direct) return playerImageUrl(direct[1].photo || direct[1].url);
   const saved = parsed ? findSavedPlayer(parsed.name, club, dir) : null;
   return saved ? playerImageUrl(saved[1].photo || saved[1].url) : "";
-}
-function playerPhotoMarkup(key, fixture, market) {
-  const url = savedPlayerPhoto(key, fixture, market);
-  return url
-    ? '<div class="player-photo-row"><img src="' +
-        esc(url) +
-        '" alt="Foto de ' +
-        esc(market?.playerName || "jugador") +
-        '" loading="lazy" referrerpolicy="no-referrer"><span>Foto del jugador guardada en Logos</span></div>'
-    : '<button type="button" class="btn sm player-photo-button" data-player-photo="' +
-        esc(key) +
-        '">▣ Buscar foto del jugador</button>';
 }
 async function lookupMatchPlayerPhoto(marketKeyValue, refOverride = null, playerBet = null) {
   const ref = refOverride || currentMatchRef,

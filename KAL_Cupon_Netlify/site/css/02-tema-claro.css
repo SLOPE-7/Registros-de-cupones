@@ -6,7 +6,7 @@
   --panel2: #edf5e9;
   --line: #d8e4d6;
   --text: #183c2e;
-  --muted: #687d70;
+  --muted: #55695c;
   --gold: #f0bf45;
   --gold2: #ffe08a;
   --green: #138657;
@@ -232,7 +232,7 @@ select:focus-visible {
   box-shadow: 0 -5px 20px #183c2e12;
 }
 .mobile button {
-  color: #708477;
+  color: var(--ink2);
 }
 .mobile button.active {
   color: #128657;
@@ -481,7 +481,7 @@ select:focus-visible {
 .chart-placeholder {
   padding: 16px;
   text-align: center;
-  color: #718577;
+  color: var(--ink2);
 }
 .bookmaker-presets,
 .account-box {
@@ -590,7 +590,7 @@ select:focus-visible {
   border-radius: 10px;
 }
 .saved-metrics small {
-  color: #718577;
+  color: var(--ink2);
 }
 .saved-fixtures {
   display: grid;
@@ -613,7 +613,7 @@ select:focus-visible {
 }
 .saved-fixture small {
   margin-left: auto;
-  color: #718577;
+  color: var(--ink2);
 }
 .result-badge {
   padding: 5px 10px;
@@ -1073,7 +1073,7 @@ select:focus-visible {
   background: #fff;
 }
 .match-data-intro p {
-  color: #718577;
+  color: var(--ink2);
 }
 .match-loading {
   padding: 30px;
@@ -1147,7 +1147,7 @@ select:focus-visible {
   cursor: pointer;
 }
 .match-coupon-link span {
-  color: #718577;
+  color: var(--ink2);
 }
 .match-market-insight {
   padding: 7px 12px;

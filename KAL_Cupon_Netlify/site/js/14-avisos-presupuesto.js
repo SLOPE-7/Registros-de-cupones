@@ -281,8 +281,7 @@ function checkInAppAlerts() {
       msg = "🔴 <b>Empezó</b> " + esc(m.name);
       key = st;
     } else if (now >= t - c.lead * 60000 && now < t && !shown[pre]) {
-      msg =
-        "⏰ <b>" + esc(m.name) + "</b> empieza en " + Math.max(1, Math.round((t - now) / 60000)) + " min";
+      msg = "⏰ <b>" + esc(m.name) + "</b> empieza en " + Math.max(1, Math.round((t - now) / 60000)) + " min";
       key = pre;
     }
     if (key) {
@@ -376,7 +375,7 @@ function renderBudget() {
     "</span><span>" +
     (level === "over" ? "Excedido en " + money(spent - budget) : "Te quedan " + money(budget - spent)) +
     "</span></div></div>";
-  const key = "kal_budget_alert_" + new Date().toISOString().slice(0, 7),
+  const key = "kal_budget_alert_" + localISODate().slice(0, 7),
     prev = readLS(key) || "ok";
   if (level !== prev && (level === "over" || (level === "warn" && prev === "ok"))) {
     writeLS(key, level);
