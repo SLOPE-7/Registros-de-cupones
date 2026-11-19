@@ -513,3 +513,8 @@ VERSIÓN 21.2 — REVISIÓN GENERAL
 - site/_headers: nosniff, Referrer-Policy, X-Frame-Options y Permissions-Policy.
 - La clave del aviso de presupuesto usa el mes local (antes UTC).
 - Limpieza del repositorio: se quitó el index.html antiguo de la raíz (la versión de una sola página de noviembre, que Cloudflare no sirve) y el ZIP (500 KB por versión que engordaba git; Cloudflare publica directamente desde GitHub). La raíz tiene .gitignore con *.zip.
+
+VERSIÓN 21.3 — PESTAÑAS DEL PARTIDO Y NOMBRES
+- La ficha del partido tiene 3 pestañas: Mercados, Datos y Cupones. Análisis, Estadísticas y Eventos (API-Football) se quitaron de la barra porque el plan gratis solo da temporadas 2022-2024: no traían datos de partidos actuales y cada intento gastaba la cuota diaria que usan los escudos. El código de esas secciones y el modo de /api/partido siguen en el proyecto por si algún día se contrata un plan de pago.
+- datos-partido.mjs: alias por palabra (Cologne→Köln, Munich→München, Wolves, Spurs…) y motivoNoEncontrado(): si solo coincide un equipo, explica que los nombres no coinciden en lugar de culpar al plan gratis.
+- nombres.mjs: Cologne / FC Cologne / 1 FC Cologne → Köln para la búsqueda de escudos.

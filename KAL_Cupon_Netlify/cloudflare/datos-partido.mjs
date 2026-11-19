@@ -3,6 +3,7 @@
 //   GET /api/datos-partido?home=Barcelona&away=Real%20Madrid&date=2026-11-22
 // Variable: FOOTBALL_DATA_KEY (gratis en football-data.org/client/register).
 // Las respuestas se guardan un tiempo para no gastar el límite de consultas.
+import { TEAM_ALIASES } from "../servidor/nombres.mjs";
 
 const API = "https://api.football-data.org/v4";
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
@@ -91,8 +92,20 @@ const NOISE = new Set([
   "1910",
   "calcio",
 ]);
-export function normTeam(v) {
-  let s = String(v || "")
+// Palabras que la casa escribe en inglés y football-data.org en el idioma del club.
+const TOKEN_ALIASES = {
+  cologne: "koln",
+  munich: "munchen",
+  nuremberg: "nurnberg",
+  dusseldorf: "dusseldorf",
+  wolves: "wolverhampton",
+  spurs: "tottenham",
+  nottm: "nottingham",
+  gladbach: "monchengladbach",
+  mgladbach: "monchengladbach",
+};
+const limpiar = (v) =>
+  String(v || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
@@ -100,8 +113,15 @@ export function normTeam(v) {
     .replace(/[^a-z0-9 ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (ALIASES[s]) s = ALIASES[s];
-  return s;
+export function normTeam(v) {
+  let s = limpiar(v);
+  // Diccionario propio y el de la búsqueda de escudos (Colonia, Maguncia, Friburgo, nombres en inglés…).
+  const alias = ALIASES[s] || TEAM_ALIASES[s];
+  if (alias) s = limpiar(alias);
+  return s
+    .split(" ")
+    .map((t) => TOKEN_ALIASES[t] || t)
+    .join(" ");
 }
 const tokens = (s) =>
   normTeam(s)
@@ -126,6 +146,36 @@ export function nameScore(query, team) {
     best = Math.max(best, sc);
   }
   return best;
+}
+// Por qué no se encontró el partido: ¿la liga no está en el plan o los nombres no coinciden?
+export function motivoNoEncontrado(matches, home, away) {
+  const plan =
+    "No encontré este partido en football-data.org. El plan gratis cubre las ligas principales de Europa, la Champions, el Mundial y la Eurocopa; otras competiciones (como la Nations League) no están incluidas.";
+  const cercanos = (matches || [])
+    .map((m) => ({
+      m,
+      s: Math.max(
+        nameScore(home, m.homeTeam),
+        nameScore(home, m.awayTeam),
+        nameScore(away, m.homeTeam),
+        nameScore(away, m.awayTeam),
+      ),
+    }))
+    .filter((x) => x.s >= 0.5)
+    .sort((a, b) => b.s - a.s);
+  if (!cercanos.length) return plan;
+  const m = cercanos[0].m;
+  return (
+    "Encontré un partido parecido en football-data.org (" +
+    (m.homeTeam?.shortName || m.homeTeam?.name) +
+    " vs " +
+    (m.awayTeam?.shortName || m.awayTeam?.name) +
+    ") pero los nombres no coinciden con «" +
+    home +
+    " vs " +
+    away +
+    "». Si es el mismo partido, corrige el nombre del equipo en el cupón."
+  );
 }
 export function findMatch(matches, home, away) {
   let best = null;
@@ -342,8 +392,7 @@ export async function datosPartido(request, { token, store, fetchImpl = fetch })
     if (!found)
       return reply(200, {
         encontrado: false,
-        motivo:
-          "No encontré este partido en football-data.org. El plan gratis cubre las ligas principales de Europa, la Champions, el Mundial y la Eurocopa; otras competiciones (como la Nations League) no están incluidas.",
+        motivo: motivoNoEncontrado(day.matches, home, away),
       });
     const m = found.m;
     // Si la casa puso los equipos al revés, se respeta el orden de la API.

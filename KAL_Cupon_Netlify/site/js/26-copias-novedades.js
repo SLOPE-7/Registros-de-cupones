@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "21.2";
+const APP_VERSION = "21.3";
 const NOVEDADES = [
+  {
+    v: "21.3",
+    titulo: "Pestañas del partido y nombres de equipos",
+    items: [
+      "◎ La ficha del partido queda con las pestañas que sí aportan: Mercados, Datos y Cupones. Se quitaron Análisis, Estadísticas y Eventos, que dependían de un plan de pago y nunca traían datos.",
+      "🔎 football-data.org ahora reconoce más nombres en inglés (Cologne, Munich, Wolves, Spurs…) y, si no encuentra el partido, explica por qué.",
+      "🛡️ Cologne y otros equipos con nombre en inglés ya encuentran su escudo.",
+    ],
+  },
   {
     v: "21.2",
     titulo: "Revisión general",

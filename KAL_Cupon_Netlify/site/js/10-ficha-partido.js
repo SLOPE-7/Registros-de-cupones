@@ -907,12 +907,11 @@ function renderMatchDetail(ref = currentMatchRef) {
     date = esc(displayFixtureDate(f)),
     time = esc(f.time || "Hora pendiente"),
     logo = f.leagueCrest ? crestHTML(f.leagueCrest, comp) : '<span class="match-league-ball">⚽</span>',
+    // Análisis, Estadísticas y Eventos venían de API-Football, cuyo plan gratis solo da temporadas 2022-2024: nunca
+    // traían datos de partidos actuales y cada intento gastaba la cuota de los escudos. Los datos útiles están en "Datos".
     tabs = [
-      ["analysis", "◈ Análisis"],
-      ["statistics", "▤ Estadísticas"],
       ["markets", "◎ Mercados"],
       ["datos", "📈 Datos"],
-      ["events", "◷ Eventos"],
       ["coupons", "▣ Cupones"],
     ];
   const content = renderMatchDataPanel(matchActiveTab, f, merged),

@@ -268,7 +268,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "21.2");
+        localStorage.setItem("kal_version_vista", "21.3");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -4405,6 +4405,121 @@ section("33. Revisión general: datos incompletos, nube, service worker y accesi
   });
   check("accesibilidad: las casillas miden al menos 20 px", tam === "20x20", tam);
   await r4.ctx.close();
+}
+
+section("34. Pestañas del partido y nombres de equipos");
+{
+  const D = await import(path.join(ROOT, "cloudflare/datos-partido.mjs"));
+  const T = (id, name, shortName, tla) => ({ id, name, shortName, tla });
+  const dia = [
+    {
+      id: 1,
+      homeTeam: T(5, "FC Bayern München", "Bayern", "FCB"),
+      awayTeam: T(38, "1. FC Köln", "1. FC Köln", "KOE"),
+    },
+    {
+      id: 2,
+      homeTeam: T(11, "VfL Wolfsburg", "Wolfsburg", "WOB"),
+      awayTeam: T(3, "Bayer 04 Leverkusen", "Leverkusen", "B04"),
+    },
+    {
+      id: 3,
+      homeTeam: T(76, "Wolverhampton Wanderers FC", "Wolves", "WOL"),
+      awayTeam: T(73, "Tottenham Hotspur FC", "Tottenham", "TOT"),
+    },
+  ];
+  const r1 = D.findMatch(dia, "Bayern Munich", "Cologne");
+  check(
+    "«Bayern Munich vs Cologne» encuentra «FC Bayern München vs 1. FC Köln»",
+    r1?.m.id === 1 && !r1.swapped,
+    JSON.stringify(r1 && r1.m.id),
+  );
+  check(
+    "«Cologne vs Bayern Munich» (al revés) también",
+    D.findMatch(dia, "Cologne", "Bayern Munich")?.m.id === 1,
+  );
+  check(
+    "«FC Cologne» y «Colonia» llegan a Köln",
+    D.nameScore("FC Cologne", dia[0].awayTeam) === 1 && D.nameScore("Colonia", dia[0].awayTeam) === 1,
+  );
+  check(
+    "«Wolves vs Spurs» encuentra Wolverhampton vs Tottenham",
+    D.findMatch(dia, "Wolves", "Spurs")?.m.id === 3,
+  );
+  check("no confunde: «Inter vs Napoli» no está ese día", !D.findMatch(dia, "Inter", "Napoli"));
+  const hint = D.motivoNoEncontrado(dia, "Cologne", "Hamburgo");
+  check(
+    "si solo coincide un equipo, el mensaje lo dice y pide corregir el nombre",
+    /parecido/.test(hint) && /Köln|Bayern/.test(hint) && /corrige/.test(hint),
+    hint,
+  );
+  check(
+    "si no hay nada parecido, explica el límite del plan gratis",
+    /plan gratis/.test(D.motivoNoEncontrado(dia, "Boca Juniors", "River Plate")),
+  );
+  const nombres = await import(path.join(ROOT, "servidor/nombres.mjs"));
+  check(
+    "la búsqueda de escudos entiende «Cologne» como Köln",
+    nombres.teamAlias("Cologne") === "koln" && nombres.teamAlias("1. FC Cologne") === "koln",
+  );
+
+  // --- ficha del partido: solo las pestañas útiles
+  const db0 = {
+    coupons: [
+      {
+        id: "Z1",
+        name: "Z",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 2,
+        payout: 10,
+        fixtures: [
+          {
+            id: "fz",
+            home: "Bayern Munich",
+            away: "Cologne",
+            competition: "Bundesliga",
+            league: "Bundesliga",
+            dateISO: isoDay(Date.now() + 86400e3),
+            time: "13:30",
+            markets: [
+              {
+                market: "Total de goles",
+                pick: "Más de 1.5",
+                odd: "1.3",
+                builder: false,
+                settlement: "pending",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await tap(page, '[data-view="saved"]');
+  await page.evaluate(() => {
+    couponFilter = "all";
+    renderCoupons();
+  });
+  await tap(page, "[data-open-saved-match]");
+  await page.waitForSelector(".match-tabs");
+  const tabs = await page.$$eval(".match-tab", (e) => e.map((x) => x.textContent.trim()));
+  check(
+    "la ficha tiene solo Mercados, Datos y Cupones",
+    tabs.length === 3 && /Mercados/.test(tabs[0]) && /Datos/.test(tabs[1]) && /Cupones/.test(tabs[2]),
+    tabs.join(" | "),
+  );
+  check("abre en Mercados", await page.$eval(".match-tab.active", (e) => /Mercados/.test(e.textContent)));
+  const sinApi = await page.evaluate(() => !document.querySelector("[data-load-match-tab]"));
+  check("no hay botones que consulten API-Football (ya no gastan la cuota)", sinApi);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------
