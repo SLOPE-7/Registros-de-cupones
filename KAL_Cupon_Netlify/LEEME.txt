@@ -522,3 +522,9 @@ VERSIÓN 21.3 — PESTAÑAS DEL PARTIDO Y NOMBRES
 VERSIÓN 22 — PESTAÑA RESUMEN DEL PARTIDO (site/js/25-datos-partido.js)
 - "📈 Datos" pasa a "📊 Resumen" con bloques tipo tarjeta: pronóstico del modelo + marcador más probable (poissonModel ahora devuelve marcador y pMarcador), 1X2, goles esperados (xG) con barras y escudos, total de goles, mejores mercados (>= 65 %), tus mercados frente al modelo, forma con chips G/E/P, tabla y enfrentamientos.
 - Solo usa datos reales de football-data.org y del modelo de goles. No se muestran posesión, tiros totales, "nivel de confianza" ni Monte Carlo porque el plan gratis no los entrega y habría que inventarlos.
+
+VERSIÓN 23 — FICHA DEL JUGADOR (site/js/37-ficha-jugador.js)
+- 📇 junto al nombre de cada jugador (marcador en vivo y "Tus registros") abre su ficha: para cada dato (remates, remates a puerta, goleador, tarjetas, paradas del portero) muestra, por línea, la probabilidad en sus últimos 5 partidos registrados = (aciertos + 1) / (partidos + 2) y la cuota justa = 1 / probabilidad. Con "con suplente / sin suplente" para remates y remates a puerta.
+- Si tienes un mercado suyo en ese partido, compara tu cuota con la justa (valor = probabilidad x cuota - 1).
+- Marcador: nuevos contadores por jugador "🟨 Tarjetas" y "🧤 Paradas" (statKind: stat cards / saves). Se marcan solos al llegar a la línea y entran en sus registros (campos tarjetas, paradas, rematesConSup, aPuertaConSup) y en lo que recibe el Analista.
+- Arreglo: «Tarjetas - Jugador» se leía como tarjetas de todo el partido porque PLAYER_MARKET_RE no reconocía tarjeta/parada/atajada/portero.

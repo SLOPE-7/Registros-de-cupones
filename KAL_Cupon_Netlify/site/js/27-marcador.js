@@ -15,7 +15,8 @@ const playerKeyOf = (name) => crestNorm(name);
 function statKind(m, f, info = parseLine(m, f)) {
   if (!info) return null;
   if (info.player) {
-    const stat = info.cat === "a puerta" ? "onTarget" : info.cat === "remates" ? "shots" : null;
+    const stat =
+      { "a puerta": "onTarget", remates: "shots", tarjetas: "cards", paradas: "saves" }[info.cat] || null;
     if (!stat) return null;
     return {
       type: "player",
@@ -55,7 +56,14 @@ const shotsOf = (o) =>
         Number(o.onTarget) || 0,
         o.shots != null ? Number(o.shots) || 0 : (Number(o.onTarget) || 0) + (Number(o.off) || 0),
       );
-const shotValue = (o, stat) => (!o ? 0 : stat === "onTarget" ? Number(o.onTarget) || 0 : shotsOf(o));
+const shotValue = (o, stat) =>
+  !o
+    ? 0
+    : stat === "cards" || stat === "saves"
+      ? Number(o[stat]) || 0
+      : stat === "onTarget"
+        ? Number(o.onTarget) || 0
+        : shotsOf(o);
 function lineValueFromStats(st, kind) {
   if (kind.type !== "player")
     return kind.side ? teamStat(st, kind.side, kind.type) : Number(st[kind.type]) || 0;
@@ -91,6 +99,8 @@ function statStep(fk, target, delta) {
       // Un remate a puerta también suma (o resta) un remate.
       o.onTarget = Math.max(0, (Number(o.onTarget) || 0) + delta);
       o.shots = Math.max(o.onTarget, total + delta);
+    } else if (stat === "cards" || stat === "saves") {
+      o[stat] = Math.max(0, (Number(o[stat]) || 0) + delta);
     } else o.shots = Math.max(Number(o.onTarget) || 0, total + delta);
   }
   st.updatedAt = new Date().toISOString();
@@ -212,6 +222,7 @@ function statsPlayers(fk) {
     const e = out.get(k) || { name, code: "", photo: "", incl: true, stats: new Set() };
     e.stats.add("shots");
     e.stats.add("onTarget");
+    if (tracked) e.stats.add("cards");
     e.incl = true;
     e.tracked = e.tracked || tracked;
     if (!e.side && side) e.side = side;
@@ -378,7 +389,7 @@ function liveBoardHtml(f) {
     const p = st.players?.[pk] || { onTarget: 0, shots: 0 };
     // Solo los contadores que usan sus líneas: "Remates" si hay líneas de remates, "Remates a puerta" si hay
     // líneas a puerta. Toca el número para escribirlo (p. ej. copiado de Sofascore).
-    const shotCounters = (o, who) =>
+    const shotCountersBase = (o, who) =>
       (pl.stats.has("shots")
         ? statCounter(
             fk,
@@ -397,6 +408,27 @@ function liveBoardHtml(f) {
             editable,
           )
         : "");
+    // Tarjetas y paradas del jugador: solo si alguna de sus líneas las usa (o si lo sigues a mano).
+    const extraCounters = (o, who) =>
+      (pl.stats.has("cards")
+        ? statCounter(
+            fk,
+            "player:" + pk + ":" + who + ":cards",
+            "🟨 Tarjetas",
+            Number(o?.cards) || 0,
+            editable,
+          )
+        : "") +
+      (pl.stats.has("saves")
+        ? statCounter(
+            fk,
+            "player:" + pk + ":" + who + ":saves",
+            "🧤 Paradas",
+            Number(o?.saves) || 0,
+            editable,
+          )
+        : "");
+    const shotCounters = (o, who) => shotCountersBase(o, who) + extraCounters(o, who);
     const photo = resolveImage(pl.photo);
     const face = (src, name) =>
       src
@@ -420,6 +452,13 @@ function liveBoardHtml(f) {
       esc(pl.name) +
       (pside ? '<small class="muted"> · ' + esc(f[pside]) + "</small>" : "") +
       "</b>" +
+      '<button type="button" class="pg-mini-btn" data-player-card="' +
+      esc(pk) +
+      '" data-fk="' +
+      esc(fk) +
+      '" aria-label="Ficha de ' +
+      esc(pl.name) +
+      '">📇 Ficha</button>' +
       (pl.tracked && !pl.lines
         ? '<button type="button" class="pg-mini-btn" data-track-remove data-st-fk="' +
           esc(fk) +
@@ -494,7 +533,12 @@ function statSet(fk, target) {
   else {
     const p = st.players?.[pk],
       o = who === "sub" ? p?.sub : p;
-    cur = stat === "onTarget" ? Number(o?.onTarget) || 0 : shotsOf(o);
+    cur =
+      stat === "cards" || stat === "saves"
+        ? Number(o?.[stat]) || 0
+        : stat === "onTarget"
+          ? Number(o?.onTarget) || 0
+          : shotsOf(o);
   }
   const a = prompt("Escribe el número actual:", String(cur));
   if (a === null) return;

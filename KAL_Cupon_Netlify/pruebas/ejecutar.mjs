@@ -269,7 +269,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "22");
+        localStorage.setItem("kal_version_vista", "23");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -3645,7 +3645,7 @@ section("27. Registros propios de equipos y jugadores (promedios y goleadores)")
     /Tus registros/.test(dt) &&
       /Real Madrid 2 partidos registrados/.test(dt) &&
       /Barcelona Sin partidos registrados/.test(dt) &&
-      /Kylian Mbappe 3 partido\(s\) registrado\(s\) · 4 gol/.test(dt) &&
+      /Kylian Mbappe (?:📇 Ficha )?3 partido\(s\) registrado\(s\) · 4 gol/.test(dt) &&
       /Francia \(selección\)/.test(dt),
     dt.slice(0, 420),
   );
@@ -4542,6 +4542,253 @@ section("34. Pestañas del partido y nombres de equipos");
   check("abre en Mercados", await page.$eval(".match-tab.active", (e) => /Mercados/.test(e.textContent)));
   const sinApi = await page.evaluate(() => !document.querySelector("[data-load-match-tab]"));
   check("no hay botones que consulten API-Football (ya no gastan la cuota)", sinApi);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("35. Ficha del jugador: tarjetas, paradas y probabilidades");
+{
+  // --- lectura de mercados nuevos
+  const { ctx: c0, page: p0 } = await open(baseDb());
+  const lec = await p0.evaluate(() => {
+    const f = { home: "Real Madrid", away: "Sevilla", markets: [] };
+    const pb = (market, pick) => parsePlayerBet({ market, pick }, f);
+    const sk = (market, pick) => {
+      const k = statKind({ market, pick }, f);
+      return k ? (k.type === "player" ? "player:" + k.stat : k.type) : null;
+    };
+    return {
+      tarj: pb("Tarjetas - Rasmus Hojlund (DNK)", "Más de 0.5")?.name,
+      tarjStat: sk("Tarjetas - Rasmus Hojlund (DNK)", "Más de 0.5"),
+      para: pb("Paradas del portero - Thibaut Courtois (RMD)", "Más de 2.5")?.name,
+      paraStat: sk("Paradas del portero - Thibaut Courtois (RMD)", "Más de 2.5"),
+      ata: sk("Atajadas (Keylor Navas (CRC))", "Más de 3.5"),
+      totalTarj: pb("Total de tarjetas", "Más de 1.5"),
+      totalTarjStat: sk("Total de tarjetas", "Más de 1.5"),
+      equipoTarj: pb("Tarjetas - Real Madrid", "Más de 1.5"),
+      equipoTarjStat: sk("Tarjetas - Real Madrid", "Más de 1.5"),
+      remates: sk("Remates a Puerta - Kylian Mbappe (RMD)", "Más de 0.5"),
+    };
+  });
+  check(
+    "lee «Tarjetas - Rasmus Hojlund (DNK)» como tarjetas del jugador (antes contaba las del partido)",
+    lec.tarj === "Rasmus Hojlund" && lec.tarjStat === "player:cards",
+    JSON.stringify(lec),
+  );
+  check(
+    "lee «Paradas del portero - Thibaut Courtois (RMD)» y «Atajadas (Keylor Navas (CRC))»",
+    lec.para === "Thibaut Courtois" && lec.paraStat === "player:saves" && lec.ata === "player:saves",
+    JSON.stringify(lec),
+  );
+  check(
+    "«Total de tarjetas» y las tarjetas de un equipo siguen siendo del partido (no de un jugador)",
+    lec.totalTarj === null &&
+      lec.totalTarjStat === "cards" &&
+      lec.equipoTarj === null &&
+      lec.equipoTarjStat === "cards",
+    JSON.stringify(lec),
+  );
+  check("los remates a puerta siguen igual", lec.remates === "player:onTarget");
+  await c0.close();
+
+  // --- partidos registrados de Mbappé y Courtois (5 cerrados) + un partido futuro con tus mercados
+  const day = (n) => isoDay(Date.now() - n * 86400e3);
+  const MB = "Remates - Kylian Mbappe (RMD)",
+    MT = "Tarjetas - Kylian Mbappe (RMD)",
+    CP = "Paradas del portero - Thibaut Courtois (RMD)";
+  const mk = (market, pick, odd, st = "won") => ({ market, pick, odd, builder: false, settlement: st });
+  const fx = (id, dias, markets) => ({
+    id,
+    home: "Real Madrid",
+    away: "Sevilla",
+    competition: "LaLiga",
+    league: "LaLiga",
+    dateISO: day(dias),
+    time: "14:00",
+    markets,
+  });
+  const pasados = [20, 16, 12, 8, 4].map((d, i) =>
+    fx("p" + i, d, [mk(MB, "Más de 1.5", "1.9"), mk(MT, "Más de 0.5", "2.6"), mk(CP, "Más de 2.5", "1.8")]),
+  );
+  const futuro = fx("fut", -2, [
+    mk(MB, "Más de 1.5", "1.90", "pending"),
+    mk(MT, "Más de 0.5", "2.60", "pending"),
+    mk(CP, "Más de 2.5", "1.80", "pending"),
+  ]);
+  const db0 = {
+    coupons: [
+      {
+        id: "P1",
+        name: "P1",
+        created: new Date().toISOString(),
+        stake: 10,
+        odds: 3,
+        payout: 30,
+        fixtures: [...pasados, futuro],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => {
+    const mb = crestNorm("Kylian Mbappe"),
+      co = crestNorm("Thibaut Courtois");
+    // a, b, c, d, e = del más antiguo al más reciente (20, 16, 12, 8 y 4 días atrás)
+    const shots = [3, 1, 2, 4, 0],
+      cards = [1, 0, 0, 1, 0],
+      saves = [4, 2, 5, 3, 1];
+    db.stats = {};
+    db.coupons[0].fixtures.slice(0, 5).forEach((f, i) => {
+      const players = {
+        [mb]: { shots: shots[i], onTarget: Math.min(1, shots[i]), cards: cards[i] },
+        [co]: { saves: saves[i] },
+      };
+      if (i === 0) players[mb].sub = { shots: 2, onTarget: 1 };
+      db.stats[fixtureKey(f)] = {
+        goals: 2,
+        corners: 5,
+        cards: 2,
+        final: true,
+        teams: { home: { goals: 1, corners: 3, cards: 1 }, away: { goals: 1, corners: 2, cards: 1 } },
+        players,
+        scorers: [],
+        auto: {},
+      };
+    });
+    save();
+    renderAll();
+  });
+  const rec = await page.evaluate(() => {
+    const p = playerRecord("Kylian Mbappe"),
+      c = playerRecord("Thibaut Courtois");
+    const ms = p.matches.map((m) => m.remates + "/" + m.tarjetas + "/" + (m.rematesConSup ?? "-"));
+    return {
+      ms,
+      par: c.matches.map((m) => m.paradas),
+      sum: playerSummary(p).tarjetas,
+      sumC: playerSummary(c).paradas,
+    };
+  });
+  check(
+    "registros: remates, tarjetas y paradas por partido (con suplente cuando lo hay)",
+    rec.ms.join() === "0/0/-,4/1/-,2/0/-,1/0/-,3/1/5" && rec.par.join() === "1,3,5,2,4",
+    JSON.stringify(rec),
+  );
+  check(
+    "promedios: tarjetas de Mbappé 0.4 y paradas de Courtois 3",
+    rec.sum?.prom === 0.4 && rec.sumC?.prom === 3,
+    JSON.stringify([rec.sum, rec.sumC]),
+  );
+
+  // --- ficha del jugador abierta desde el partido
+  await page.evaluate(() => openMatchDetails({ couponId: "P1", fixtureIndex: 5 }));
+  await page.waitForSelector(".live-board [data-player-card]");
+  const contadores = await page.$$eval(".live-board .lb-counter span", (e) =>
+    e.map((x) => x.textContent.trim()),
+  );
+  check(
+    "el marcador del partido trae los contadores 🟨 Tarjetas y 🧤 Paradas de esos jugadores",
+    contadores.some((t) => /Tarjetas/.test(t)) && contadores.some((t) => /Paradas/.test(t)),
+    contadores.join(" | "),
+  );
+  const mbKey = await page.evaluate(() => crestNorm("Kylian Mbappe"));
+  await tap(page, `.live-board [data-player-card="${mbKey}"]`);
+  await page.waitForSelector(".pc-sheet");
+  const ficha = await page.$eval(".pc-sheet", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "ficha: nombre, equipo y los datos registrados",
+    /Kylian Mbappe/.test(ficha) && /Real Madrid/.test(ficha),
+    ficha.slice(0, 160),
+  );
+  check(
+    "ficha: remates más de 1.5 → 3 de 5 partidos = 57 % y cuota justa 1.75",
+    /Más de 1\.5 57 % 1\.75 3\/5/.test(ficha),
+    ficha.slice(ficha.indexOf("Remates"), ficha.indexOf("Remates") + 260),
+  );
+  check(
+    "ficha: tarjetas → 2 de 5 = 43 % y cuota justa 2.33",
+    /Tarjetas[^]*?Más de 0\.5 43 % 2\.33 2\/5/.test(ficha) || /43 % 2\.33 2\/5/.test(ficha),
+    ficha.slice(ficha.indexOf("Tarjetas"), ficha.indexOf("Tarjetas") + 200),
+  );
+  check(
+    "ficha: compara tu cuota 1.90 con la justa (+9 % valor) y la de tarjetas 2.60 (+11 % valor)",
+    /Tu cuota 1\.90 · \+9 % valor/.test(ficha) && /Tu cuota 2\.60 · \+11 % valor/.test(ficha),
+    ficha.match(/Tu cuota[^A-Z]{0,40}/g)?.join(" | "),
+  );
+  const encima = await page.evaluate(() => {
+    const r = document.querySelector(".pc-sheet").getBoundingClientRect();
+    const el = document.elementFromPoint(r.x + r.width / 2, r.y + 80);
+    return !!el?.closest(".pc-sheet");
+  });
+  check("ficha: se ve encima de la ventana del partido (no queda escondida detrás)", encima);
+  check("ficha: lleva un aviso honesto de que es una estimación", /estimación con pocos datos/.test(ficha));
+  const antes = await page.$eval(".pc-sheet", (e) =>
+    e.innerText
+      .replace(/\s+/g, " ")
+      .match(/Más de 3\.5 (\d+) % ([\d.]+)/)
+      ?.slice(1)
+      .join(" "),
+  );
+  await tap(page, '[data-pc-sub="1"]');
+  const despues = await page.$eval(".pc-sheet", (e) =>
+    e.innerText
+      .replace(/\s+/g, " ")
+      .match(/Más de 3\.5 (\d+) % ([\d.]+)/)
+      ?.slice(1)
+      .join(" "),
+  );
+  check(
+    "«Con suplente» suma al reemplazo: más de 3.5 remates pasa de 29 % (3.50) a 43 % (2.33)",
+    antes === "29 3.50" && despues === "43 2.33",
+    antes + " → " + despues,
+  );
+  await tap(page, "[data-pc-close]");
+  check("la ficha se cierra", (await page.$(".pc-sheet")) === null);
+  const coKey = await page.evaluate(() => crestNorm("Thibaut Courtois"));
+  await tap(page, `.live-board [data-player-card="${coKey}"]`);
+  await page.waitForSelector(".pc-sheet");
+  const portero = await page.$eval(".pc-sheet", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "portero: paradas más de 2.5 → 3 de 5 = 57 % (1.75) y tu cuota 1.80 (+3 % valor)",
+    /Más de 2\.5 57 % 1\.75 3\/5/.test(portero) && /Tu cuota 1\.80 · \+3 % valor/.test(portero),
+    portero.slice(portero.indexOf("Paradas"), portero.indexOf("Paradas") + 240),
+  );
+  await tap(page, "[data-pc-close]");
+
+  // --- contador de tarjetas del jugador: se marca solo al llegar a la línea
+  const tkey = `player:${mbKey}:main:cards`;
+  await tap(page, `.live-board [data-st-step="1"][data-st-target="${tkey}"]`);
+  const est = await page.evaluate(() => {
+    const f = db.coupons[0].fixtures[5];
+    return { tarj: f.markets[1].settlement, rem: f.markets[0].settlement, equipo: statsOf(f).cards };
+  });
+  check(
+    "sumar una tarjeta a Mbappé gana su línea «Más de 0.5» y no toca las tarjetas del partido ni sus remates",
+    est.tarj === "won" && est.rem === "pending" && est.equipo === 0,
+    JSON.stringify(est),
+  );
+  await tap(page, `.live-board [data-st-step="1"][data-st-target="player:${coKey}:main:saves"]`);
+  await tap(page, `.live-board [data-st-step="1"][data-st-target="player:${coKey}:main:saves"]`);
+  await tap(page, `.live-board [data-st-step="1"][data-st-target="player:${coKey}:main:saves"]`);
+  check(
+    "3 paradas de Courtois ganan «Más de 2.5»",
+    (await page.evaluate(() => db.coupons[0].fixtures[5].markets[2].settlement)) === "won",
+  );
+
+  // --- desde «Tus registros»
+  await page.evaluate(() => {
+    renderMatchDetail(currentMatchRef);
+  });
+  await tap(page, '[data-match-tab="datos"]');
+  await page.waitForTimeout(500);
+  check(
+    "«Tus registros» tiene el botón 📇 Ficha de cada jugador",
+    (await page.$$("#matchTabPanel [data-player-card]")).length >= 1,
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }

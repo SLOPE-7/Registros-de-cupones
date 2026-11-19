@@ -746,3 +746,21 @@ input[type="checkbox"] { width: 20px; height: 20px; margin-right: 6px; vertical-
 .rs-pill.lo { background: rgba(255, 98, 107, 0.18); border-color: var(--red); }
 .rs-form-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
 .rs-more summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+/* V23 · ficha del jugador */
+.pc-sheet { max-height: 90vh; overflow-y: auto; }
+.pc-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.pc-head h2 { margin: 0 0 2px; font-size: 20px; }
+.pc-photo { width: 64px; height: 64px; flex: none; border-radius: 50%; object-fit: cover; display: grid; place-items: center; font-size: 20px; font-weight: 800; }
+.pc-toggle { display: grid; gap: 4px; margin: 8px 0; }
+.pc-stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin: 0 0 10px; }
+.pc-stat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.pc-line { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.pc-line:first-of-type { border-top: 0; }
+.pc-line.mine { background: rgba(240, 191, 69, 0.14); border-radius: 8px; padding: 6px; }
+.pc-odd { font-weight: 800; min-width: 44px; text-align: right; }
+.pc-hits { color: var(--muted); font-size: 12px; min-width: 28px; text-align: right; }
+.pc-mine { grid-column: 1 / -1; font-size: 12px; }
+/* La ficha del jugador se abre sobre la ventana del partido (capa 100). */
+.pc-wrap { z-index: 120; }
+.pg-mini-btn[data-player-card] { width: auto; padding: 2px 8px; white-space: nowrap; }

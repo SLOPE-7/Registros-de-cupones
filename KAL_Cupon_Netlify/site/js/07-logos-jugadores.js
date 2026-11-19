@@ -343,7 +343,7 @@ function playerIsTrashed(item, trash) {
 // Detecta si un mercado es de un jugador y extrae su nombre y el código del club, por ejemplo "Nico Paz (COM)".
 // Los mercados de equipo o de marcador (por ejemplo "Total de remates - Como" o "Marcador correcto: 2-1") no son jugadores.
 const PLAYER_MARKET_RE =
-  /(remat|goleador|anotador|anotar[aá]?|tiros? a puerta|tiros? al arco|asistenc|shots?|scorer|to score|player prop|jugador|primer marcador|[uú]ltimo marcador|marcar[aá]? en cualquier)/i;
+  /(remat|goleador|anotador|anotar[aá]?|tiros? a puerta|tiros? al arco|asistenc|shots?|scorer|to score|player prop|jugador|primer marcador|[uú]ltimo marcador|marcar[aá]? en cualquier|tarjeta|amonestad|parada|atajada|portero|guardameta|cards?\b|saves?\b)/i;
 const TEAM_MARKET_RE =
   /\b(?:equipo|local|visitante|total(?:es)?|partido|ambos|1x2|doble oportunidad|h[aá]ndicap|tiempo|descanso|mitad|c[oó]rners?|tarjetas?|marcador (?:correcto|exacto|final|al descanso))\b/i;
 const PLAYER_NOISE_WORDS = new Set([
@@ -406,6 +406,28 @@ const PLAYER_NOISE_WORDS = new Set([
   "marcará",
   "marcar",
   "partido",
+  "tarjeta",
+  "tarjetas",
+  "amonestacion",
+  "amonestaciones",
+  "amarilla",
+  "amarillas",
+  "roja",
+  "rojas",
+  "recibe",
+  "recibir",
+  "parada",
+  "paradas",
+  "atajada",
+  "atajadas",
+  "portero",
+  "porteros",
+  "guardameta",
+  "save",
+  "saves",
+  "card",
+  "cards",
+  "goalkeeper",
 ]);
 function splitPlayerCode(text) {
   let code = "";

@@ -30,7 +30,9 @@ function buildRecords() {
         if (!bets.has(fk)) bets.set(fk, new Map());
         const k = crestNorm(b.name);
         if (!bets.get(fk).has(k) || (side && !bets.get(fk).get(k).side))
-          bets.get(fk).set(k, { name: b.name, side });
+          bets.get(fk).set(k, { name: b.name, side, stats: bets.get(fk).get(k)?.stats || new Set() });
+        const sk = statKind(m, f);
+        if (sk?.type === "player") bets.get(fk).get(k).stats.add(sk.stat);
       });
     }),
   );
@@ -93,7 +95,15 @@ function buildRecords() {
       const shotsKnown = shots > 0 || (!!st.final && (hasBet || info.tracked) && !!p);
       const goles = scorers.filter((s) => crestNorm(s.name) === k).length;
       const side = st.sides?.[k] || info.side || scorers.find((s) => crestNorm(s.name) === k)?.side || "";
-      if (!shotsKnown && !goles) continue;
+      // Tarjetas y paradas: se conocen si se anotaron, o si el partido cerró y el jugador tenía ese mercado.
+      const knownStat = (stat) =>
+        (Number(p?.[stat]) || 0) > 0 ||
+        (!!st.final &&
+          !!p &&
+          (!!info.stats?.has(stat) || p[stat] != null || (!!info.tracked && stat === "cards")));
+      const cardsKnown = knownStat("cards"),
+        savesKnown = knownStat("saves");
+      if (!shotsKnown && !goles && !cardsKnown && !savesKnown) continue;
       const equipo = side ? f[side] : "";
       addPlayer(info.name, {
         fk,
@@ -103,6 +113,11 @@ function buildRecords() {
         tipo: equipo ? (findCountryLocal(equipo) ? "selección" : "club") : "",
         rival: side ? f[side === "home" ? "away" : "home"] : "",
         ...(shotsKnown ? { remates: shots, aPuerta: onT } : {}),
+        ...(shotsKnown && p?.sub
+          ? { rematesConSup: shots + shotsOf(p.sub), aPuertaConSup: onT + (Number(p.sub.onTarget) || 0) }
+          : {}),
+        ...(cardsKnown ? { tarjetas: Number(p?.cards) || 0 } : {}),
+        ...(savesKnown ? { paradas: Number(p?.saves) || 0 } : {}),
         ...(scorers.length ? { goles } : {}),
       });
     }
@@ -148,6 +163,8 @@ function playerSummary(p) {
     partidosRegistrados: p.matches.length,
     remates: recAvg(p.matches, "remates"),
     aPuerta: recAvg(p.matches, "aPuerta"),
+    tarjetas: recAvg(p.matches, "tarjetas"),
+    paradas: recAvg(p.matches, "paradas"),
     goles: p.matches.reduce((s, m) => s + (m.goles || 0), 0),
     porEquipo: [...groups.values()].map((g) => ({
       equipo: g.equipo,
@@ -155,6 +172,8 @@ function playerSummary(p) {
       partidos: g.matches.length,
       remates: recAvg(g.matches, "remates"),
       aPuerta: recAvg(g.matches, "aPuerta"),
+      tarjetas: recAvg(g.matches, "tarjetas"),
+      paradas: recAvg(g.matches, "paradas"),
       goles: g.matches.reduce((s, m) => s + (m.goles || 0), 0),
     })),
   };
@@ -210,6 +229,8 @@ function recordsPayload(fixtures) {
           partidos: g.partidos,
           rematesPromedio: short(g.remates),
           aPuertaPromedio: short(g.aPuerta),
+          tarjetasPromedio: short(g.tarjetas),
+          paradasPromedio: short(g.paradas),
           goles: g.goles,
         })),
         ultimos: p.matches.slice(0, REC_LAST).map((x) => ({
@@ -219,6 +240,8 @@ function recordsPayload(fixtures) {
           competicion: x.competicion || undefined,
           remates: x.remates,
           aPuerta: x.aPuerta,
+          tarjetas: x.tarjetas,
+          paradas: x.paradas,
           goles: x.goles,
         })),
       });
@@ -441,7 +464,11 @@ function playerRecordCard(name) {
   return (
     '<div class="rec-card"><b>' +
     esc(p.name) +
-    '</b><small class="muted">' +
+    '</b> <button type="button" class="pg-mini-btn" data-player-card="' +
+    esc(p.key) +
+    '" aria-label="Ficha de ' +
+    esc(p.name) +
+    '">📇 Ficha</button><small class="muted">' +
     p.matches.length +
     " partido(s) registrado(s) · " +
     s.goles +
@@ -457,6 +484,8 @@ function playerRecordCard(name) {
           "</b> · A puerta <b>" +
           avgTxt(g.aPuerta) +
           "</b>" +
+          (g.tarjetas ? " · 🟨 <b>" + avgTxt(g.tarjetas) + "</b>" : "") +
+          (g.paradas ? " · 🧤 <b>" + avgTxt(g.paradas) + "</b>" : "") +
           (g.goles ? " · ⚽ <b>" + g.goles + "</b>" : "") +
           ' <small class="muted">(' +
           g.partidos +

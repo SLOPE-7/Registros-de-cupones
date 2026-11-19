@@ -9,6 +9,7 @@
 const LINE_CATEGORIES = [
   [/corner|esquina/, "córners", "Córners", "⛳"],
   [/tarjeta|amonestac|card/, "tarjetas", "Tarjetas", "🟨"],
+  [/parada|atajada|salvada|\bsaves?\b/, "paradas", "Paradas", "🧤"],
   [/a puerta|al arco|on target/, "a puerta", "A puerta", "🎯"],
   [/remate|tiro|shot/, "remates", "Remates", "🎯"],
   [/gol|goal/, "goles", "Goles", "🥅"],

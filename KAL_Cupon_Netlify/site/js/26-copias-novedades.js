@@ -205,8 +205,18 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "22";
+const APP_VERSION = "23";
 const NOVEDADES = [
+  {
+    v: "23",
+    titulo: "Ficha del jugador",
+    items: [
+      "📇 Toca 📇 junto al nombre de un jugador (en el marcador o en Tus registros) para ver su ficha: probabilidad de cada línea de remates, remates a puerta, goles, tarjetas y paradas, con su cuota justa.",
+      "🟨 🧤 Nuevos contadores por jugador en el marcador: Tarjetas y Paradas del portero. Se marcan solos al llegar a la línea y alimentan sus registros.",
+      "Con suplente / sin suplente, y tu cuota comparada con la cuota justa (valor).",
+      "Arreglo: un mercado de tarjetas de un jugador contaba las tarjetas de todo el partido; ahora cuenta solo las de ese jugador.",
+    ],
+  },
   {
     v: "22",
     titulo: "Resumen del partido rediseñado",
