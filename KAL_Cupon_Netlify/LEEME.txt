@@ -8,29 +8,33 @@ QUÉ INCLUYE
 - Guarda también los resultados de búsqueda. El botón no repite las consultas al proveedor si ya hay resultados guardados.
 - Limita a tres búsquedas nuevas por minuto para proteger el cupo.
 - Si el proveedor no tiene una imagen, muestra las iniciales del equipo.
-- La clave API se mantiene solo en Netlify.
+- La clave API se mantiene solo en el servidor (Cloudflare).
 
-PASOS
-1) Crea una cuenta en API-Football y activa el plan Free. Copia tu API key del panel. El plan Free publica actualmente 100 solicitudes diarias y un límite de 10 por minuto.
-2) En Netlify agrega la variable de entorno API_FOOTBALL_KEY con tu clave real. Marca “Contiene valores secretos”; puedes dejar “Todos los ámbitos”. No envíes la clave por chat.
-3) Descomprime este ZIP y publica el contenido completo con Netlify CLI o un repositorio Git conectado. Deben ir juntas las carpetas site y netlify, y los archivos netlify.toml y LEEME.txt.
-4) Después de publicar, Netlify debe mostrar las funciones: escudos, logo, partido, jugadores y catalogo.
-5) En la página publicada, pega un cupón, pulsa “Leer y revisar”, pulsa “Buscar logos”, elige los resultados y pulsa “Aplicar selecciones”.
-6) Si aparece un aviso de cuota, consulta Usage en el panel API-Football. Si se agotó el límite por minuto, espera un minuto; si el cupo diario está en cero, espera a que se renueve.
+CÓMO SE PUBLICA Y SE CONFIGURA HOY (Cloudflare Workers)
+La app y sus funciones de servidor viven en un solo Worker de Cloudflare ("kal-cupones", plan gratis). Se publica sola:
+cada vez que se sube un cambio a la rama main de GitHub, Cloudflare reconstruye y publica en ~1 minuto
+(Root directory del proyecto: KAL_Cupon_Netlify). No hay ZIP ni comandos que ejecutar.
+1) Claves y secretos: Cloudflare → Workers → kal-cupones → Settings → Variables and Secrets (tipo Secret, en Production):
+   API_FOOTBALL_KEY (escudos y fotos), FOOTBALL_DATA_KEY (datos de partidos), ANTHROPIC_API_KEY (Analista),
+   ANALISTA_CLAVE (código de acceso al Analista; mejor largo, 16 caracteres o más) y, opcional, THESPORTSDB_KEY.
+   Nunca pegues una clave en un chat ni en una captura. Si una se vio, créala de nuevo.
+2) Cómo saber qué versión está publicada: abre /sw.js del sitio y mira CACHE = 'kal-vNN'. Cada publicación sube ese número.
+3) Probar antes de publicar (en este mismo directorio): npm install y luego node pruebas/ejecutar.mjs
+   (usa Playwright y el servidor real con wrangler dev; debe terminar con "N correctas, 0 fallidas").
+4) Estructura: site/ (la app: index.html, css/, js/ en orden numérico, sw.js, manifest), servidor/ (funciones comunes:
+   escudos, logo, partido, jugadores, catalogo, imagenes, analista, buscar-logos), cloudflare/ (worker.mjs, avisos y
+   datos de partido), herramientas/ (generar-paises.mjs), pruebas/ (suite automática y boletos de ejemplo).
+5) Al añadir un archivo nuevo en site/js o site/css: agrégalo a index.html y a la lista SHELL de site/sw.js
+   (hay una prueba que falla si falta) y sube el número de CACHE en sw.js.
 
-NETLIFY CLI
-- Abre PowerShell dentro de la carpeta KAL_Cupon_Netlify, donde está netlify.toml.
-- Ejecuta:
-  npx netlify-cli login
-  npx netlify-cli link
-  npx netlify-cli deploy --prod
-- Selecciona tu sitio actual cuando aparezca la pregunta de enlace.
+(Las instrucciones de Netlify que había aquí quedaron obsoletas con la mudanza a Cloudflare y se retiraron; los apartados
+siguientes que mencionan Netlify, Netlify Blobs o netlify.toml son históricos.)
 
 NOTAS
 - Sin iniciar sesión, los logos se guardan localmente. Con la cuenta Supabase configurada, el catálogo de escudos también se sincroniza entre dispositivos.
 - La opción “Borrar cupones y movimientos” conserva el catálogo local de escudos y logos, incluidas las imágenes guardadas en IndexedDB.
 - Si una competición no aparece en el catálogo, puedes añadir su URL manualmente.
-- Los datos de cupones de file:// y del dominio Netlify están separados; exporta/importa un respaldo para trasladarlos.
+- Los datos de cupones de file:// y de cada dirección web (por ejemplo workers.dev) están separados; exporta/importa un respaldo para trasladarlos.
 
 
 ACTUALIZACIÓN: MEJORAS DE CUPONES Y SINCRONIZACIÓN
