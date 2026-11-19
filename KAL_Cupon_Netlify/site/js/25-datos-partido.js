@@ -1,4 +1,4 @@
-// Pestaña "📈 Datos" de la ficha del partido (V16): forma reciente, tabla, enfrentamientos directos y un modelo de
+// Pestaña "📊 Resumen" de la ficha del partido (V16, rediseñada en V22): forma reciente, tabla, enfrentamientos directos y un modelo de
 // goles (Poisson) con la probabilidad de 1X2, más/menos goles y ambos marcan. Cuando un mercado tuyo coincide con
 // el modelo, se compara la probabilidad del modelo con la de tu cuota (valor esperado).
 // Fuente: football-data.org (plan gratis: ligas principales de Europa, Champions, Mundial y Eurocopa).
@@ -108,18 +108,29 @@ function formList(list) {
     )
     .join("");
 }
-function probBar(label, p, extra = "") {
-  return (
-    '<div class="dp-prob"><span>' +
-    esc(label) +
-    '</span><div class="mk-bar"><i style="width:' +
-    Math.round(p * 100) +
-    '%"></i></div><b>' +
-    pctR(p) +
-    "</b>" +
-    extra +
-    "</div>"
-  );
+const rsPill = (p) =>
+  '<span class="rs-pill ' + (p >= 0.65 ? "hi" : p <= 0.35 ? "lo" : "mid") + '">' + pctR(p) + "</span>";
+const rsLine = (label, p) => '<div class="rs-line"><span>' + esc(label) + "</span>" + rsPill(p) + "</div>";
+
+// Los mercados que el modelo ve más probables (65 % o más).
+function bestMarkets(md, L, V) {
+  return [
+    ["Gana " + L, md.p1],
+    ["Gana " + V, md.p2],
+    ["Empate", md.px],
+    [L + " o empate (1X)", md.p1 + md.px],
+    ["Empate o " + V + " (X2)", md.px + md.p2],
+    ["Más de 1.5 goles", md.over15],
+    ["Más de 2.5 goles", md.over25],
+    ["Más de 3.5 goles", md.over35],
+    ["Menos de 2.5 goles", 1 - md.over25],
+    ["Menos de 3.5 goles", 1 - md.over35],
+    ["Ambos equipos marcan", md.btts],
+    ["No marcan ambos", 1 - md.btts],
+  ]
+    .filter(([, p]) => p >= 0.65)
+    .sort((x, y) => y[1] - x[1])
+    .slice(0, 5);
 }
 
 function renderFormPanel(f, merged) {
@@ -140,11 +151,91 @@ function renderFormPanel(f, merged) {
   if (!d.encontrado) return '<div class="notice">' + esc(d.motivo) + "</div>";
   const md = d.modelo,
     sw = !!d.alReves;
-  const L = d.partido.local.nombre,
-    V = d.partido.visitante.nombre;
-  let html = "";
-  // Tus mercados frente al modelo
+  // Nombres y escudos como los tienes en tu cupón (la API puede tener los equipos en el otro orden).
+  const L = sw ? f.away : f.home,
+    V = sw ? f.home : f.away,
+    crestL = crestHTML((sw ? f.awayCrest : f.homeCrest) || d.partido.local.escudo, L),
+    crestV = crestHTML((sw ? f.homeCrest : f.awayCrest) || d.partido.visitante.escudo, V);
+  let html = '<div class="rs">';
   if (md) {
+    const top = [
+      [md.p1, L + " gana"],
+      [md.px, "Empate"],
+      [md.p2, V + " gana"],
+    ].sort((x, y) => y[0] - x[0])[0];
+    html +=
+      '<section class="rs-card rs-pick"><div class="rs-pick-main"><div><small>Pronóstico del modelo</small><b>' +
+      esc(top[1]) +
+      "</b></div>" +
+      rsPill(top[0]) +
+      "</div>" +
+      (md.marcador
+        ? '<div class="rs-score"><small>Marcador más probable</small><b>' +
+          md.marcador[0] +
+          " - " +
+          md.marcador[1] +
+          "</b></div>"
+        : "") +
+      '<p class="small muted">Estimación de un modelo de goles con la forma y la tabla. No es una garantía.</p></section>';
+    html +=
+      '<section class="rs-card"><h3>📊 Probabilidad 1X2</h3><div class="rs-1x2">' +
+      [
+        ["1 · " + L, md.p1],
+        ["X · Empate", md.px],
+        ["2 · " + V, md.p2],
+      ]
+        .map(
+          ([lab, p]) =>
+            '<div class="rs-box' +
+            (p === Math.max(md.p1, md.px, md.p2) ? " rs-top" : "") +
+            '"><small>' +
+            esc(lab) +
+            "</small><b>" +
+            pctR(p) +
+            "</b></div>",
+        )
+        .join("") +
+      "</div></section>";
+    const mx = Math.max(md.lambdaLocal, md.lambdaVisitante, 0.5);
+    html +=
+      '<section class="rs-card"><h3>🎯 Goles esperados (xG)</h3>' +
+      [
+        [crestL, L, md.lambdaLocal, ""],
+        [crestV, V, md.lambdaVisitante, " v"],
+      ]
+        .map(
+          ([c, n, v, cls]) =>
+            '<div class="rs-xg" title="' +
+            esc(n) +
+            '">' +
+            c +
+            '<div class="rs-bar' +
+            cls +
+            '"><i style="width:' +
+            Math.round((v / mx) * 100) +
+            '%"></i></div><b>' +
+            v.toFixed(2) +
+            "</b></div>",
+        )
+        .join("") +
+      '<p class="small muted">Según ' +
+      esc(md.base) +
+      ".</p></section>";
+    html +=
+      '<section class="rs-card"><h3>⚽ Total de goles</h3>' +
+      rsLine("Más de 1.5 goles", md.over15) +
+      rsLine("Más de 2.5 goles", md.over25) +
+      rsLine("Más de 3.5 goles", md.over35) +
+      rsLine("Ambos marcan", md.btts) +
+      "</section>";
+    const best = bestMarkets(md, L, V);
+    html +=
+      '<section class="rs-card"><h3>🔥 Mejores mercados <small class="muted">(65 % o más)</small></h3>' +
+      (best.length
+        ? best.map(([lab, p]) => rsLine(lab, p)).join("")
+        : '<p class="small muted">Ningún mercado llega al 65 % según el modelo: partido parejo.</p>') +
+      "</section>";
+    // Tus mercados frente al modelo
     const rows = [...merged.values()]
       .map((x) => {
         const p = modelProbForMarket(x.m, x.f, md, sw);
@@ -169,32 +260,38 @@ function renderFormPanel(f, merged) {
       .filter(Boolean);
     if (rows.length)
       html +=
-        '<section class="dp-block"><h3>🎯 Tus mercados frente al modelo</h3><ul class="dp-markets">' +
+        '<section class="rs-card"><h3>🎯 Tus mercados frente al modelo</h3><ul class="dp-markets">' +
         rows.join("") +
         '</ul><p class="small muted">Valor positivo = el modelo ve más probable tu pick de lo que paga la cuota. Es una estimación: úsala junto con tu lectura del partido.</p></section>';
-    html +=
-      '<section class="dp-block"><h3>📊 Modelo de goles</h3><p class="small muted">Goles esperados: ' +
-      esc(L) +
-      " " +
-      md.lambdaLocal.toFixed(2) +
-      " · " +
-      esc(V) +
-      " " +
-      md.lambdaVisitante.toFixed(2) +
-      " (según " +
-      esc(md.base) +
-      ")</p>" +
-      probBar("Gana " + L, md.p1) +
-      probBar("Empate", md.px) +
-      probBar("Gana " + V, md.p2) +
-      probBar("Más de 1.5 goles", md.over15) +
-      probBar("Más de 2.5 goles", md.over25) +
-      probBar("Más de 3.5 goles", md.over35) +
-      probBar("Ambos marcan", md.btts) +
-      "</section>";
   } else
     html +=
       '<div class="notice">No hay datos suficientes para el modelo de goles (equipos sin tabla ni partidos recientes).</div>';
+  html +=
+    '<section class="rs-card"><h3>📈 Forma <small class="muted">(últimos 5)</small></h3>' +
+    [
+      [crestL, L, d.forma?.local],
+      [crestV, V, d.forma?.visitante],
+    ]
+      .map(
+        ([c, n, list]) =>
+          '<div class="rs-form-row">' +
+          c +
+          "<b>" +
+          esc(n) +
+          '</b><div class="form-row">' +
+          formChips(list) +
+          "</div></div>",
+      )
+      .join("") +
+    '<details class="rs-more"><summary>Ver los partidos</summary><div class="dp-form"><div><b>' +
+    esc(L) +
+    '</b><ul class="dp-list">' +
+    formList(d.forma?.local) +
+    "</ul></div><div><b>" +
+    esc(V) +
+    '</b><ul class="dp-list">' +
+    formList(d.forma?.visitante) +
+    "</ul></div></div></details></section>";
   const t = d.tabla;
   if (t?.local && t?.visitante) {
     const row = (name, r, split, splitLabel) =>
@@ -214,30 +311,16 @@ function renderFormPanel(f, merged) {
         : "—") +
       "</td></tr>";
     html +=
-      '<section class="dp-block"><h3>🏆 Tabla' +
+      '<section class="rs-card"><h3>🏆 Tabla' +
       (t.equipos ? " (" + t.equipos + " equipos)" : "") +
       '</h3><table class="dp-table"><thead><tr><th></th><th>Pos</th><th>Pts</th><th>Goles</th><th>G-E-P</th></tr></thead><tbody>' +
       row(L, t.local, t.localEnCasa, "en casa") +
       row(V, t.visitante, t.visitanteFuera, "fuera") +
       "</tbody></table></section>";
   }
-  html +=
-    '<section class="dp-block"><h3>📈 Forma reciente</h3><div class="dp-form"><div><b>' +
-    esc(L) +
-    '</b><div class="form-row">' +
-    formChips(d.forma?.local) +
-    '</div><ul class="dp-list">' +
-    formList(d.forma?.local) +
-    "</ul></div><div><b>" +
-    esc(V) +
-    '</b><div class="form-row">' +
-    formChips(d.forma?.visitante) +
-    '</div><ul class="dp-list">' +
-    formList(d.forma?.visitante) +
-    "</ul></div></div></section>";
   if (d.h2h?.partidos)
     html +=
-      '<section class="dp-block"><h3>⚔️ Enfrentamientos directos</h3><p>' +
+      '<section class="rs-card"><h3>⚔️ Enfrentamientos directos</h3><p>' +
       d.h2h.partidos +
       " partidos · " +
       esc(L) +
@@ -268,7 +351,7 @@ function renderFormPanel(f, merged) {
     '<p class="small muted dp-source">Datos: ' +
     esc(d.fuente) +
     (sw ? " · la casa puso los equipos al revés; se usa el orden oficial" : "") +
-    ' · <button type="button" class="linkish" data-reload-form>↻ Actualizar</button></p>'
+    ' · <button type="button" class="linkish" data-reload-form>↻ Actualizar</button></p></div>'
   );
 }
 

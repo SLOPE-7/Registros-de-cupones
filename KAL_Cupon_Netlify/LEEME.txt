@@ -518,3 +518,7 @@ VERSIÓN 21.3 — PESTAÑAS DEL PARTIDO Y NOMBRES
 - La ficha del partido tiene 3 pestañas: Mercados, Datos y Cupones. Análisis, Estadísticas y Eventos (API-Football) se quitaron de la barra porque el plan gratis solo da temporadas 2022-2024: no traían datos de partidos actuales y cada intento gastaba la cuota diaria que usan los escudos. El código de esas secciones y el modo de /api/partido siguen en el proyecto por si algún día se contrata un plan de pago.
 - datos-partido.mjs: alias por palabra (Cologne→Köln, Munich→München, Wolves, Spurs…) y motivoNoEncontrado(): si solo coincide un equipo, explica que los nombres no coinciden en lugar de culpar al plan gratis.
 - nombres.mjs: Cologne / FC Cologne / 1 FC Cologne → Köln para la búsqueda de escudos.
+
+VERSIÓN 22 — PESTAÑA RESUMEN DEL PARTIDO (site/js/25-datos-partido.js)
+- "📈 Datos" pasa a "📊 Resumen" con bloques tipo tarjeta: pronóstico del modelo + marcador más probable (poissonModel ahora devuelve marcador y pMarcador), 1X2, goles esperados (xG) con barras y escudos, total de goles, mejores mercados (>= 65 %), tus mercados frente al modelo, forma con chips G/E/P, tabla y enfrentamientos.
+- Solo usa datos reales de football-data.org y del modelo de goles. No se muestran posesión, tiros totales, "nivel de confianza" ni Monte Carlo porque el plan gratis no los entrega y habría que inventarlos.

@@ -198,6 +198,7 @@ export function poissonModel(lh, la) {
     p2 = 0,
     btts = 0;
   const totals = new Array(2 * N + 1).fill(0);
+  let best = { p: -1, i: 0, j: 0 };
   for (let i = 0; i <= N; i++)
     for (let j = 0; j <= N; j++) {
       const p = pois(i, lh) * pois(j, la);
@@ -206,6 +207,7 @@ export function poissonModel(lh, la) {
       else p2 += p;
       if (i > 0 && j > 0) btts += p;
       totals[i + j] += p;
+      if (p > best.p) best = { p, i, j };
     }
   const over = (line) => totals.reduce((s, p, g) => (g > line ? s + p : s), 0);
   const r = (v) => Math.round(v * 1000) / 1000;
@@ -220,6 +222,8 @@ export function poissonModel(lh, la) {
     over25: r(over(2.5)),
     over35: r(over(3.5)),
     btts: r(btts),
+    marcador: [best.i, best.j],
+    pMarcador: r(best.p),
   };
 }
 // Goles esperados con la tabla de local y de visitante (fuerza de ataque × debilidad defensiva × media de la liga),

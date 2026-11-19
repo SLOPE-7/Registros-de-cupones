@@ -911,7 +911,7 @@ function renderMatchDetail(ref = currentMatchRef) {
     // traían datos de partidos actuales y cada intento gastaba la cuota de los escudos. Los datos útiles están en "Datos".
     tabs = [
       ["markets", "◎ Mercados"],
-      ["datos", "📈 Datos"],
+      ["datos", "📊 Resumen"],
       ["coupons", "▣ Cupones"],
     ];
   const content = renderMatchDataPanel(matchActiveTab, f, merged),

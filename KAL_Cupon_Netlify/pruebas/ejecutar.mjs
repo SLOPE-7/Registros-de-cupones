@@ -155,6 +155,7 @@ const server = http.createServer((req, res) => {
       },
       modelo: {
         lambdaLocal: 1.2,
+        marcador: [1, 1],
         lambdaVisitante: 1.6,
         p1: 0.3,
         px: 0.25,
@@ -268,7 +269,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "21.3");
+        localStorage.setItem("kal_version_vista", "22");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -1968,6 +1969,11 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
       D.findMatch(fdMatches, "Barcelona", "Atlético de Madrid")?.swapped === true &&
       !D.findMatch(fdMatches, "Inter", "Napoli"),
   );
+  check(
+    "modelo: marcador más probable (1.5 vs 1.5 → 1-1; 2.9 vs 0.92 → 2-0)",
+    JSON.stringify(m.marcador) === "[1,1]" && JSON.stringify(D.poissonModel(2.9, 0.92).marcador) === "[2,0]",
+    JSON.stringify([m.marcador, D.poissonModel(2.9, 0.92).marcador]),
+  );
   const fin = (id, h, a, gh, ga, d) => ({
     id,
     utcDate: d + "T15:00:00Z",
@@ -2101,22 +2107,40 @@ section("19. Datos del partido: forma, tabla, enfrentamientos y modelo de goles"
   await page.waitForTimeout(500);
   const panel = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
   check(
-    "ficha → 📈 Datos: modelo, tabla, forma y enfrentamientos",
-    /Modelo de goles/.test(panel) &&
+    "ficha → 📊 Resumen: modelo, tabla, forma y enfrentamientos",
+    /Probabilidad 1X2/.test(panel) &&
+      /Pronóstico del modelo/.test(panel) &&
       /Más de 2.5 goles 53 %/.test(panel) &&
       /12º/.test(panel) &&
-      /Forma reciente/.test(panel) &&
+      /Forma \(últimos 5\)/.test(panel) &&
       /Enfrentamientos directos/.test(panel),
     panel.slice(0, 300),
   );
+  const rs = await page.evaluate(() => ({
+    cajas: document.querySelectorAll("#matchTabPanel .rs-box").length,
+    top: document.querySelectorAll("#matchTabPanel .rs-box.rs-top").length,
+    xg: document.querySelectorAll("#matchTabPanel .rs-xg").length,
+    chips: document.querySelectorAll("#matchTabPanel .rs-form-row .form-chip").length,
+    mejores: /Mejores mercados/.test(document.getElementById("matchTabPanel").innerText),
+  }));
   check(
-    "ficha → 📈 Datos: compara tus mercados con el modelo (más de 1.5 a 1.50: 77 % → +16 % de valor)",
+    "ficha → 📊 Resumen: 3 recuadros 1X2 con el favorito resaltado, 2 barras de goles esperados, forma con chips y marcador probable",
+    rs.cajas === 3 &&
+      rs.top === 1 &&
+      rs.xg === 2 &&
+      rs.chips >= 1 &&
+      rs.mejores &&
+      /Marcador más probable 1 - 1/.test(panel),
+    JSON.stringify(rs) + " " + panel.slice(0, 200),
+  );
+  check(
+    "ficha → 📊 Resumen: compara tus mercados con el modelo (más de 1.5 a 1.50: 77 % → +16 % de valor)",
     /Total de goles · Más de 1.5 Modelo 77 % · cuota 1.50 \(67 %\) \+16 % valor/.test(panel) &&
       /Ambos equipos marcan · Sí Modelo 52 %/.test(panel),
     panel.match(/Tus mercados[^📊]*/)?.[0],
   );
   check(
-    "ficha → 📈 Datos: pide los datos con la fecha del partido",
+    "ficha → 📊 Resumen: pide los datos con la fecha del partido",
     seen.some((x) => x.startsWith("datos:Fenerbahce|20")),
   );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
@@ -3617,7 +3641,7 @@ section("27. Registros propios de equipos y jugadores (promedios y goleadores)")
   await page.waitForTimeout(400);
   const dt = await page.$eval("#matchTabPanel", (e) => e.innerText.replace(/\s+/g, " "));
   check(
-    "ficha → 📈 Datos: 'Tus registros' con los dos equipos y los jugadores de tus mercados",
+    "ficha → 📊 Resumen: 'Tus registros' con los dos equipos y los jugadores de tus mercados",
     /Tus registros/.test(dt) &&
       /Real Madrid 2 partidos registrados/.test(dt) &&
       /Barcelona Sin partidos registrados/.test(dt) &&
@@ -4511,8 +4535,8 @@ section("34. Pestañas del partido y nombres de equipos");
   await page.waitForSelector(".match-tabs");
   const tabs = await page.$$eval(".match-tab", (e) => e.map((x) => x.textContent.trim()));
   check(
-    "la ficha tiene solo Mercados, Datos y Cupones",
-    tabs.length === 3 && /Mercados/.test(tabs[0]) && /Datos/.test(tabs[1]) && /Cupones/.test(tabs[2]),
+    "la ficha tiene solo Mercados, Resumen y Cupones",
+    tabs.length === 3 && /Mercados/.test(tabs[0]) && /Resumen/.test(tabs[1]) && /Cupones/.test(tabs[2]),
     tabs.join(" | "),
   );
   check("abre en Mercados", await page.$eval(".match-tab.active", (e) => /Mercados/.test(e.textContent)));

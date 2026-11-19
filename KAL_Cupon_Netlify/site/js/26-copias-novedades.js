@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "21.3";
+const APP_VERSION = "22";
 const NOVEDADES = [
+  {
+    v: "22",
+    titulo: "Resumen del partido rediseñado",
+    items: [
+      "📊 La pestaña Datos ahora es “Resumen”: pronóstico del modelo y marcador más probable arriba, probabilidad 1X2 en recuadros, goles esperados con barras y escudos, total de goles y mejores mercados (65 % o más).",
+      "📈 Forma de los últimos 5 con chips G/E/P y escudos, tabla y enfrentamientos directos; “Tus mercados frente al modelo” sigue mostrando el valor de cada cuota.",
+      "Los nombres y escudos son los de tu cupón, aunque la fuente tenga los equipos en otro orden.",
+    ],
+  },
   {
     v: "21.3",
     titulo: "Pestañas del partido y nombres de equipos",
