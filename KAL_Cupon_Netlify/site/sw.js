@@ -3,7 +3,7 @@
 //   conexión, se usa la copia guardada.
 // - Iconos y manifiesto se sirven desde la caché.
 // - Las funciones del servidor (/api/…) nunca se guardan: siempre van a la red.
-const CACHE = 'kal-v53';
+const CACHE = 'kal-v54';
 const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', '/icons/favicon-32.png',
   '/css/01-base.css',
   '/css/02-tema-claro.css',
@@ -22,6 +22,7 @@ const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon
   '/css/15-animaciones.css',
   '/css/16-analista.css',
   '/css/17-control.css',
+  '/css/18-logos.css',
   '/js/01-nucleo.js',
   '/js/02-lector-cupones.js',
   '/js/03-reglas-cupones.js',

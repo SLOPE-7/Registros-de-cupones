@@ -662,21 +662,97 @@ function syncFoldAllLabel() {
       ? "Contraer todo"
       : "Expandir todo";
 }
+// Filtro de cada sección (por defecto "Faltan": lo que aún no tiene foto o escudo).
+const LG_FILTER_KEY = "kal_logo_filter_v1";
+function readLgFilters() {
+  try {
+    return JSON.parse(localStorage.getItem(LG_FILTER_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function setLgFilter(fold, value) {
+  const f = readLgFilters();
+  f[fold] = value;
+  try {
+    localStorage.setItem(LG_FILTER_KEY, JSON.stringify(f));
+  } catch {}
+}
+const LG_TILES = [
+  ["logoClubs", "🛡️", "Clubes"],
+  ["logoNat", "🏳️", "Selecciones"],
+  ["logoLeagues", "🏆", "Ligas"],
+  ["logoPlayers", "👤", "Jugadores"],
+];
+function lgCounts(el) {
+  const total = el.querySelectorAll(".fold-body .logo-card").length,
+    has = el.querySelectorAll('.fold-body .logo-card[data-has="1"]').length;
+  return { total, has, miss: total - has };
+}
+function renderLogoSummary() {
+  const box = $("logoSummary");
+  if (!box) return;
+  box.innerHTML = LG_TILES.map(([k, ico, label]) => {
+    const el = document.querySelector('#view-logos .fold[data-fold="' + k + '"]');
+    if (!el) return "";
+    const { total, has, miss } = lgCounts(el);
+    return (
+      '<button type="button" class="lg-tile' +
+      (total && !miss ? " is-ok" : "") +
+      '" data-lg-open="' +
+      k +
+      '"><span class="lg-ico">' +
+      ico +
+      "</span><b>" +
+      label +
+      "</b><small>" +
+      has +
+      " de " +
+      total +
+      '</small><i class="lg-bar"><u style="width:' +
+      (total ? Math.round((has / total) * 100) : 0) +
+      '%"></u></i><em>' +
+      (!total ? "sin datos" : miss ? "faltan " + miss : "✓ completo") +
+      "</em></button>"
+    );
+  }).join("");
+}
 function updateFolds() {
   const state = readFolds(),
+    filters = readLgFilters(),
     searching = !!($("logoSearch")?.value || "").trim() || logoManagerFocus.length > 0;
   document.querySelectorAll("#view-logos .fold").forEach((el) => {
-    if (el.dataset.defaultOpen === undefined)
-      el.dataset.defaultOpen = el.classList.contains("is-open") ? "1" : "0";
-    const count = el.querySelectorAll(".fold-body .logo-card").length,
+    const { total, has, miss } = lgCounts(el),
       badge = el.querySelector(".fold-count");
-    if (badge) badge.textContent = count;
-    const saved = state[el.dataset.fold];
-    let open = saved === undefined ? el.dataset.defaultOpen === "1" : !!saved;
-    if (searching && el.dataset.fold !== "catalog") open = count > 0;
+    if (badge) badge.textContent = total;
+    if (el.dataset.kind === "logos") {
+      // Buscando se muestran todos; si no, el filtro elegido (por defecto, lo que falta).
+      const f = searching ? "all" : filters[el.dataset.fold] || "pending";
+      el.dataset.filter = f;
+      el.querySelectorAll("[data-lg-filter]").forEach((b) => {
+        const on = b.dataset.lgFilter === f;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-pressed", String(on));
+        const n = b.querySelector("b");
+        if (n)
+          n.textContent =
+            b.dataset.lgFilter === "pending" ? miss : b.dataset.lgFilter === "saved" ? has : total;
+      });
+      const m = el.querySelector(".fold-miss");
+      if (m) {
+        m.textContent = !total ? "" : miss ? "faltan " + miss : "✓ completo";
+        m.classList.toggle("is-ok", total > 0 && !miss);
+      }
+      const done = el.querySelector(".lg-done");
+      if (done) done.hidden = !(f === "pending" && total > 0 && miss === 0);
+    }
+    // Por defecto todo retraído; recuerda lo que abres.
+    let open = !!state[el.dataset.fold];
+    if (searching && el.dataset.fold !== "catalog") open = total > 0;
     setFold(el, open);
   });
   syncFoldAllLabel();
+  renderLogoSummary();
 }
 function toggleFold(el, open) {
   const state = readFolds();
@@ -701,38 +777,119 @@ document.addEventListener("click", (e) => {
 function marketKeyForPlayer(f, m) {
   return marketKey(f, m);
 }
-function renderPlayerLogoActions(item) {
-  let html = "";
-  if (item.marketKey) {
-    const label = item.photo ? "Actualizar foto" : "Buscar foto";
-    html +=
-      '<button type="button" class="btn gold sm" data-player-photo="' +
-      esc(item.marketKey) +
-      '" data-player-photo-bet="' +
-      esc(item.id) +
-      '">' +
-      label +
-      "</button>";
-  }
-  html += '<button type="button" class="btn sm" data-player-id="' + esc(item.id) + '">Por ID</button>';
-  html +=
-    '<button type="button" class="btn sm" data-player-upload="' +
-    esc(item.id) +
-    '" title="Subir foto del teléfono">📷</button>';
-  if (item.photo && item.savedKey)
-    html +=
-      '<button type="button" class="btn sm" data-player-photo-remove="' +
-      esc(item.savedKey) +
-      '">Quitar foto</button>';
-  html +=
-    '<button type="button" class="btn danger sm" data-player-hide="' + esc(item.id) + '">🗑 Ocultar</button>';
-  return html;
+// ---- Filas compactas: una línea por escudo/foto con un solo botón visible; el resto en "⋯" ----
+const lgInitials = (name) =>
+  String(name || "?")
+    .split(/\s+/)
+    .map((x) => x[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+function lgRow(o) {
+  return (
+    '<article class="logo-card lg-row ' +
+    (o.cls || "") +
+    '" data-has="' +
+    (o.has ? 1 : 0) +
+    '"><div class="logo-card-top">' +
+    o.thumb +
+    '<div class="logo-team-info"><strong>' +
+    esc(o.name) +
+    "</strong><span>" +
+    esc(o.sub) +
+    "</span></div>" +
+    // Guardado: marca ✓. Pendiente: el botón «＋ Buscar» ya lo dice (no hace falta otra etiqueta).
+    (o.has ? '<span class="logo-status is-saved" title="Guardado">✓</span>' : "") +
+    (o.primary || "") +
+    '<button type="button" class="lg-more" data-lg-more aria-expanded="false" aria-label="Más opciones de ' +
+    esc(o.name) +
+    '">⋯</button></div><div class="logo-card-actions">' +
+    o.actions +
+    "</div>" +
+    (o.options || "") +
+    "</article>"
+  );
 }
+const lgBtn = (cls, attrs, text) =>
+  '<button type="button" class="btn sm ' + cls + '" ' + attrs + ">" + text + "</button>";
+function teamCard(x) {
+  const t = x.team,
+    has = !!t.url,
+    i = x.index;
+  return lgRow({
+    has,
+    name: t.name,
+    sub: (t.country || "País no especificado") + " · " + (t.matches || 0) + " partido(s)",
+    thumb: crestHTML(t.url, t.name),
+    primary: has ? "" : lgBtn("gold lg-main", 'data-logo-lookup="' + i + '"', "＋ Buscar"),
+    actions:
+      (has ? lgBtn("", 'data-logo-lookup="' + i + '"', "↻ Actualizar") : "") +
+      lgBtn("", 'data-logo-id="' + i + '"', "Por ID") +
+      lgBtn("", 'data-logo-upload="' + i + '" title="Subir imagen del teléfono"', "📷 Subir imagen") +
+      (has ? lgBtn("", 'data-team-logo-remove="' + esc(t.key) + '"', "Quitar") : "") +
+      lgBtn("danger", 'data-logo-hide="' + esc(t.key) + '"', "🗑 Ocultar"),
+    options: '<div class="logo-options" id="logo-options-' + i + '"></div>',
+  });
+}
+function leagueCard(x, index) {
+  const has = !!x.url;
+  return lgRow({
+    has,
+    name: x.name,
+    sub: (x.country || "País no especificado") + " · " + x.matches + " partido(s)",
+    thumb: crestHTML(x.url, x.name),
+    primary: has ? "" : lgBtn("gold lg-main", 'data-league-search="' + index + '"', "＋ Buscar"),
+    actions:
+      (has ? lgBtn("", 'data-league-search="' + index + '"', "↻ Actualizar por nombre") : "") +
+      lgBtn("", 'data-league-id="' + esc(x.key) + '"', "Por ID") +
+      lgBtn(
+        "",
+        'data-league-upload="' + esc(x.key) + '" title="Subir imagen del teléfono"',
+        "📷 Subir imagen",
+      ) +
+      (has ? lgBtn("", 'data-league-remove="' + esc(x.key) + '"', "Quitar") : "") +
+      lgBtn("danger", 'data-league-hide="' + esc(x.key) + '"', "🗑 Ocultar"),
+    options: '<div class="logo-options" id="league-options-' + index + '"></div>',
+  });
+}
+function playerCard(item) {
+  const has = !!item.photo,
+    photoAttrs = item.marketKey
+      ? 'data-player-photo="' + esc(item.marketKey) + '" data-player-photo-bet="' + esc(item.id) + '"'
+      : "";
+  return lgRow({
+    has,
+    cls: "player-logo-card",
+    name: item.name,
+    sub: [item.club, item.country, item.count + " mercado(s)"].filter(Boolean).join(" · "),
+    thumb: has
+      ? '<img class="player-logo-thumb" src="' +
+        esc(playerImageUrl(item.photo)) +
+        '" alt="Foto de ' +
+        esc(item.name) +
+        '" loading="lazy" referrerpolicy="no-referrer">'
+      : '<span class="team-fallback player-logo-thumb">' + esc(lgInitials(item.name)) + "</span>",
+    primary: !has && photoAttrs ? lgBtn("gold lg-main", photoAttrs, "＋ Buscar") : "",
+    actions:
+      (has && photoAttrs ? lgBtn("", photoAttrs, "↻ Actualizar foto") : "") +
+      lgBtn("", 'data-player-id="' + esc(item.id) + '"', "Por ID") +
+      lgBtn(
+        "",
+        'data-player-upload="' + esc(item.id) + '" title="Subir foto del teléfono"',
+        "📷 Subir foto",
+      ) +
+      (has && item.savedKey
+        ? lgBtn("", 'data-player-photo-remove="' + esc(item.savedKey) + '"', "Quitar foto")
+        : "") +
+      lgBtn("danger", 'data-player-hide="' + esc(item.id) + '"', "🗑 Ocultar"),
+  });
+}
+const lgFill = (el, items, empty) => {
+  if (el) el.innerHTML = items.length ? items.join("") : empty;
+};
 function renderLogos() {
   const el = $("logoList"),
-    archive = $("logoArchive"),
-    leagueEl = $("leagueLogoList"),
-    leagueArchive = $("leagueLogoArchive");
+    archive = $("logoArchive");
   if (!el || !archive) return;
   logoManagerTeams = collectLogoTeams();
   const q = crestNorm($("logoSearch")?.value || ""),
@@ -745,143 +902,88 @@ function renderLogos() {
       );
   const clearFocus = $("logoClearFocus");
   if (clearFocus) clearFocus.hidden = !logoManagerFocus.length;
-  const saved = shown.filter((x) => x.team.url),
-    pending = shown.filter((x) => !x.team.url);
   $("logoTeamCount").textContent = logoManagerTeams.length;
   $("logoSavedCount").textContent = logoManagerTeams.filter((t) => t.url).length;
-  const card = (x) =>
-    '<article class="logo-card"><div class="logo-card-top">' +
-    crestHTML(x.team.url, x.team.name) +
-    '<div class="logo-team-info"><strong>' +
-    esc(x.team.name) +
-    "</strong><span>" +
-    esc(x.team.country || "País no especificado") +
-    " · " +
-    (x.team.matches || 0) +
-    ' partido(s)</span></div><span class="logo-status ' +
-    (x.team.url ? "is-saved" : "") +
-    '">' +
-    (x.team.url ? "Guardado" : "Pendiente") +
-    '</span></div><div class="logo-card-actions"><button class="btn sm ' +
-    (x.team.url ? "" : "gold") +
-    '" data-logo-lookup="' +
-    x.index +
-    '">' +
-    (x.team.url ? "↻ Actualizar" : "＋ Buscar escudo") +
-    '</button><button class="btn sm" data-logo-id="' +
-    x.index +
-    '">Por ID</button><button class="btn sm" data-logo-upload="' +
-    x.index +
-    '" title="Subir imagen del teléfono">📷</button>' +
-    (x.team.url
-      ? '<button class="btn sm" data-team-logo-remove="' + esc(x.team.key) + '">Quitar</button>'
-      : "") +
-    '<button class="btn danger sm" data-logo-hide="' +
-    esc(x.team.key) +
-    '">🗑 Ocultar</button></div><div class="logo-options" id="logo-options-' +
-    x.index +
-    '"></div></article>';
-  el.innerHTML = pending.length
-    ? pending.map(card).join("")
-    : '<div class="empty logo-empty"><strong>No quedan equipos pendientes</strong>Los que falten aparecerán al guardar nuevos cupones.</div>';
-  archive.innerHTML = saved.length
-    ? saved.map(card).join("")
-    : '<div class="empty logo-empty"><strong>Aún no hay escudos guardados</strong>Al guardar uno, aparecerá aquí.</div>';
+  // Clubes y selecciones van en secciones distintas (las selecciones llevan bandera).
+  const national = (x) => !!findCountryLocal(x.team.name),
+    savedMsg = (what) =>
+      '<div class="empty logo-empty"><strong>Aún no hay ' +
+      what +
+      " guardados</strong>Al guardar uno, aparecerá aquí.</div>";
+  const clubs = shown.filter((x) => !national(x)),
+    nats = shown.filter(national);
+  lgFill(el, clubs.filter((x) => !x.team.url).map(teamCard), "");
+  lgFill(archive, clubs.filter((x) => x.team.url).map(teamCard), savedMsg("escudos"));
+  lgFill($("logoListNat"), nats.filter((x) => !x.team.url).map(teamCard), "");
+  lgFill($("logoArchiveNat"), nats.filter((x) => x.team.url).map(teamCard), savedMsg("banderas"));
   const playerArchive = $("playerPhotoArchive");
   if (playerArchive) {
-    const players = collectPlayerBets().filter(
-      (item) =>
-        !q ||
-        crestNorm(item.name).includes(q) ||
-        crestNorm(item.club).includes(q) ||
-        crestNorm(item.country).includes(q),
+    const players = collectPlayerBets()
+      .filter(
+        (item) =>
+          !q ||
+          crestNorm(item.name).includes(q) ||
+          crestNorm(item.club).includes(q) ||
+          crestNorm(item.country).includes(q),
+      )
+      // Primero los que no tienen foto.
+      .sort((a, b) => !!a.photo - !!b.photo);
+    lgFill(
+      playerArchive,
+      players.map(playerCard),
+      '<div class="empty logo-empty"><strong>No detecté mercados de jugadores</strong>Los jugadores aparecerán automáticamente al guardar cupones con mercados de remates, goleador, tarjetas o paradas.</div>',
     );
-    playerArchive.innerHTML = players.length
-      ? players
-          .map(
-            (item) =>
-              '<article class="logo-card player-logo-card"><div class="logo-card-top">' +
-              (item.photo
-                ? '<img class="player-logo-thumb" src="' +
-                  esc(playerImageUrl(item.photo)) +
-                  '" alt="Foto de ' +
-                  esc(item.name) +
-                  '" loading="lazy" referrerpolicy="no-referrer">'
-                : '<span class="team-fallback player-logo-thumb">' +
-                  esc(
-                    item.name
-                      .split(/\s+/)
-                      .map((x) => x[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase(),
-                  ) +
-                  "</span>") +
-              '<div class="logo-team-info"><strong>' +
-              esc(item.name) +
-              "</strong><span>" +
-              esc(item.club || "Club por identificar") +
-              " · " +
-              esc(item.country || "País del jugador por consultar") +
-              " · " +
-              item.count +
-              ' mercado(s)</span></div><span class="logo-status ' +
-              (item.photo ? "is-saved" : "") +
-              '">' +
-              (item.photo ? "Foto guardada" : "Pendiente") +
-              '</span></div><div class="logo-card-actions">' +
-              renderPlayerLogoActions(item) +
-              "</div></article>",
-          )
-          .join("")
-      : '<div class="empty logo-empty"><strong>No detecté mercados de jugadores</strong>Los jugadores aparecerán automáticamente al guardar cupones con mercados de remates, goleador o anotador.</div>';
     showPlayerPhotoImagesIn(playerArchive);
   }
+  const leagueEl = $("leagueLogoList"),
+    leagueArchive = $("leagueLogoArchive");
   if (leagueEl && leagueArchive) {
     const allLeagues = collectLogoLeagues(),
       leagues = allLeagues.filter(
         (x) => !q || crestNorm(x.name).includes(q) || crestNorm(x.country).includes(q),
-      ),
-      waiting = leagues.filter((x) => !x.url),
-      done = leagues.filter((x) => x.url),
-      leagueCard = (x, index) =>
-        '<article class="logo-card"><div class="logo-card-top">' +
-        crestHTML(x.url, x.name) +
-        '<div class="logo-team-info"><strong>' +
-        esc(x.name) +
-        "</strong><span>" +
-        esc(x.country || "País no especificado") +
-        " · " +
-        x.matches +
-        ' partido(s)</span></div><span class="logo-status ' +
-        (x.url ? "is-saved" : "") +
-        '">' +
-        (x.url ? "Guardado" : "Pendiente") +
-        '</span></div><div class="logo-card-actions"><button class="btn sm gold" data-league-search="' +
-        index +
-        '">' +
-        (x.url ? "Actualizar por nombre" : "Buscar por nombre") +
-        '</button><button class="btn sm" data-league-id="' +
-        esc(x.key) +
-        '">Por ID</button><button class="btn sm" data-league-upload="' +
-        esc(x.key) +
-        '" title="Subir imagen del teléfono">📷</button>' +
-        (x.url ? '<button class="btn sm" data-league-remove="' + esc(x.key) + '">Quitar</button>' : "") +
-        '<button class="btn danger sm" data-league-hide="' +
-        esc(x.key) +
-        '">🗑 Ocultar</button></div><div class="logo-options" id="league-options-' +
-        index +
-        '"></div></article>';
-    leagueEl.innerHTML = waiting.length
-      ? waiting.map((x) => leagueCard(x, allLeagues.indexOf(x))).join("")
-      : '<div class="empty logo-empty"><strong>No hay ligas pendientes</strong>Las competencias de tus cupones aparecerán aquí.</div>';
-    leagueArchive.innerHTML = done.length
-      ? done.map((x) => leagueCard(x, leagues.indexOf(x))).join("")
-      : '<div class="empty logo-empty"><strong>Aún no hay ligas guardadas</strong>Busca por ID para archivarlas.</div>';
+      );
+    lgFill(
+      leagueEl,
+      leagues.filter((x) => !x.url).map((x) => leagueCard(x, allLeagues.indexOf(x))),
+      "",
+    );
+    lgFill(
+      leagueArchive,
+      leagues.filter((x) => x.url).map((x) => leagueCard(x, allLeagues.indexOf(x))),
+      '<div class="empty logo-empty"><strong>Aún no hay ligas guardadas</strong>Busca por ID para archivarlas.</div>',
+    );
     renderLogoTrash();
   }
   updateFolds();
 }
+
+// Filtros, tarjetas resumen y opciones de cada fila.
+document.addEventListener("click", (e) => {
+  const flt = e.target.closest("[data-lg-filter]");
+  if (flt) {
+    setLgFilter(flt.closest(".fold").dataset.fold, flt.dataset.lgFilter);
+    updateFolds();
+    return;
+  }
+  const tile = e.target.closest("[data-lg-open]");
+  if (tile) {
+    const el = document.querySelector('#view-logos .fold[data-fold="' + tile.dataset.lgOpen + '"]');
+    if (!el) return;
+    setLgFilter(el.dataset.fold, "pending");
+    if (!el.classList.contains("is-open")) toggleFold(el, true);
+    updateFolds();
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const more = e.target.closest("[data-lg-more]"),
+    top = !more && e.target.closest(".lg-row .logo-card-top");
+  if (more || (top && !e.target.closest("button, a, input, img"))) {
+    const card = (more || top).closest(".lg-row"),
+      open = !card.classList.contains("is-open");
+    card.classList.toggle("is-open", open);
+    card.querySelector("[data-lg-more]")?.setAttribute("aria-expanded", String(open));
+  }
+});
 
 async function saveLogoById(kind, indexOrKey) {
   const team = kind === "team" ? logoManagerTeams[Number(indexOrKey)] : null;

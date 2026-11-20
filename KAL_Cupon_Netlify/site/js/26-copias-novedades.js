@@ -205,8 +205,18 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "24";
+const APP_VERSION = "25";
 const NOVEDADES = [
+  {
+    v: "25",
+    titulo: "Escudos y fotos rediseñado",
+    items: [
+      "📋 Arriba verás cuántos clubes, selecciones, ligas y jugadores te faltan; toca uno y se abre solo con lo que falta.",
+      "🗂️ Todo aparece retraído por defecto, separado en Clubes, Selecciones, Ligas y Jugadores.",
+      "🔎 Cada sección tiene el filtro Faltan / Completos / Todos (por defecto Faltan), y al buscar se muestran todos.",
+      "📏 Filas compactas: los que faltan traen un solo botón “＋ Buscar”; las demás opciones están en “⋯”.",
+    ],
+  },
   {
     v: "24",
     titulo: "Alias de equipos y partidos mejor encontrados",

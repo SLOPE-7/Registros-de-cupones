@@ -538,3 +538,9 @@ VERSIÓN 24 — ALIAS DE EQUIPOS (site/js/25-datos-partido.js, cloudflare/datos-
 - Si no se encuentra el partido, /api/datos-partido devuelve partidosDelDia (con "cerca" para los parecidos). La ficha los muestra; al tocar uno se envía matchId, el servidor orienta local/visitante y devuelve los nombres oficiales (partido.local.oficial / visitante.oficial) y la app guarda db.aliases[clave] = { mi, fd }.
 - Las consultas siguientes envían ah / aa (alias) y el servidor busca con esos nombres. El Analista también usa los alias.
 - Ajustes → "Alias de equipos": lista y permite quitar. Se sincronizan con la nube y entran en respaldos.
+
+VERSIÓN 25 — ESCUDOS Y FOTOS REDISEÑADO (site/js/07-logos-jugadores.js, site/css/18-logos.css)
+- Resumen arriba (clubes, selecciones, ligas, jugadores) con barra y "faltan N"; al tocarlo abre la sección con el filtro "Faltan".
+- Secciones: Clubes, Selecciones (banderas), Ligas, Jugadores, Ocultos y Buscar por ID. Todas retraídas por defecto (claves de plegado nuevas: logoClubs, logoNat, logoLeagues, logoPlayers).
+- Cada sección tiene filtro Faltan / Completos / Todos (se recuerda en kal_logo_filter_v1); al buscar o al venir de "Editar escudos" se muestran todos.
+- Cada escudo o foto es una fila compacta: los que faltan muestran "＋ Buscar"; Actualizar, Por ID, Subir imagen, Quitar y Ocultar están en "⋯". Los ids de las listas (logoList, logoArchive, playerPhotoArchive…) y los atributos data- de los botones no cambiaron.

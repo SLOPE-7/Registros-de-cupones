@@ -295,7 +295,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "24");
+        localStorage.setItem("kal_version_vista", "25");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -1064,6 +1064,12 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
 {
   const { ctx, page } = await open(baseDb());
   await view(page, "logos");
+  // Las secciones vienen retraídas y cada fila esconde sus opciones en «⋯»: aquí se abren para probar los botones.
+  await page.evaluate(() =>
+    document.querySelectorAll("#view-logos .fold").forEach((f) => toggleFold(f, true)),
+  );
+  const abrirFila = (sel) =>
+    page.evaluate((x) => document.querySelector(x).closest(".lg-row").classList.add("is-open"), sel);
   const idx = (name) => page.evaluate((n) => logoManagerTeams.findIndex((t) => t.name === n), name);
   const fb = await idx("Fenerbahce");
   await page.click(`[data-logo-lookup="${fb}"]`);
@@ -1104,6 +1110,7 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
     seen.slice(-4).join(" | "),
   );
   const aek = await idx("AEK");
+  await abrirFila(`[data-logo-upload="${aek}"]`);
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
     page.click(`[data-logo-upload="${aek}"]`),
@@ -1139,7 +1146,7 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
   );
   // Fotos de jugadores: búsqueda combinada y subida
   await page.evaluate(() => {
-    const el = document.querySelector('[data-fold="players"]');
+    const el = document.querySelector('[data-fold="logoPlayers"]');
     if (!el.classList.contains("is-open")) el.querySelector(".fold-head").click();
   });
   await page.click("#playerPhotoArchive [data-player-photo]");
@@ -1155,6 +1162,12 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
     (await nico()).includes("thesportsdb.com"),
     await nico(),
   );
+  // Con la foto ya guardada, el jugador sale de «Faltan»: se muestran todos para subirle otra desde el teléfono.
+  await page.evaluate(() => {
+    setLgFilter("logoPlayers", "all");
+    updateFolds();
+    document.querySelectorAll("#playerPhotoArchive .lg-row").forEach((c) => c.classList.add("is-open"));
+  });
   const [ch2] = await Promise.all([
     page.waitForEvent("filechooser"),
     page.click("#playerPhotoArchive [data-player-upload]"),
@@ -5036,6 +5049,224 @@ section("36. Alias de equipos y partidos del día");
   check("Ajustes → Alias de equipos lista «Nijmegen» = «NEC»", /Nijmegen.*NEC/.test(caja), caja);
   await tap(page, "[data-alias-del]");
   check("y se puede quitar", (await page.evaluate(() => Object.keys(db.aliases || {}).length)) === 0);
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
+section("37. Escudos y fotos: resumen, secciones retraídas y filas compactas");
+{
+  const fut = isoDay(Date.now() + 2 * 86400e3);
+  const mk = (market, pick) => ({ market, pick, odd: "1.5", builder: false, settlement: "pending" });
+  const fx = (id, home, away, comp, country, markets) => ({
+    id,
+    home,
+    away,
+    competition: comp,
+    league: comp,
+    country,
+    dateISO: fut,
+    time: "14:00",
+    markets,
+  });
+  const db0 = {
+    coupons: [
+      {
+        id: "L1",
+        name: "L1",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 3,
+        payout: 15,
+        fixtures: [
+          fx("a", "Fenerbahce", "Liverpool", "UEFA Champions League", "Europa", [
+            mk("Total de goles", "Más de 1.5"),
+          ]),
+          fx("b", "Francia", "Italia", "UEFA Nations League", "Europa", [
+            mk("Remates a Puerta - Kylian Mbappe (FRA)", "Más de 0.5"),
+          ]),
+          fx("c", "Como", "Napoli", "Serie A", "Italia", [
+            mk("Remates a Puerta (Nico Paz (COM)) - Incl. suplente", "Más de 0.5"),
+          ]),
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  // El estado de plegado que guardaba la versión anterior (como tu captura: jugadores abierto) no debe abrir nada.
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "kal_fold_state_v1",
+      JSON.stringify({ players: true, teamsPending: true, teamsSaved: true }),
+    ),
+  );
+  await page.evaluate(() => {
+    setTeamCrest("Liverpool", "https://media.api-sports.io/football/teams/40.png", "Inglaterra");
+  });
+  await view(page, "logos");
+  await page.waitForTimeout(200);
+  const abiertas = await page.$$eval("#view-logos .fold.is-open", (e) => e.length);
+  check(
+    "todas las secciones empiezan retraídas, aunque la versión anterior las dejara abiertas",
+    abiertas === 0,
+    String(abiertas),
+  );
+  const tiles = await page.$$eval(".lg-tile", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ")));
+  check(
+    "el resumen tiene 4 tarjetas: clubes, selecciones, ligas y jugadores",
+    tiles.length === 4 &&
+      /Clubes/.test(tiles[0]) &&
+      /Selecciones/.test(tiles[1]) &&
+      /Ligas/.test(tiles[2]) &&
+      /Jugadores/.test(tiles[3]),
+    tiles.join(" | "),
+  );
+  check(
+    "clubes: 1 de 2 con escudo, «faltan 1» (Liverpool sí, Fenerbahce no, Como/Napoli aún)",
+    /Clubes/.test(tiles[0]) && /\d+ de \d+/.test(tiles[0]) && /faltan \d+/.test(tiles[0]),
+    tiles[0],
+  );
+  check(
+    "jugadores: 2 de 2 sin foto → «faltan 2»",
+    /0 de 2/.test(tiles[3]) && /faltan 2/.test(tiles[3]),
+    tiles[3],
+  );
+  const clubes = await page.evaluate(() =>
+    [...document.querySelectorAll('.fold[data-fold="logoClubs"] .logo-card')]
+      .map((c) => c.querySelector("strong").textContent + ":" + c.dataset.has)
+      .sort()
+      .join(","),
+  );
+  const sel = await page.evaluate(() =>
+    [...document.querySelectorAll('.fold[data-fold="logoNat"] .logo-card')]
+      .map((c) => c.querySelector("strong").textContent)
+      .sort()
+      .join(","),
+  );
+  check(
+    "clubes y selecciones van en secciones distintas (Francia e Italia son selecciones)",
+    /Fenerbahce:0/.test(clubes) &&
+      /Liverpool:1/.test(clubes) &&
+      !/Francia/.test(clubes) &&
+      /Francia/.test(sel) &&
+      /Italia/.test(sel) &&
+      !/Fenerbahce/.test(sel),
+    clubes + " || " + sel,
+  );
+
+  // Tocar la tarjeta abre la sección con lo que falta
+  await tap(page, '[data-lg-open="logoClubs"]');
+  await page.waitForTimeout(150);
+  const abierta = await page.evaluate(() => {
+    const f = document.querySelector('.fold[data-fold="logoClubs"]');
+    const vis = [...f.querySelectorAll(".logo-card")]
+      .filter((c) => c.offsetParent)
+      .map((c) => c.querySelector("strong").textContent + ":" + c.dataset.has);
+    return { open: f.classList.contains("is-open"), filtro: f.dataset.filter, vis };
+  });
+  check(
+    "tocar «Clubes» abre la sección con el filtro «Faltan» (solo los sin escudo)",
+    abierta.open &&
+      abierta.filtro === "pending" &&
+      abierta.vis.length >= 1 &&
+      abierta.vis.every((x) => x.endsWith(":0")) &&
+      !abierta.vis.some((x) => /Liverpool/.test(x)),
+    JSON.stringify(abierta),
+  );
+  // Fila compacta: un solo botón a la vista; el resto en «⋯»
+  const fila = await page.evaluate(() => {
+    const c = [...document.querySelectorAll('.fold[data-fold="logoClubs"] .logo-card')].find((x) =>
+      /Fenerbahce/.test(x.innerText),
+    );
+    const visibles = [...c.querySelectorAll("button")]
+      .filter((b) => b.offsetParent)
+      .map((b) => b.textContent.trim());
+    return { visibles, alto: Math.round(c.getBoundingClientRect().height) };
+  });
+  check(
+    "fila de un club sin escudo: solo «＋ Buscar» y «⋯» a la vista, y mide menos de 80 px",
+    fila.visibles.length === 2 &&
+      /Buscar/.test(fila.visibles[0]) &&
+      fila.visibles[1] === "⋯" &&
+      fila.alto < 80,
+    JSON.stringify(fila),
+  );
+  await tap(page, '.fold[data-fold="logoClubs"] .logo-card [data-lg-more]');
+  const abiertaFila = await page.$$eval(
+    '.fold[data-fold="logoClubs"] .logo-card.is-open [data-logo-id], .fold[data-fold="logoClubs"] .logo-card.is-open [data-logo-hide]',
+    (e) => e.filter((x) => x.offsetParent).length,
+  );
+  check("«⋯» muestra Por ID, Subir imagen y Ocultar", abiertaFila === 2, String(abiertaFila));
+
+  // Filtros
+  await tap(page, '.fold[data-fold="logoClubs"] [data-lg-filter="saved"]');
+  const comp = await page.evaluate(() =>
+    [...document.querySelectorAll('.fold[data-fold="logoClubs"] .logo-card')]
+      .filter((c) => c.offsetParent)
+      .map((c) => c.querySelector("strong").textContent),
+  );
+  check("filtro «Completos»: solo Liverpool", comp.length === 1 && comp[0] === "Liverpool", comp.join());
+  await tap(page, '.fold[data-fold="logoClubs"] [data-lg-filter="all"]');
+  const todos = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('.fold[data-fold="logoClubs"] .logo-card')].filter((c) => c.offsetParent)
+        .length,
+  );
+  check("filtro «Todos»: se ven los dos", todos >= 2, String(todos));
+  const chips = await page.$$eval('.fold[data-fold="logoClubs"] .lg-filter .chip', (e) =>
+    e.map((x) => x.innerText.replace(/\s+/g, " ")),
+  );
+  check(
+    "los filtros muestran sus cantidades",
+    chips.length === 3 &&
+      /Faltan \d+/.test(chips[0]) &&
+      /Completos 1/.test(chips[1]) &&
+      /Todos \d+/.test(chips[2]),
+    chips.join(" | "),
+  );
+  // Buscar muestra todos aunque el filtro sea «Faltan»
+  await tap(page, '.fold[data-fold="logoClubs"] [data-lg-filter="pending"]');
+  await page.fill("#logoSearch", "liverpool");
+  await page.waitForTimeout(150);
+  const busca = await page.evaluate(() => {
+    const f = document.querySelector('.fold[data-fold="logoClubs"]');
+    return {
+      filtro: f.dataset.filter,
+      vis: [...f.querySelectorAll(".logo-card")]
+        .filter((c) => c.offsetParent)
+        .map((c) => c.querySelector("strong").textContent),
+    };
+  });
+  check(
+    "al buscar se muestran todos (aunque el filtro sea «Faltan») y aparece Liverpool",
+    busca.filtro === "all" && busca.vis.includes("Liverpool"),
+    JSON.stringify(busca),
+  );
+  await page.fill("#logoSearch", "");
+  await page.waitForTimeout(150);
+  // Jugadores: los que faltan salen primero y con un solo botón visible
+  await tap(page, '[data-lg-open="logoPlayers"]');
+  await page.waitForTimeout(150);
+  const jug = await page.evaluate(() => {
+    const f = document.querySelector('.fold[data-fold="logoPlayers"]');
+    const c = [...f.querySelectorAll(".logo-card")].filter((x) => x.offsetParent);
+    return {
+      n: c.length,
+      botones: c[0]
+        ? [...c[0].querySelectorAll("button")].filter((b) => b.offsetParent).map((b) => b.textContent.trim())
+        : [],
+      miss: f.querySelector(".fold-miss").textContent,
+    };
+  });
+  check(
+    "jugadores sin foto: 2 filas, cada una con «＋ Buscar» y «⋯», y la sección dice «faltan 2»",
+    jug.n === 2 && jug.botones.length === 2 && /Buscar/.test(jug.botones[0]) && jug.miss === "faltan 2",
+    JSON.stringify(jug),
+  );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
 }
