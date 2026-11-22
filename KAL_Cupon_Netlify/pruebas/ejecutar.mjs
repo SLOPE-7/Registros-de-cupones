@@ -64,7 +64,25 @@ const server = http.createServer((req, res) => {
       league: { options: [] },
     });
   }
-  if (url.pathname === "/api/jugadores") return sendJson({ players: [] });
+  if (url.pathname === "/api/jugadores") {
+    const q = url.searchParams.get("search") || "";
+    seen.push("jugadores:" + q);
+    const P = (id, name, team, country) => ({
+      id,
+      name,
+      team,
+      country,
+      photo: "https://media.api-sports.io/football/players/" + id + ".png",
+      teamId: "26",
+    });
+    return sendJson({
+      players: /baena/i.test(q)
+        ? [P("501", "Alejandro Baena Rodriguez", "Villarreal", "Spain")]
+        : /kang/i.test(q)
+          ? [P("88", "Kang-in Lee", "Paris Saint Germain", "South Korea")]
+          : [],
+    });
+  }
   if (url.pathname === "/api/imagenes") {
     seen.push("imagenes:" + url.searchParams.get("tipo") + ":" + url.searchParams.get("q"));
     return sendJson({
@@ -79,17 +97,27 @@ const server = http.createServer((req, res) => {
                 source: "TheSportsDB",
               },
             ]
-          : /nico|paz/i.test(url.searchParams.get("q"))
+          : /^rodriguez$/i.test(url.searchParams.get("q"))
             ? [
                 {
-                  id: "9",
-                  name: "Nico Paz",
-                  team: "Como",
-                  photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png",
+                  id: "77",
+                  name: "Carlos Mario Rodriguez",
+                  team: "Getafe",
+                  photo: "https://r2.thesportsdb.com/images/media/player/cutout/rod.png",
                   source: "TheSportsDB",
                 },
               ]
-            : [],
+            : /nico|paz/i.test(url.searchParams.get("q"))
+              ? [
+                  {
+                    id: "9",
+                    name: "Nico Paz",
+                    team: "Como",
+                    photo: "https://r2.thesportsdb.com/images/media/player/cutout/nico.png",
+                    source: "TheSportsDB",
+                  },
+                ]
+              : [],
     });
   }
   if (url.pathname === "/api/buscar-logo") {
@@ -295,7 +323,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "25");
+        localStorage.setItem("kal_version_vista", "26");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -1149,7 +1177,10 @@ section("10. Escudos y fotos: TheSportsDB e imagen del teléfono");
     const el = document.querySelector('[data-fold="logoPlayers"]');
     if (!el.classList.contains("is-open")) el.querySelector(".fold-head").click();
   });
-  await page.click("#playerPhotoArchive [data-player-photo]");
+  // «＋ Buscar» abre la ventana de búsqueda (sin cuadros de texto) y se toca al jugador correcto.
+  await page.click("#playerPhotoArchive [data-pp-open]");
+  await page.waitForSelector(".pp-result", { timeout: 8000 });
+  await page.click(".pp-result");
   await page.waitForTimeout(400);
   const nico = () =>
     page.evaluate(
@@ -3557,8 +3588,11 @@ section("27. Registros propios de equipos y jugadores (promedios y goleadores)")
       /Seguir jugador de Barcelona/.test(bd),
     bd.slice(0, 200),
   );
-  page.promptAnswer = "Lamine Yamal";
+  // «Seguir jugador» abre la ventana de búsqueda; sin red se puede seguir solo con el nombre.
   await tap(page, '[data-track-add="away"]');
+  await page.waitForSelector(".pp-sheet");
+  await page.fill("#ppQuery", "Lamine Yamal");
+  await tap(page, "[data-pp-manual]");
   await page.waitForTimeout(250);
   const fkD = await page.evaluate(() => Object.keys(db.stats).find((k) => db.stats[k].tracked?.length));
   const card = await page.evaluate(() =>
@@ -5269,6 +5303,220 @@ section("37. Escudos y fotos: resumen, secciones retraídas y filas compactas");
   );
   check("sin errores", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
+}
+
+section("38. Seguir jugador y foto: búsqueda en ventana, equipo y selección");
+{
+  // --- códigos de selecciones (antes quedaban como «Equipo (GER)»)
+  const { ctx: c0, page: p0 } = await open(baseDb());
+  const cods = await p0.evaluate(() => {
+    const f = (home, away) => ({ home, away });
+    const r = (code, h, a) => {
+      const x = playerClubForCode(code, f(h, a));
+      return x.side + ":" + x.club;
+    };
+    return {
+      ger: r("GER", "Alemania", "Países Bajos"),
+      eng: r("ENG", "España", "Inglaterra"),
+      dnk: r("DNK", "Dinamarca", "Noruega"),
+      ned: r("NED", "Alemania", "Países Bajos"),
+      swe: r("SWE", "Polonia", "Suecia"),
+      sco: r("SCO", "Suiza", "Escocia"),
+      wal: r("WAL", "Gales", "Portugal"),
+      por: r("POR", "Gales", "Portugal"),
+      fraCh: r("CHE", "Chelsea", "Arsenal"),
+      roma: r("ROM", "Roma", "Lazio"),
+      fuera: r("GER", "España", "Francia"),
+      club: r("ATM", "Getafe", "Atletico Madrid"),
+      sinResolver: Object.entries(NATION_CODES)
+        .filter(([, n]) => !findCountryLocal(n))
+        .map(([c]) => c),
+    };
+  });
+  check(
+    "GER, ENG, DNK, NED, SWE, SCO y WAL se ligan con su selección y su lado",
+    cods.ger === "home:Alemania" &&
+      cods.eng === "away:Inglaterra" &&
+      cods.dnk === "home:Dinamarca" &&
+      cods.ned === "away:Países Bajos" &&
+      cods.swe === "away:Suecia" &&
+      cods.sco === "away:Escocia" &&
+      cods.wal === "home:Gales" &&
+      cods.por === "away:Portugal",
+    JSON.stringify(cods),
+  );
+  check(
+    "los códigos de clubes siguen igual (Chelsea, Roma, Atlético)",
+    cods.fraCh === "home:Chelsea" && cods.roma === "home:Roma" && cods.club === "away:Atletico Madrid",
+    JSON.stringify(cods),
+  );
+  check(
+    "si el partido no es de esa selección, muestra el país (no «Equipo (GER)»)",
+    cods.fuera === ":Alemania",
+    cods.fuera,
+  );
+  check(
+    "todos los códigos de la tabla apuntan a un país que la app conoce",
+    cods.sinResolver.length === 0,
+    cods.sinResolver.join(),
+  );
+  await c0.close();
+
+  // --- seguir a un jugador buscándolo
+  const fut = isoDay(Date.now() + 2 * 86400e3);
+  const mk = (market, pick) => ({ market, pick, odd: "1.6", builder: false, settlement: "pending" });
+  const db0 = {
+    coupons: [
+      {
+        id: "G1",
+        name: "G1",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 3,
+        payout: 15,
+        fixtures: [
+          {
+            id: "g",
+            home: "Getafe",
+            away: "Atletico Madrid",
+            competition: "LaLiga",
+            league: "LaLiga",
+            dateISO: fut,
+            time: "14:00",
+            markets: [mk("Remates a Puerta (Kang In Lee (ATM)) - Incl. suplente", "Más de 0.5")],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  let dialogos = 0;
+  page.on("dialog", () => dialogos++);
+  await page.evaluate(() => openMatchDetails({ couponId: "G1", fixtureIndex: 0 }));
+  await page.waitForSelector(".live-board");
+  await tap(page, '[data-track-add="away"]');
+  await page.waitForSelector(".pp-sheet");
+  const cab = await page.$eval(".pp-sheet", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "«Seguir jugador» abre una ventana con el equipo y los jugadores que ya conoce",
+    /Equipo: Atletico Madrid/.test(cab) && /Kang In Lee/.test(cab),
+    cab.slice(0, 220),
+  );
+  await page.fill("#ppQuery", "Baena");
+  await tap(page, "[data-pp-search]");
+  await page.waitForSelector(".pp-result", { timeout: 8000 });
+  const res = await page.$$eval(".pp-result", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ")));
+  check(
+    "busca y muestra al jugador con su equipo y la fuente",
+    res.length === 1 &&
+      /Alejandro Baena Rodriguez/.test(res[0]) &&
+      /Villarreal/.test(res[0]) &&
+      /API-Football/.test(res[0]),
+    res.join(" | "),
+  );
+  await tap(page, ".pp-result");
+  await page.waitForTimeout(300);
+  const seg = await page.evaluate(() => {
+    const st = Object.values(db.stats).find((x) => x.tracked?.length);
+    const dir = Object.values(readCrestDirectory()).find((x) => x.kind === "player" && /Baena/.test(x.name));
+    const card = [...document.querySelectorAll(".lb-player")].find((e) => /Baena/.test(e.innerText));
+    return {
+      tracked: st.tracked[0],
+      dir: dir && { club: dir.club, photo: dir.photo, alias: dir.aliases },
+      foto: card?.querySelector("img.pg-photo")?.getAttribute("src") || "",
+      texto: card?.querySelector(".lb-player-head")?.innerText.replace(/\s+/g, " "),
+    };
+  });
+  check(
+    "al elegirlo lo sigue con su nombre completo y del lado del equipo correcto",
+    seg.tracked.name === "Alejandro Baena Rodriguez" && seg.tracked.side === "away",
+    JSON.stringify(seg.tracked),
+  );
+  check(
+    "guarda su foto ligada al equipo del partido (Atletico Madrid), con el nombre que escribiste como alias",
+    seg.dir?.club === "Atletico Madrid" &&
+      /players\/501/.test(seg.dir.photo) &&
+      seg.dir.alias.includes("Baena"),
+    JSON.stringify(seg.dir),
+  );
+  check(
+    "en el marcador aparece con su foto y su equipo",
+    /players\/501/.test(seg.foto) && /Atletico Madrid/.test(seg.texto),
+    JSON.stringify([seg.foto, seg.texto]),
+  );
+  const logos = await page.evaluate(() => {
+    const x = collectPlayerBets().find((p) => /Baena/.test(p.name));
+    return x && { club: x.club, tiene: !!x.photo, count: x.count };
+  });
+  check(
+    "también aparece en Logos → Jugadores, con su club y su foto",
+    logos?.club === "Atletico Madrid" && logos.tiene && logos.count === 0,
+    JSON.stringify(logos),
+  );
+
+  // --- probar otras formas del nombre (apellido) cuando no hay resultados
+  await tap(page, '[data-track-add="home"]');
+  await page.waitForSelector(".pp-sheet");
+  await page.fill("#ppQuery", "Carlos Mario Rodriguez");
+  await tap(page, "[data-pp-search]");
+  await page.waitForSelector(".pp-result", { timeout: 8000 });
+  const rod = await page.$$eval(".pp-result", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ")));
+  check(
+    "sin resultados con el nombre completo, prueba solo con el apellido y lo encuentra",
+    rod.length === 1 &&
+      /Carlos Mario Rodriguez/.test(rod[0]) &&
+      /TheSportsDB/.test(rod[0]) &&
+      seen.some((x) => x === "imagenes:jugador:Rodriguez"),
+    rod.join(" | "),
+  );
+  await tap(page, "[data-pp-close]");
+
+  // --- foto de un jugador del marcador (con mercado)
+  await tap(page, ".live-board [data-pp-live]");
+  await page.waitForSelector(".pp-result", { timeout: 8000 });
+  const kang = await page.$eval(".pp-sheet", (e) => ({
+    q: document.getElementById("ppQuery").value,
+    r: e.innerText.replace(/\s+/g, " "),
+  }));
+  check(
+    "📷 del marcador: abre la búsqueda con su nombre y encuentra a «Kang-in Lee»",
+    /Kang/.test(kang.q) && /Kang-in Lee/.test(kang.r),
+    kang.q,
+  );
+  await tap(page, ".pp-result");
+  await page.waitForTimeout(300);
+  const kf = await page.evaluate(() => {
+    const card = [...document.querySelectorAll(".lb-player")].find((e) => /Kang/.test(e.innerText));
+    return card?.querySelector("img.pg-photo")?.getAttribute("src") || "";
+  });
+  check("la foto de Kang In Lee ya sale en su tarjeta del marcador", /players\/88/.test(kf), kf);
+  check("sin ningún cuadro de texto del navegador en todo el recorrido", dialogos === 0, String(dialogos));
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+
+  // --- el servidor ya no se queda esperando: tiempo máximo
+  const J = (await import(path.join(ROOT, "servidor/jugadores.mjs"))).default;
+  const realFetch = globalThis.fetch;
+  process.env.API_FOOTBALL_KEY = "k";
+  globalThis.fetch = (u, o) =>
+    new Promise((_, rej) => o?.signal?.addEventListener("abort", () => rej(o.signal.reason)));
+  const t0 = Date.now();
+  const lento = await J(
+    new Request("https://x/api/jugadores?search=Jugador%20Muy%20Lento&teamId=26&season=2026"),
+  );
+  const dur = Date.now() - t0;
+  globalThis.fetch = realFetch;
+  const cuerpo = await lento.json();
+  check(
+    "servidor: si API-Football se cuelga, responde en menos de 10 s con un aviso claro",
+    dur < 10500 && lento.status === 502 && /tardó demasiado/.test(cuerpo.error),
+    dur + " ms · " + JSON.stringify(cuerpo),
+  );
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

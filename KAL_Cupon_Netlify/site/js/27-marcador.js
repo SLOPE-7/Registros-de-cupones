@@ -220,6 +220,12 @@ function statsPlayers(fk) {
     const k = playerKeyOf(name);
     if (!k) return;
     const e = out.get(k) || { name, code: "", photo: "", incl: true, stats: new Set() };
+    if (!e.photo) {
+      // Foto guardada para este jugador (ligada al equipo del partido).
+      const f = fixtureByKey(fk),
+        saved = findSavedPlayer(name, side && f ? f[side] : "", readCrestDirectory());
+      if (saved) e.photo = saved[1].photo || saved[1].url || "";
+    }
     e.stats.add("shots");
     e.stats.add("onTarget");
     if (tracked) e.stats.add("cards");
@@ -459,6 +465,13 @@ function liveBoardHtml(f) {
       '" aria-label="Ficha de ' +
       esc(pl.name) +
       '">📇 Ficha</button>' +
+      '<button type="button" class="pg-mini-btn" data-pp-live data-fk="' +
+      esc(fk) +
+      '" data-pk="' +
+      esc(pk) +
+      '" aria-label="Buscar foto de ' +
+      esc(pl.name) +
+      '">📷</button>' +
       (pl.tracked && !pl.lines
         ? '<button type="button" class="pg-mini-btn" data-track-remove data-st-fk="' +
           esc(fk) +

@@ -671,182 +671,35 @@ function savedPlayerPhoto(key, fixture, market) {
   const saved = parsed ? findSavedPlayer(parsed.name, club, dir) : null;
   return saved ? playerImageUrl(saved[1].photo || saved[1].url) : "";
 }
+// Abre la ventana para buscar la foto del jugador de un mercado (sin cuadros de texto del navegador).
 async function lookupMatchPlayerPhoto(marketKeyValue, refOverride = null, playerBet = null) {
   const ref = refOverride || currentMatchRef,
     c = ref?.draft ? { fixtures: draftSelections } : db.coupons.find((x) => x.id === ref?.couponId),
-    f = ref?.draft ? draftSelections[Number(ref.fixtureIndex)] : c?.fixtures?.[Number(ref.fixtureIndex)];
+    f = ref?.draft ? draftSelections[Number(ref.fixtureIndex)] : c?.fixtures?.[Number(ref?.fixtureIndex)];
   if (!f) {
     toast("No pude identificar el partido asociado a este jugador.");
     return;
   }
-  const market =
-      f.markets?.find((m) => marketKey(f, m) === marketKeyValue) ||
-      f.markets?.find((m) => parsePlayerBet(m, f)),
-    parsed = parsePlayerBet(market, f) || {},
-    hinted = parsed.name || "";
-  const search = hinted || prompt("Escribe el nombre del jugador para buscar su foto:");
-  if (!search || search.trim().length < 3) {
-    if (search !== null) toast("Escribe al menos tres letras.");
-    return;
-  }
+  const market = f.markets?.find((m) => marketKey(f, m) === marketKeyValue),
+    parsed = (market && parsePlayerBet(market, f)) || {},
+    name = parsed.name || playerBet?.name || "",
+    code = playerBet?.code || parsed.code || "";
   const inferred = playerBet?.side
-    ? { side: playerBet.side, club: playerBet.club }
-    : playerClubForCode(playerBet?.code || parsed.code, f);
-  const isHome =
-    inferred.side === "home"
-      ? true
-      : inferred.side === "away"
-        ? false
-        : confirm("¿Juega en el equipo local: " + f.home + "? Pulsa Cancelar para buscar en " + f.away + ".");
-  const teamId = isHome ? matchApiIds(f).home : matchApiIds(f).away,
-    club = isHome ? f.home : f.away;
-  const button = [...document.querySelectorAll("[data-player-photo]")].find(
-    (x) => x.dataset.playerPhoto === marketKeyValue,
-  );
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Buscando foto…";
-  }
-  try {
-    const cleanName = search
-      .replace(/\s*\([A-Z]{2,5}\)\s*$/i, "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Za-z0-9 ]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    // Busca en API-Football y TheSportsDB a la vez; si ninguna lo encuentra, deja probar con otro nombre.
-    const searchBoth = async (name) => {
-      const n = name
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^A-Za-z0-9 ]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-      const apiFootball = (async () => {
-        const params = new URLSearchParams({
-          search: n,
-          teamId: teamId || "",
-          season: scheduleISO(f).slice(0, 4),
-        });
-        const response = await fetch("/api/jugadores?" + params.toString(), {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(16000),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw Error(data.error || "No se pudo buscar al jugador.");
-        return (data.players || []).map((x) => ({ ...x, source: "API-Football" }));
-      })();
-      const [a, b] = await Promise.allSettled([apiFootball, tsdbSearch("jugador", n, club)]);
-      return [
-        ...(a.status === "fulfilled" ? a.value : []),
-        ...(b.status === "fulfilled" ? b.value.map((x) => ({ ...x, id: x.id ? "tsdb-" + x.id : "" })) : []),
-      ].filter((x) => x.photo);
-    };
-    let players = await searchBoth(cleanName);
-    for (let tries = 0; !players.length && tries < 2; tries++) {
-      const other = prompt(
-        "No encontré la foto de " + search + ". Escribe otro nombre o solo el apellido (o Cancelar):",
-        "",
-      );
-      if (!other || other.trim().length < 3) break;
-      players = await searchBoth(other.trim());
-    }
-    if (!players.length)
-      throw Error("No encontré la foto de " + search + ". Puedes subirla desde tu teléfono con 📷 en Logos.");
-    const data = { players };
-    let chosen = data.players[0];
-    if (
-      data.players.length === 1 &&
-      !confirm(
-        "¿Es este jugador?\n" +
-          chosen.name +
-          (chosen.team ? " · " + chosen.team : "") +
-          " (" +
-          chosen.source +
-          ")",
-      )
-    )
-      return;
-    if (data.players.length > 1) {
-      const options = data.players
-          .map(
-            (x, i) =>
-              i +
-              1 +
-              ". " +
-              x.name +
-              (x.team ? " · " + x.team : x.country ? " · " + x.country : "") +
-              " (" +
-              x.source +
-              ")",
-          )
-          .join("\n"),
-        answer = prompt("Elige el jugador correcto:\n" + options, "1");
-      if (answer === null) return;
-      chosen = data.players[Number(answer) - 1];
-      if (!chosen) {
-        toast("Número de jugador no válido.");
-        return;
-      }
-    }
-    if (!chosen.photo) throw Error("Se encontró al jugador, pero sin foto.");
-    const code = playerBet?.code || parsed.code || "",
-      savedClub = chosen.team || club || playerBet?.club || "",
-      playerId = String(chosen.id || ""),
-      photoKey = playerId ? "player:" + playerId : "player:" + crestNorm(chosen.name),
-      dir = readCrestDirectory(),
-      aliases = new Set([chosen.name, search, parsed.name].filter(Boolean));
-    Object.entries(dir).forEach(([oldKey, item]) => {
-      if (!oldKey.startsWith("player:")) return;
-      const oldId = String(item.playerId || oldKey.split(":")[1] || "");
-      if (
-        (playerId && oldId === playerId) ||
-        (samePlayerName(item.name, chosen.name) && samePlayerClub(item.club, savedClub))
-      ) {
-        (item.aliases || []).forEach((name) => aliases.add(name));
-        if (item.name) aliases.add(item.name);
-        if (oldKey !== photoKey) delete dir[oldKey];
-      }
-    });
-    dir[photoKey] = {
-      kind: "player",
-      playerId,
-      name: chosen.name,
-      aliases: [...aliases],
-      club: savedClub,
-      teamCode: code,
-      country: chosen.country || "",
-      teamId: chosen.teamId || teamId || "",
-      photo: chosen.photo,
-      url: chosen.photo,
-      marketKey: marketKeyValue,
-      market: market?.market || "",
-      savedAt: Date.now(),
-    };
-    try {
-      localStorage.setItem(CREST_DIR, JSON.stringify(dir));
-    } catch {
-      throw Error("No se pudo guardar la foto en Logos. Libera espacio del navegador e inténtalo otra vez.");
-    }
-    matchPlayerPhotos[marketKeyValue] = playerImageUrl(chosen.photo);
-    if (cloudSession) queueCloudSync();
-    renderLogos();
-    if (currentMatchRef === ref && $("matchModal")?.classList.contains("open")) renderMatchDetail(ref);
-    toast(
-      "Foto guardada en Logos para " + chosen.name + " · " + (chosen.team || club || "club por identificar"),
-    );
-  } catch (error) {
-    toast(error?.message || "No se pudo cargar la foto del jugador.");
-  } finally {
-    const b = [...document.querySelectorAll("[data-player-photo]")].find(
-      (x) => x.dataset.playerPhoto === marketKeyValue,
-    );
-    if (b) {
-      b.disabled = false;
-      b.textContent = "▣ Buscar foto del jugador";
-    }
-  }
+      ? { side: playerBet.side, club: playerBet.club }
+      : playerClubForCode(code, f),
+    side = inferred.side,
+    club = side ? f[side] : /^Equipo \(/.test(inferred.club || "") ? "" : inferred.club || "";
+  openPlayerPicker({
+    mode: "photo",
+    name,
+    club,
+    code,
+    marketKey: marketKeyValue,
+    market: market?.market || "",
+    aliases: [parsed.name].filter(Boolean),
+    teamId: (side && matchApiIds(f)[side]) || "",
+    season: (scheduleISO(f) || "").slice(0, 4) || undefined,
+  });
 }
 function renderMatchDetail(ref = currentMatchRef) {
   if (!ref) return;

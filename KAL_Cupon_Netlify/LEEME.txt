@@ -544,3 +544,10 @@ VERSIÓN 25 — ESCUDOS Y FOTOS REDISEÑADO (site/js/07-logos-jugadores.js, site
 - Secciones: Clubes, Selecciones (banderas), Ligas, Jugadores, Ocultos y Buscar por ID. Todas retraídas por defecto (claves de plegado nuevas: logoClubs, logoNat, logoLeagues, logoPlayers).
 - Cada sección tiene filtro Faltan / Completos / Todos (se recuerda en kal_logo_filter_v1); al buscar o al venir de "Editar escudos" se muestran todos.
 - Cada escudo o foto es una fila compacta: los que faltan muestran "＋ Buscar"; Actualizar, Por ID, Subir imagen, Quitar y Ocultar están en "⋯". Los ids de las listas (logoList, logoArchive, playerPhotoArchive…) y los atributos data- de los botones no cambiaron.
+
+VERSIÓN 26 — BUSCAR JUGADOR Y FOTO (site/js/38-buscar-jugador.js)
+- "＋ Seguir jugador" (trackPlayer) y "buscar foto" (lookupMatchPlayerPhoto, 📷 del marcador y Logos → Jugadores) abren la misma ventana: busca en API-Football (/api/jugadores) y TheSportsDB (/api/imagenes) a la vez; si no hay resultados prueba apellido y nombre + apellido en TheSportsDB. Ya no se usan prompt()/confirm() encadenados.
+- Al elegir a alguien, la foto se guarda ligada al equipo del partido (club o selección: campo club) y con sus otros nombres (aliases); al seguirlo se usa su nombre completo (applyTrack).
+- Los jugadores seguidos o anotados como goleadores entran en Logos → Jugadores (collectPlayerBets).
+- NATION_CODES: códigos de selecciones (GER, ENG, DNK…) → país, para que playerClubForCode los ligue con Alemania, Inglaterra, Dinamarca…
+- servidor/jugadores.mjs: tiempo máximo de 9 s para toda la búsqueda.

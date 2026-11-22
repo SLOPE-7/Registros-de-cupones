@@ -338,22 +338,23 @@ function playerGoal(fk, pk, delta) {
   registerGoal(fk, side, pl.name);
 }
 // Seguir a un jugador (aunque no tengas ningún mercado suyo): contadores de remates, a puerta y goles.
+// Abre la ventana para buscar al jugador (con su foto y su equipo); al elegirlo se llama a applyTrack().
 function trackPlayer(fk, side) {
   const f = fixtureByKey(fk);
   if (!f) return;
-  const options = scorerNamesFor(fk, f, side);
-  const a = (
-    prompt(
-      "¿A qué jugador de " +
-        f[side] +
-        " quieres seguir?" +
-        (options.length
-          ? "\nEscribe el número o el nombre:\n" + options.map((n, i) => i + 1 + ". " + n).join("\n")
-          : "\nEscribe el nombre del jugador:"),
-    ) || ""
-  ).trim();
-  if (!a) return;
-  const name = /^\d$/.test(a) && options[Number(a) - 1] ? options[Number(a) - 1] : a;
+  openPlayerPicker({
+    mode: "track",
+    fk,
+    side,
+    club: f[side],
+    teamId: matchApiIds(f)[side] || "",
+    season: (scheduleISO(f) || "").slice(0, 4) || undefined,
+    known: scorerNamesFor(fk, f, side),
+  });
+}
+// Empieza a seguir a un jugador en este partido, ligado al equipo (club o selección) del lado elegido.
+function applyTrack(fk, side, rawName) {
+  const name = String(rawName || "").trim();
   if (name.length < 3) return toast("Escribe al menos 3 letras.");
   db.stats = db.stats || {};
   const st = (db.stats[fk] = db.stats[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} });

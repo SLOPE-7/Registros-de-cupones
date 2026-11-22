@@ -519,11 +519,155 @@ function cleanSavedPlayerNames() {
 function titleCaseClub(s) {
   return String(s || "").replace(/\b([a-zà-ÿ])/g, (c) => c.toUpperCase());
 }
+// Códigos de selecciones que usan las casas (GER, ENG, DNK…) → nombre en inglés de la lista de países.
+const NATION_CODES = Object.fromEntries(
+  [
+    ["ALB", "Albania"],
+    ["AND", "Andorra"],
+    ["ARM", "Armenia"],
+    ["AUT", "Austria"],
+    ["AZE", "Azerbaijan"],
+    ["BEL", "Belgium"],
+    ["BLR", "Belarus"],
+    ["BIH", "Bosnia and Herzegovina"],
+    ["BUL", "Bulgaria"],
+    ["CYP", "Cyprus"],
+    ["CRO", "Croatia"],
+    ["DEN DNK", "Denmark"],
+    ["SCO", "Scotland"],
+    ["SVK", "Slovakia"],
+    ["SVN SLO", "Slovenia"],
+    ["ESP", "Spain"],
+    ["EST", "Estonia"],
+    ["FIN", "Finland"],
+    ["FRA", "France"],
+    ["WAL", "Wales"],
+    ["GEO", "Georgia"],
+    ["GIB", "Gibraltar"],
+    ["GRE GRC", "Greece"],
+    ["HUN", "Hungary"],
+    ["ENG", "England"],
+    ["IRL IRE", "Ireland"],
+    ["NIR", "Northern Ireland"],
+    ["ISL ICE", "Iceland"],
+    ["FRO", "Faroe Islands"],
+    ["ISR", "Israel"],
+    ["ITA", "Italy"],
+    ["KAZ", "Kazakhstan"],
+    ["KOS", "Kosovo"],
+    ["LVA LAT", "Latvia"],
+    ["LIE", "Liechtenstein"],
+    ["LTU LIT", "Lithuania"],
+    ["LUX", "Luxembourg"],
+    ["MKD", "North Macedonia"],
+    ["MLT", "Malta"],
+    ["MDA", "Moldova"],
+    ["MNE", "Montenegro"],
+    ["NOR", "Norway"],
+    ["NED NLD", "Netherlands"],
+    ["POL", "Poland"],
+    ["POR PRT", "Portugal"],
+    ["GBR", "United Kingdom"],
+    ["CZE", "Czechia"],
+    ["ROU ROM", "Romania"],
+    ["RUS", "Russia"],
+    ["SMR", "San Marino"],
+    ["SRB", "Serbia"],
+    ["SWE", "Sweden"],
+    ["SUI CHE", "Switzerland"],
+    ["TUR", "Turkey"],
+    ["UKR", "Ukraine"],
+    ["GER DEU", "Germany"],
+    ["ARG", "Argentina"],
+    ["BOL", "Bolivia"],
+    ["BRA", "Brazil"],
+    ["CHI CHL", "Chile"],
+    ["COL", "Colombia"],
+    ["ECU", "Ecuador"],
+    ["PAR", "Paraguay"],
+    ["PER", "Peru"],
+    ["URU", "Uruguay"],
+    ["VEN", "Venezuela"],
+    ["CAN", "Canada"],
+    ["CRC", "Costa Rica"],
+    ["CUB", "Cuba"],
+    ["SLV", "El Salvador"],
+    ["USA", "United States"],
+    ["GUA", "Guatemala"],
+    ["HAI", "Haiti"],
+    ["HON", "Honduras"],
+    ["JAM", "Jamaica"],
+    ["MEX", "Mexico"],
+    ["NCA NIC", "Nicaragua"],
+    ["PAN", "Panama"],
+    ["DOM", "Dominican Republic"],
+    ["TRI TTO", "Trinidad and Tobago"],
+    ["CUW", "Curacao"],
+    ["SUR", "Suriname"],
+    ["ALG", "Algeria"],
+    ["ANG", "Angola"],
+    ["BEN", "Benin"],
+    ["BFA", "Burkina Faso"],
+    ["CPV", "Cape Verde"],
+    ["CMR", "Cameroon"],
+    ["CIV", "Ivory Coast"],
+    ["EGY", "Egypt"],
+    ["GAB", "Gabon"],
+    ["GAM GMB", "Gambia"],
+    ["GHA", "Ghana"],
+    ["GUI", "Guinea"],
+    ["EQG", "Equatorial Guinea"],
+    ["KEN", "Kenya"],
+    ["LBY LBA", "Libya"],
+    ["MLI", "Mali"],
+    ["MAR", "Morocco"],
+    ["MTN", "Mauritania"],
+    ["MOZ", "Mozambique"],
+    ["NAM", "Namibia"],
+    ["NGA", "Nigeria"],
+    ["COD", "DR Congo"],
+    ["CGO COG", "Congo"],
+    ["SEN", "Senegal"],
+    ["SLE", "Sierra Leone"],
+    ["SOM", "Somalia"],
+    ["RSA", "South Africa"],
+    ["SDN SUD", "Sudan"],
+    ["TAN TZA", "Tanzania"],
+    ["TOG", "Togo"],
+    ["TUN", "Tunisia"],
+    ["UGA", "Uganda"],
+    ["ZAM ZMB", "Zambia"],
+    ["ZIM", "Zimbabwe"],
+    ["KSA SAU", "Saudi Arabia"],
+    ["AUS", "Australia"],
+    ["CHN", "China"],
+    ["KOR", "South Korea"],
+    ["UAE ARE", "United Arab Emirates"],
+    ["IND", "India"],
+    ["IRQ", "Iraq"],
+    ["IRN", "Iran"],
+    ["JPN", "Japan"],
+    ["JOR", "Jordan"],
+    ["NZL", "New Zealand"],
+    ["QAT", "Qatar"],
+    ["UZB", "Uzbekistan"],
+  ].flatMap(([codes, name]) => codes.split(" ").map((c) => [c, name])),
+);
 function playerClubForCode(code, fixture) {
   code = String(code || "")
     .trim()
     .toUpperCase();
   if (!code) return { side: "", club: "" };
+  // Selecciones: GER → Alemania, ENG → Inglaterra, DNK → Dinamarca… (solo si el partido es de selecciones).
+  const nation = NATION_CODES[code] ? findCountryLocal(NATION_CODES[code]) : null;
+  if (nation)
+    for (const [side, name] of [
+      ["home", fixture?.home],
+      ["away", fixture?.away],
+    ]) {
+      const c = name && findCountryLocal(name);
+      if (c && c.en === nation.en) return { side, club: name };
+    }
   const alias = playerTeamAliases[code];
   for (const [side, name] of [
     ["home", fixture?.home],
@@ -557,7 +701,11 @@ function playerClubForCode(code, fixture) {
     )
       return { side, club: name };
   }
-  return { side: "", club: alias ? titleCaseClub(alias) : "Equipo (" + code + ")" };
+  const nationalFixture = [fixture?.home, fixture?.away].some((n) => n && findCountryLocal(n));
+  return {
+    side: "",
+    club: alias ? titleCaseClub(alias) : nation && nationalFixture ? nation.es : "Equipo (" + code + ")",
+  };
 }
 function collectPlayerBets() {
   const bets = new Map(),
@@ -604,6 +752,51 @@ function collectPlayerBets() {
   draftSelections.forEach((f, fixtureIndex) =>
     (f.markets || []).forEach((m) => add(f, m, { draft: true, fixtureIndex })),
   );
+  // Jugadores que sigues a mano o anotaste como goleadores en el marcador (sin mercado): también llevan foto y equipo.
+  const fixRefs = new Map();
+  db.coupons.forEach((c) =>
+    (c.fixtures || []).forEach((f, fixtureIndex) => {
+      const k = fixtureKey(f);
+      if (!fixRefs.has(k)) fixRefs.set(k, { couponId: c.id, fixtureIndex, f });
+    }),
+  );
+  Object.entries(db.stats || {}).forEach(([fk, st]) => {
+    const info = fixRefs.get(fk);
+    if (!info) return;
+    [
+      ...(Array.isArray(st?.tracked) ? st.tracked : []),
+      ...(Array.isArray(st?.scorers) ? st.scorers : []),
+    ].forEach((t) => {
+      if (!t?.name || !(t.side === "home" || t.side === "away")) return;
+      const club = info.f[t.side] || "",
+        saved = findSavedPlayer(t.name, club, dir),
+        id = saved ? "saved:" + saved[0] : playerIdentity(t.name, club),
+        existing = bets.get(id);
+      if (existing) {
+        existing.aliases = [...new Set([...(existing.aliases || []), t.name])];
+        return;
+      }
+      bets.set(id, {
+        id,
+        name: saved?.[1]?.name || t.name,
+        aliases: [t.name, ...(saved?.[1]?.aliases || [])],
+        code: "",
+        club: saved?.[1]?.club || club,
+        country: saved?.[1]?.country || "",
+        photo: saved?.[1]?.photo || saved?.[1]?.url || "",
+        savedKey: saved?.[0] || "",
+        playerId: saved?.[1]?.playerId || "",
+        marketKey: "",
+        count: 0,
+      });
+      playerBetRefs[id] = {
+        ref: { couponId: info.couponId, fixtureIndex: info.fixtureIndex },
+        side: t.side,
+        club,
+        code: "",
+      };
+    });
+  });
   Object.entries(dir)
     .filter(([key, item]) => key.startsWith("player:") && item?.name)
     .sort(
@@ -854,14 +1047,18 @@ function leagueCard(x, index) {
 }
 function playerCard(item) {
   const has = !!item.photo,
-    photoAttrs = item.marketKey
-      ? 'data-player-photo="' + esc(item.marketKey) + '" data-player-photo-bet="' + esc(item.id) + '"'
-      : "";
+    open = 'data-pp-open="' + esc(item.id) + '"';
   return lgRow({
     has,
     cls: "player-logo-card",
     name: item.name,
-    sub: [item.club, item.country, item.count + " mercado(s)"].filter(Boolean).join(" · "),
+    sub: [
+      /^Equipo \(/.test(item.club || "") ? "" : item.club,
+      item.country,
+      item.count ? item.count + " mercado(s)" : "seguido",
+    ]
+      .filter(Boolean)
+      .join(" · "),
     thumb: has
       ? '<img class="player-logo-thumb" src="' +
         esc(playerImageUrl(item.photo)) +
@@ -869,9 +1066,9 @@ function playerCard(item) {
         esc(item.name) +
         '" loading="lazy" referrerpolicy="no-referrer">'
       : '<span class="team-fallback player-logo-thumb">' + esc(lgInitials(item.name)) + "</span>",
-    primary: !has && photoAttrs ? lgBtn("gold lg-main", photoAttrs, "＋ Buscar") : "",
+    primary: has ? "" : lgBtn("gold lg-main", open, "＋ Buscar"),
     actions:
-      (has && photoAttrs ? lgBtn("", photoAttrs, "↻ Actualizar foto") : "") +
+      (has ? lgBtn("", open, "↻ Actualizar foto") : "") +
       lgBtn("", 'data-player-id="' + esc(item.id) + '"', "Por ID") +
       lgBtn(
         "",

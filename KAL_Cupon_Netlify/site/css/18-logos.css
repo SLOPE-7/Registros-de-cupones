@@ -221,3 +221,89 @@
 :root[data-theme="dark"] .fold-miss.is-ok {
   color: var(--green);
 }
+
+/* V26 · ventana para buscar al jugador (seguirlo o ponerle foto) */
+.pp-wrap {
+  z-index: 120;
+}
+.pp-sheet {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.pp-search {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+.pp-search .input {
+  flex: 1;
+  min-width: 0;
+}
+.pp-known {
+  margin: 6px 0;
+}
+.pp-status {
+  min-height: 1.4em;
+  margin: 6px 0;
+}
+.pp-results {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.pp-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.pp-result span {
+  display: grid;
+  min-width: 0;
+}
+.pp-result small {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-photo {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+.pp-actions {
+  margin-top: 6px;
+}
+.pp-search .input {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+.pp-search .btn {
+  flex: none;
+  width: auto;
+}
+.news-sheet.pp-sheet .pp-search .btn.gold {
+  flex: none;
+  width: auto;
+  min-width: 92px;
+}
+.news-sheet.pp-sheet .pp-search input.input {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}

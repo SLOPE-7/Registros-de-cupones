@@ -205,8 +205,18 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "25";
+const APP_VERSION = "26";
 const NOVEDADES = [
+  {
+    v: "26",
+    titulo: "Seguir jugador y fotos, sin cuadros de texto",
+    items: [
+      "＋ Seguir jugador abre una ventana que busca al jugador (API-Football y TheSportsDB), te deja tocar al correcto y lo guarda con su foto y su equipo o selección.",
+      "📷 Cada jugador del marcador tiene botón para buscar o cambiar su foto. Los jugadores que sigues también aparecen en Logos → Jugadores.",
+      "La búsqueda de fotos ya no se queda esperando: tiene límite de tiempo, prueba el apellido y nombre + apellido, y no usa cuadros de texto encadenados.",
+      "Los códigos de selecciones (GER, ENG, DNK, NED, SWE, SCO…) ahora se enlazan con su selección en vez de «Equipo (GER)».",
+    ],
+  },
   {
     v: "25",
     titulo: "Escudos y fotos rediseñado",

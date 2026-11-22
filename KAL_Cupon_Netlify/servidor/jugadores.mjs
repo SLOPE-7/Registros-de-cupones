@@ -41,14 +41,22 @@ export default async (request) => {
   const cacheKey = [normalize(search), teamId, season].join("|");
   const cached = cache.get(cacheKey);
   if (cached && cached.until > Date.now()) return reply(200, cached.data);
+  // Tiempo máximo de toda la búsqueda: antes podía encadenar varias consultas lentas y dejar la pantalla esperando.
+  const deadline = Date.now() + 9000;
   const apiFetch = async (path, query) => {
+    const left = deadline - Date.now();
+    if (left < 600) {
+      const e = new Error("La consulta tardó demasiado. Inténtalo otra vez.");
+      e.name = "TimeoutError";
+      throw e;
+    }
     const url = new URL(path, base);
     Object.entries(query).forEach(([key, value]) => {
       if (value !== "" && value !== undefined && value !== null) url.searchParams.set(key, value);
     });
     const response = await fetch(url, {
       headers: { "x-apisports-key": apiKey },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(Math.min(4500, left)),
     });
     if (response.status === 204) return [];
     if (response.status === 401 || response.status === 403)
