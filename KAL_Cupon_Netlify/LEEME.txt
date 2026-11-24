@@ -558,3 +558,4 @@ VERSIÓN 27 — FAVORITO DE SAFARI (site/js/39-favorito.js)
 - importarDeFavorito() (se llama en 99-arranque.js) decodifica el texto, limpia la dirección, va a Nuevo cupón y ejecuta readText(). Si no hay partidos, el aviso de siempre.
 - Si KAL se usa desde el icono de inicio (almacenamiento aparte de Safari), el favorito también copia el boleto: abrir KAL y tocar 📋 Pegar.
 - No ve contraseñas ni habla con la casa. Pruebas: página simulada con los tres boletos reales de Doradobet (sección 39).
+- V27.1: el favorito también lee marcos (iframe) de la misma casa y shadow DOM. Si no encuentra «vs», avisa cuántas letras leyó, si hay marcos protegidos de otro sitio (que ningún favorito puede leer: entonces seleccionar, copiar y 📋 Pegar) y el inicio del texto. Hay que volver a copiar el código y pegarlo en el favorito.

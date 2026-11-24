@@ -5542,7 +5542,7 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     ),
   );
 
-  await ctx.route("https://casa.test/**", (r) => {
+  await ctx.route(/https:\/\/(casa|otra)\.test\/.*/, (r) => {
     const u = new URL(r.request().url());
     const n = Number(u.searchParams.get("n") || 1);
     const cuerpo =
@@ -5553,6 +5553,16 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
           : u.pathname === "/acentos"
             ? "Peña vs Año — Ñandú ¿qué? 1.50 € ✓\n" + "x".repeat(60)
             : raws[n - 1];
+    if (u.pathname === "/marco" || u.pathname === "/ajeno")
+      return r.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<html><body><h1>Doradobet</h1><iframe src="${u.pathname === "/marco" ? "https://casa.test" : "https://otra.test"}/boleto?n=2"></iframe></body></html>`,
+      });
+    if (u.pathname === "/sombra")
+      return r.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<html><body><h1>Doradobet</h1><div id="h"></div><script>document.getElementById("h").attachShadow({mode:"open"}).textContent=${JSON.stringify(raws[2])}</script></body></html>`,
+      });
     return r.fulfill({ contentType: "text/html; charset=utf-8", body: html(cuerpo) });
   });
   const abrirCasa = async (ruta) => {
@@ -5598,6 +5608,35 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     await kal.close();
     await casa.close();
   }
+
+  // --- el cupón dentro de un marco (iframe) o de un shadow DOM
+  for (const [ruta, n, nombre] of [
+    ["/marco", 2, "un marco de la misma casa"],
+    ["/sombra", 3, "un shadow DOM"],
+  ]) {
+    const casa = await abrirCasa(ruta);
+    const pop = ctx.waitForEvent("page");
+    await casa.evaluate(code.replace(/^javascript:/, ""));
+    const kal = await pop;
+    await kal.waitForFunction(() => document.querySelectorAll("#preview .pv-market").length > 0, null, {
+      timeout: 8000,
+    });
+    check(
+      `cupón dentro de ${nombre}: se lee completo`,
+      (await kal.evaluate(() => draftSelections.length)) === esperados[n - 1],
+    );
+    await kal.close();
+    await casa.close();
+  }
+  const ajeno = await abrirCasa("/ajeno");
+  await ajeno.evaluate(code.replace(/^javascript:/, ""));
+  await ajeno.waitForTimeout(500);
+  check(
+    "cupón en un marco de otro sitio: explica que está protegido y qué hacer (copiar y Pegar)",
+    ajeno.dialogs.some((d) => /protegido/.test(d) && /Pegar/.test(d) && /Leí \d+ letras/.test(d)),
+    ajeno.dialogs.join("|"),
+  );
+  await ajeno.close();
 
   // --- sin boleto en pantalla: avisa y no abre nada
   const vacia = await abrirCasa("/vacio");

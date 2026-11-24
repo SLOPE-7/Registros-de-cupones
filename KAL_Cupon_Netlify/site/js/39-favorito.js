@@ -14,16 +14,24 @@ function favoritoCodigo(origen) {
     "javascript:(function(){" +
     "var K=" +
     K +
-    ",t=String(getSelection()).trim();" +
-    "if(t.length<40)t=(document.body.innerText||'').trim();" +
-    "var i=t.search(/\\bvs\\.?\\s/i);" +
-    "if(i<0){alert('KAL: no veo un boleto en esta pantalla. Abre tu cupón y toca el favorito otra vez.');return}" +
+    ",c=0,q=[document],t='',m='',i,d,a,j,e,x;" +
+    "while(q.length){d=q.shift();" +
+    "try{m+=String(d.getSelection())}catch(r){}" +
+    "try{t+='\\n'+(d.body?d.body.innerText:'')}catch(r){}" +
+    "try{a=d.querySelectorAll('*');for(j=0;j<a.length;j++){e=a[j];" +
+    "if(e.shadowRoot)t+='\\n'+e.shadowRoot.textContent;" +
+    "if(e.tagName=='IFRAME'){x=null;try{x=e.contentDocument}catch(r){}if(x)q.push(x);else c++}}}catch(r){}}" +
+    "t=(m.trim().length>=40?m:t).replace(/\\n{3,}/g,'\\n\\n').trim();" +
+    "i=t.search(/\\bvs\\b/i);" +
+    "if(i<0){alert('KAL: no veo un boleto en esta pantalla. Leí '+t.length+' letras. '+" +
+    "(c?'Hay '+c+' marco(s) protegido(s) que no puedo leer: selecciona y copia el texto del cupón y usa Pegar en KAL. ':" +
+    "'Abre tu cupón y toca el favorito otra vez. ')+'Inicio: '+t.slice(0,60));return}" +
     "if(t.length>" +
     FAV_MAX +
     "){i=Math.max(0,i-300);t=t.slice(i,i+" +
     FAV_MAX +
     ")}" +
-    "try{navigator.clipboard.writeText(t)}catch(e){}" +
+    "try{navigator.clipboard.writeText(t)}catch(r){}" +
     "var b=btoa(unescape(encodeURIComponent(t))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');" +
     "var u=K+String.fromCharCode(35)+'importar='+b;" +
     "if(!window.open(u,'_blank'))location.href=u" +
