@@ -551,3 +551,10 @@ VERSIÓN 26 — BUSCAR JUGADOR Y FOTO (site/js/38-buscar-jugador.js)
 - Los jugadores seguidos o anotados como goleadores entran en Logos → Jugadores (collectPlayerBets).
 - NATION_CODES: códigos de selecciones (GER, ENG, DNK…) → país, para que playerClubForCode los ligue con Alemania, Inglaterra, Dinamarca…
 - servidor/jugadores.mjs: tiempo máximo de 9 s para toda la búsqueda.
+
+VERSIÓN 27 — FAVORITO DE SAFARI (site/js/39-favorito.js)
+- Una casa no se puede abrir "dentro" de KAL (bloquea iframes y el navegador impide leer otra página). En su lugar, Nuevo cupón trae un favorito de Safari: con el cupón abierto en la casa lo tocas y KAL se abre con el boleto leído.
+- favoritoCodigo() genera el código (una línea javascript:, sin % ni #): toma la selección o el texto visible de la página, lo recorta a 14000 letras alrededor del primer «vs», lo copia al portapapeles y abre KAL con #importar=<base64url>.
+- importarDeFavorito() (se llama en 99-arranque.js) decodifica el texto, limpia la dirección, va a Nuevo cupón y ejecuta readText(). Si no hay partidos, el aviso de siempre.
+- Si KAL se usa desde el icono de inicio (almacenamiento aparte de Safari), el favorito también copia el boleto: abrir KAL y tocar 📋 Pegar.
+- No ve contraseñas ni habla con la casa. Pruebas: página simulada con los tres boletos reales de Doradobet (sección 39).

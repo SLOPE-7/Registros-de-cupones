@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "26";
+const APP_VERSION = "27";
 const NOVEDADES = [
+  {
+    v: "27",
+    titulo: "Favorito de Safari: leer el boleto desde tu casa",
+    items: [
+      "En Nuevo cupón hay un favorito para Safari. Con tu cupón abierto en la casa, lo tocas y KAL se abre con el boleto ya leído.",
+      "Solo lee el texto que ves en pantalla (o el que seleccionaste): no ve contraseñas ni habla con la casa.",
+      "También copia el boleto: si usas KAL desde el icono de inicio, ábrelo y toca 📋 Pegar.",
+    ],
+  },
   {
     v: "26",
     titulo: "Seguir jugador y fotos, sin cuadros de texto",

@@ -323,7 +323,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "26");
+        localStorage.setItem("kal_version_vista", "27");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -5517,6 +5517,162 @@ section("38. Seguir jugador y foto: búsqueda en ventana, equipo y selección");
     dur < 10500 && lento.status === 502 && /tardó demasiado/.test(cuerpo.error),
     dur + " ms · " + JSON.stringify(cuerpo),
   );
+}
+
+section("39. Favorito de Safari: leer el boleto desde la casa");
+{
+  const raws = [1, 2, 3].map((n) => fs.readFileSync(path.join(ROOT, `pruebas/doradobet-${n}.txt`), "utf8"));
+  const html = (cuerpo) =>
+    `<html><body><nav>Inicio · Deportes · Casino · Promociones</nav><h1>Doradobet</h1><pre id="b">${cuerpo.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre><footer>Juega con responsabilidad +18</footer></body></html>`;
+  const { ctx, page } = await open(baseDb());
+  const esperados = await page.evaluate((r) => r.map((t) => parseCoupon(t).fixtures.length), raws);
+  const code = await page.evaluate(() => favoritoCodigo());
+  check(
+    "el código del favorito es una sola línea «javascript:», sin % y con la dirección de KAL",
+    code.startsWith("javascript:") && !/[%\n\r#]/.test(code) && code.includes(JSON.stringify(BASE)),
+    code.slice(0, 120),
+  );
+  check(
+    "«Nuevo cupón» muestra las instrucciones y el enlace trae el mismo código",
+    await page.evaluate(
+      (c) =>
+        !!document.querySelector("#favBox #favCopy") &&
+        document.getElementById("favLink").getAttribute("href") === c,
+      code,
+    ),
+  );
+
+  await ctx.route("https://casa.test/**", (r) => {
+    const u = new URL(r.request().url());
+    const n = Number(u.searchParams.get("n") || 1);
+    const cuerpo =
+      u.pathname === "/vacio"
+        ? "Casino Slots Promociones Bonos de bienvenida y mucho más para ti"
+        : u.pathname === "/enorme"
+          ? "Texto de relleno.\n".repeat(3000) + raws[0] + "\n" + "Más relleno.\n".repeat(3000)
+          : u.pathname === "/acentos"
+            ? "Peña vs Año — Ñandú ¿qué? 1.50 € ✓\n" + "x".repeat(60)
+            : raws[n - 1];
+    return r.fulfill({ contentType: "text/html; charset=utf-8", body: html(cuerpo) });
+  });
+  const abrirCasa = async (ruta) => {
+    const casa = await ctx.newPage();
+    casa.dialogs = [];
+    casa.on("dialog", (d) => {
+      casa.dialogs.push(d.message());
+      d.accept();
+    });
+    await casa.goto("https://casa.test" + ruta);
+    return casa;
+  };
+
+  // --- los tres boletos reales: se lee todo igual que pegándolo
+  for (const n of [1, 2, 3]) {
+    const casa = await abrirCasa("/boleto?n=" + n);
+    const pop = ctx.waitForEvent("page");
+    await casa.evaluate(code.replace(/^javascript:/, ""));
+    const kal = await pop;
+    await kal.waitForFunction(() => document.querySelectorAll("#preview .pv-market").length > 0, null, {
+      timeout: 8000,
+    });
+    const r = await kal.evaluate(() => ({
+      partidos: draftSelections.length,
+      raw: window.__kalLastParsedRaw || "",
+      hash: location.hash,
+      vista: document.querySelector(".view.active")?.id,
+    }));
+    check(
+      `boleto ${n}: KAL se abre con los ${esperados[n - 1]} partidos ya leídos, en Nuevo cupón y sin dejar el texto en la dirección`,
+      r.partidos === esperados[n - 1] &&
+        r.vista === "view-new" &&
+        r.hash === "" &&
+        r.raw.includes(raws[n - 1].trim().split("\n")[0].trim()),
+      JSON.stringify({ ...r, raw: r.raw.length }),
+    );
+    if (n === 1)
+      check(
+        "el texto de menús y pie de página de la casa no impide leerlo",
+        r.partidos === esperados[0] && /Casino/.test(r.raw),
+        String(r.partidos),
+      );
+    await kal.close();
+    await casa.close();
+  }
+
+  // --- sin boleto en pantalla: avisa y no abre nada
+  const vacia = await abrirCasa("/vacio");
+  let abrio = false;
+  ctx.once("page", () => (abrio = true));
+  await vacia.evaluate(code.replace(/^javascript:/, ""));
+  await vacia.waitForTimeout(400);
+  check(
+    "sin boleto en la pantalla avisa «no veo un boleto» y no abre KAL",
+    vacia.dialogs.some((d) => /no veo un boleto/.test(d)) && !abrio,
+    vacia.dialogs.join("|"),
+  );
+  await vacia.close();
+
+  // --- texto seleccionado: usa solo la selección
+  const sel = await abrirCasa("/boleto?n=2");
+  await sel.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.getElementById("b"));
+    const g = getSelection();
+    g.removeAllRanges();
+    g.addRange(r);
+  });
+  await sel.evaluate("window.open=(u)=>{window.__u=u;return {}};" + code.replace(/^javascript:/, ""));
+  const uSel = await sel.evaluate(() => window.__u);
+  const txtSel = await page.evaluate((u) => favoritoDecodificar(u.split("#importar=")[1]), uSel);
+  check(
+    "con texto seleccionado envía solo la selección (sin menús)",
+    !/Casino|Juega con responsabilidad/.test(txtSel) && txtSel.includes("vs"),
+    txtSel.slice(0, 80),
+  );
+  await sel.close();
+
+  // --- acentos y símbolos viajan intactos
+  const ac = await abrirCasa("/acentos");
+  await ac.evaluate("window.open=(u)=>{window.__u=u;return {}};" + code.replace(/^javascript:/, ""));
+  const txtAc = await page.evaluate(
+    (u) => favoritoDecodificar(u.split("#importar=")[1]),
+    await ac.evaluate(() => window.__u),
+  );
+  check(
+    "acentos, ñ, ¿? y € llegan sin estropearse",
+    /Peña vs Año — Ñandú ¿qué\? 1\.50 € ✓/.test(txtAc),
+    txtAc.slice(0, 60),
+  );
+  await ac.close();
+
+  // --- páginas enormes: se recorta alrededor del primer «vs»
+  const enorme = await abrirCasa("/enorme");
+  await enorme.evaluate("window.open=(u)=>{window.__u=u;return {}};" + code.replace(/^javascript:/, ""));
+  const uEn = await enorme.evaluate(() => window.__u);
+  const txtEn = await page.evaluate((u) => favoritoDecodificar(u.split("#importar=")[1]), uEn);
+  check(
+    "una página enorme se recorta (máx. 14000 letras) y conserva el boleto",
+    txtEn.length <= 14000 && /\bvs\b/i.test(txtEn) && uEn.length < 40000,
+    txtEn.length + " / " + uEn.length,
+  );
+  await enorme.close();
+
+  // --- direcciones raras no rompen nada
+  const rara = await ctx.newPage();
+  rara.errors = [];
+  rara.on("pageerror", (e) => rara.errors.push(e.message));
+  await rara.goto(BASE + "#importar=!!!");
+  await rara.waitForTimeout(500);
+  check(
+    "una dirección #importar= inválida se ignora sin errores",
+    !rara.errors.length && (await rara.evaluate(() => $("raw").value)) === "",
+    rara.errors.join("|"),
+  );
+  await rara.goto(BASE + "#importar=AAAA");
+  await rara.waitForTimeout(500);
+  check("un favorito sin texto útil avisa y no deja basura", !rara.errors.length, rara.errors.join("|"));
+  check("sin errores en la pantalla principal", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

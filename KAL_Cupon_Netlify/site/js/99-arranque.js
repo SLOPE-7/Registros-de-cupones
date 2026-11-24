@@ -20,6 +20,7 @@ if (migrateCompetitionNames()) save();
 indexSavedCrests();
 autoCompact();
 renderAll();
+importarDeFavorito();
 hideSplash();
 recoverFromMirror()
   .then(() => autoSnapshot())
