@@ -5561,7 +5561,7 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     if (u.pathname === "/sombra")
       return r.fulfill({
         contentType: "text/html; charset=utf-8",
-        body: `<html><body><h1>Doradobet</h1><div id="h"></div><script>document.getElementById("h").attachShadow({mode:"open"}).textContent=${JSON.stringify(raws[2])}</script></body></html>`,
+        body: `<html><body><h1>Doradobet</h1><div id="h" style="display:none"></div><script>const r=document.getElementById("h").attachShadow({mode:"open"});r.innerHTML="<style>.x{padding:8px;z-index:10;width:100%}.vs{color:red}</style><p></p>";r.querySelector("p").textContent=${JSON.stringify(raws[2])}</script></body></html>`,
       });
     return r.fulfill({ contentType: "text/html; charset=utf-8", body: html(cuerpo) });
   });
@@ -5622,8 +5622,9 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
       timeout: 8000,
     });
     check(
-      `cupón dentro de ${nombre}: se lee completo`,
-      (await kal.evaluate(() => draftSelections.length)) === esperados[n - 1],
+      `cupón dentro de ${nombre}: se lee completo y sin código de estilos`,
+      (await kal.evaluate(() => draftSelections.length)) === esperados[n - 1] &&
+        !(await kal.evaluate(() => /z-index|padding/.test(window.__kalLastParsedRaw || ""))),
     );
     await kal.close();
     await casa.close();

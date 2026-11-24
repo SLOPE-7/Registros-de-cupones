@@ -14,14 +14,14 @@ function favoritoCodigo(origen) {
     "javascript:(function(){" +
     "var K=" +
     K +
-    ",c=0,q=[document],t='',m='',i,d,a,j,e,x;" +
+    ",c=0,q=[document],t='',m='',h='',i,d,a,j,e,x,w,n;" +
     "while(q.length){d=q.shift();" +
     "try{m+=String(d.getSelection())}catch(r){}" +
     "try{t+='\\n'+(d.body?d.body.innerText:'')}catch(r){}" +
     "try{a=d.querySelectorAll('*');for(j=0;j<a.length;j++){e=a[j];" +
-    "if(e.shadowRoot)t+='\\n'+e.shadowRoot.textContent;" +
+    "if(e.shadowRoot){w=d.createTreeWalker(e.shadowRoot,4);while(n=w.nextNode()){if(!/^(STYLE|SCRIPT)$/.test(n.parentNode.nodeName))h+=n.data+'\\n'}}" +
     "if(e.tagName=='IFRAME'){x=null;try{x=e.contentDocument}catch(r){}if(x)q.push(x);else c++}}}catch(r){}}" +
-    "t=(m.trim().length>=40?m:t).replace(/\\n{3,}/g,'\\n\\n').trim();" +
+    "t=(m.trim().length>=40?m:/\\bvs\\b/i.test(t)?t:t+'\\n'+h).replace(/\\n{3,}/g,'\\n\\n').trim();" +
     "i=t.search(/\\bvs\\b/i);" +
     "if(i<0){alert('KAL: no veo un boleto en esta pantalla. Leí '+t.length+' letras. '+" +
     "(c?'Hay '+c+' marco(s) protegido(s) que no puedo leer: selecciona y copia el texto del cupón y usa Pegar en KAL. ':" +
