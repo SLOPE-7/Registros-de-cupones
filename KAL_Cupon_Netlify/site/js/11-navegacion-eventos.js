@@ -421,6 +421,14 @@ document.body.addEventListener("click", (e) => {
     restoreLogoTrash(restoreLogo.dataset.logoRestore);
     return;
   }
+  const sub = e.target.closest("[data-msub]");
+  if (sub) {
+    matchSubTab = sub.dataset.msub;
+    renderMatchDetail();
+    const sc = document.querySelector("#matchModalContent .match-modal-markets");
+    if (sc) sc.scrollTop = 0;
+    return;
+  }
   const tab = e.target.closest("[data-match-tab]");
   if (tab) {
     matchActiveTab = tab.dataset.matchTab;

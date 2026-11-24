@@ -346,3 +346,62 @@
     top: calc(env(safe-area-inset-top, 0px) + 10px);
   }
 }
+
+/* Subpestañas de Mercados (V29): Jugadores, Goles, Córners, Tarjetas, 1X2 y Hándicap, Otros */
+.msub-nav {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.msub-nav::-webkit-scrollbar {
+  display: none;
+}
+.msub-chip {
+  flex: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.msub-chip i {
+  font-style: normal;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+  background: rgba(233, 185, 73, 0.28);
+}
+.msub-chip i.done {
+  background: rgba(38, 217, 149, 0.25);
+}
+.msub-team {
+  margin: 0 0 14px;
+}
+.msub-team-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(128, 144, 160, 0.3);
+  font-size: 14px;
+}
+.msub-team-head .team-crest,
+.msub-team-head img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.msub-team-head small {
+  margin-left: auto;
+  font-weight: 800;
+  opacity: 0.7;
+}
+.msub-body .live-board {
+  margin-top: 0;
+}

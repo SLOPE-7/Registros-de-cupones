@@ -20,6 +20,7 @@ function openMatchDetails(ref) {
   currentMatchRef = ref;
   matchActiveTab = "markets";
   matchMarkedOpen = false;
+  matchSubTab = null;
   matchApiData = {};
   matchPlayerPhotos = {};
   renderMatchDetail(ref);
@@ -286,48 +287,161 @@ function matchMarketCard(x) {
     "</div></article>"
   );
 }
+// ---- Subpestañas de «Mercados»: Jugadores · Goles · Córners · Tarjetas · 1X2 y Hándicap · Otros ----
+let matchSubTab = null;
+const MARKET_GROUPS = [
+  ["players", "👤 Jugadores"],
+  ["goals", "🥅 Goles"],
+  ["corners", "⛳ Córners"],
+  ["cards", "🟨 Tarjetas"],
+  ["result", "⚖️ 1X2 y Hándicap"],
+  ["other", "▫️ Otros"],
+];
+// A qué subpestaña pertenece un mercado.
+function marketGroupOf(x) {
+  const t = crestNorm((x.m.market || "") + " " + (x.m.pick || ""));
+  if (parsePlayerBet(x.m, x.f)) return "players";
+  if (/corner|esquina/.test(t)) return "corners";
+  if (/tarjeta|amonest|expuls|\bcards?\b|booking/.test(t)) return "cards";
+  const spec = outcomeSpec(x.m, x.f);
+  if (
+    (spec && spec.t !== "btts" && spec.t !== "tts") ||
+    /handicap|resultado|ganador|\bgana\b|ganara|apuesta sin empate|doble oportunidad|1x2|empate|draw no bet|to win/.test(
+      t,
+    )
+  )
+    return "result";
+  if (/gol|marcan|marcar|marcara|anota|total|mitad|over|under|exacto|marcador|ambos|btts|score/.test(t))
+    return "goals";
+  return "other";
+}
+// De qué equipo es un mercado: "home", "away" o "both" (del partido en general). Los jugadores usan "none" si no se sabe.
+function marketTeamOf(x, players) {
+  const f = x.f,
+    bet = parsePlayerBet(x.m, f);
+  if (bet) {
+    const fk = fixtureKey(f),
+      pk = playerKeyOf(bet.name);
+    return playerSide(fk, pk, { code: bet.code, ...(players.get(pk) || {}) }) || "none";
+  }
+  const spec = outcomeSpec(x.m, f);
+  if (spec && spec.picks) {
+    const teams = spec.picks.filter((p) => p !== "X");
+    if (teams.length === 1) return teams[0] === "1" ? "home" : "away";
+    return "both";
+  }
+  if (spec?.t === "tts") return spec.side;
+  const side = marketSide(x.m, f);
+  return side === "home" || side === "away" ? side : "both";
+}
 function renderMatchMarkets(merged) {
   const all = [...merged.values()],
     open = openCouponIds(),
+    draft = !!currentMatchRef?.draft,
     alive = (x) =>
-      currentMatchRef?.draft
-        ? (x.m.settlement || "pending") === "pending"
-        : marketIsActive(x.m, x.coupons, open);
+      draft ? (x.m.settlement || "pending") === "pending" : marketIsActive(x.m, x.coupons, open);
   all.forEach((x) => {
     x.closed = (x.m.settlement || "pending") === "pending" && !alive(x);
   });
-  const pending = all.filter(alive),
-    marked = all.filter((x) => !alive(x));
   if (!all.length) return '<div class="empty">Este partido aún no tiene mercados.</div>';
-  const count = (st) => marked.filter((x) => x.m.settlement === st).length;
+  const f0 = all[0].f,
+    fk = fixtureKey(f0),
+    st = draft ? null : statsOf(f0),
+    players = draft ? new Map() : statsPlayers(fk),
+    groups = Object.fromEntries(MARKET_GROUPS.map(([id]) => [id, []]));
+  all.forEach((x) => groups[marketGroupOf(x)].push(x));
+  const avail = (id) =>
+      groups[id].length > 0 || (!draft && (id === "goals" || (id === "players" && players.size >= 0))),
+    pendingOf = (id) => groups[id].filter(alive),
+    tabs = MARKET_GROUPS.filter(([id]) => avail(id));
+  let active = tabs.find(([id]) => id === matchSubTab)?.[0];
+  if (!active) active = (tabs.find(([id]) => pendingOf(id).length) || tabs[0])[0];
+  matchSubTab = active;
+  const chip = ([id, label]) => {
+      const pend = pendingOf(id).length,
+        mark = groups[id].length - pend;
+      return (
+        '<button type="button" class="match-tab msub-chip' +
+        (id === active ? " active" : "") +
+        '" data-msub="' +
+        id +
+        '" aria-pressed="' +
+        (id === active) +
+        '">' +
+        label +
+        (pend ? "<i>" + pend + "</i>" : mark ? '<i class="done">✓</i>' : "") +
+        "</button>"
+      );
+    },
+    teamHead = (side, n) =>
+      '<header class="msub-team-head">' +
+      (side === "home" || side === "away"
+        ? crestHTML(side === "home" ? f0.homeCrest : f0.awayCrest, f0[side]) + "<b>" + esc(f0[side]) + "</b>"
+        : side === "none"
+          ? "<b>👤 Sin equipo asignado</b>"
+          : "<b>" + (active === "result" ? "⚖️ Resultado del partido" : "🏟️ Partido") + "</b>") +
+      (n ? "<small>" + n + "</small>" : "") +
+      "</header>";
+  const sideOrder = active === "players" ? ["home", "away", "none"] : ["both", "home", "away"],
+    pend = pendingOf(active),
+    marked = groups[active].filter((x) => !alive(x)),
+    count = (stt) => marked.filter((x) => x.m.settlement === stt).length;
+  let body = "";
+  if (!draft && ["goals", "corners", "cards"].includes(active)) body += liveBoardHtml(f0, active);
+  sideOrder.forEach((side) => {
+    const cards = pend.filter((x) => marketTeamOf(x, players) === side),
+      blocks =
+        active === "players" && !draft
+          ? [...players]
+              .filter(([pk, pl]) => (playerSide(fk, pk, pl) || "none") === side)
+              .map(([pk, pl]) => playerBlockHtml(fk, f0, st, pk, pl))
+          : [];
+    if (!cards.length && !blocks.length) return;
+    body +=
+      '<section class="msub-team">' +
+      teamHead(side, cards.length) +
+      (blocks.length ? '<div class="live-board lb-part lb-players">' + blocks.join("") + "</div>" : "") +
+      cards.map(matchMarketCard).join("") +
+      "</section>";
+  });
+  if (active === "players" && !draft) body += trackButtonsHtml(fk, f0);
+  if (!pend.length && groups[active].length)
+    body +=
+      '<div class="empty small"><strong>Todo marcado ✓</strong>No quedan mercados pendientes en esta sección.</div>';
+  if (!groups[active].length && !["goals", "players"].includes(active))
+    body += '<div class="empty small">No tienes mercados de esto en este partido.</div>';
+  if (marked.length)
+    body +=
+      '<section class="fold marked-fold' +
+      (matchMarkedOpen ? " is-open" : "") +
+      '"><button type="button" class="fold-head" data-marked-toggle aria-expanded="' +
+      matchMarkedOpen +
+      '"><span class="fold-title">Ya marcados y cerrados</span><span class="marked-summary">' +
+      (count("won") ? '<span class="st st-won">' + count("won") + " ✓</span>" : "") +
+      (count("lost") ? '<span class="st st-lost">' + count("lost") + " ✕</span>" : "") +
+      (count("void") ? '<span class="st st-void">' + count("void") + " ＝</span>" : "") +
+      (marked.filter((x) => x.closed).length
+        ? '<span class="st st-lost">' + marked.filter((x) => x.closed).length + " cupón perdido</span>"
+        : "") +
+      '</span><span class="fold-icon" aria-hidden="true">▾</span></button><div class="fold-body">' +
+      marked.map(matchMarketCard).join("") +
+      "</div></section>";
+  const allPending = all.filter(alive);
   return (
     '<section class="match-tab-content">' +
-    (currentMatchRef?.draft
+    (draft
       ? '<div class="notice">Vista previa del cupón. Guarda el cupón para marcar resultados.</div>'
       : "") +
-    finishMatchButton(all[0].f, pending) +
-    liveBoardHtml(all[0].f) +
-    matchAiHtml(all[0].f) +
-    (pending.length
-      ? pending.map(matchMarketCard).join("")
-      : '<div class="empty small"><strong>Todo marcado ✓</strong>No quedan mercados pendientes en este partido.</div>') +
-    (marked.length
-      ? '<section class="fold marked-fold' +
-        (matchMarkedOpen ? " is-open" : "") +
-        '"><button type="button" class="fold-head" data-marked-toggle aria-expanded="' +
-        matchMarkedOpen +
-        '"><span class="fold-title">Ya marcados y cerrados</span><span class="marked-summary">' +
-        (count("won") ? '<span class="st st-won">' + count("won") + " ✓</span>" : "") +
-        (count("lost") ? '<span class="st st-lost">' + count("lost") + " ✕</span>" : "") +
-        (count("void") ? '<span class="st st-void">' + count("void") + " ＝</span>" : "") +
-        (marked.filter((x) => x.closed).length
-          ? '<span class="st st-lost">' + marked.filter((x) => x.closed).length + " cupón perdido</span>"
-          : "") +
-        '</span><span class="fold-icon" aria-hidden="true">▾</span></button><div class="fold-body">' +
-        marked.map(matchMarketCard).join("") +
-        "</div></section>"
-      : "") +
-    "</section>"
+    '<nav class="msub-nav" aria-label="Tipos de mercado">' +
+    tabs.map(chip).join("") +
+    "</nav>" +
+    finishMatchButton(f0, allPending) +
+    matchAiHtml(f0) +
+    '<div class="msub-body" data-msub-body="' +
+    active +
+    '">' +
+    body +
+    "</div></section>"
   );
 }
 function renderMatchDataPanel(tab, f, merged) {
@@ -830,6 +944,11 @@ function renderMatchDetail(ref = currentMatchRef) {
   showCrestImagesIn($("matchModalContent"));
   applyTeamColors($("matchModalContent").querySelector(".match-stadium"), f);
   showPlayerPhotoImagesIn($("matchModalContent"));
+  // La subpestaña activa se centra en la fila de botones (sin mover la ventana).
+  const subNav = $("matchModalContent").querySelector(".msub-nav"),
+    subChip = subNav?.querySelector(".msub-chip.active");
+  if (subNav && subChip)
+    subNav.scrollLeft = subChip.offsetLeft - (subNav.clientWidth - subChip.offsetWidth) / 2;
   if (keepScroll) {
     const sc = $("matchModalContent").querySelector(".match-modal-markets");
     if (sc) sc.scrollTop = keepScroll;

@@ -323,7 +323,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "28");
+        localStorage.setItem("kal_version_vista", "29");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -351,7 +351,40 @@ const view = async (page, v) => {
   await page.waitForTimeout(120);
 };
 // Toca un botón aunque la barra fija o el menú inferior lo tapen en la pantalla del teléfono.
-const tap = (page, sel) => page.evaluate((sel) => document.querySelector(sel).click(), sel);
+// «Mercados» tiene subpestañas (Jugadores, Goles, Córners…): muestra la que trae el elemento buscado.
+const reveal = (page, sel) =>
+  page.evaluate((sel) => {
+    if (document.querySelector(sel)) return true;
+    // Cada clic vuelve a dibujar la ficha: se busca el botón de nuevo en cada vuelta.
+    for (const id of [...document.querySelectorAll("[data-msub]")].map((c) => c.dataset.msub)) {
+      document.querySelector(`[data-msub="${id}"]`)?.click();
+      if (document.querySelector(sel)) return true;
+    }
+    return false;
+  }, sel);
+// Textos de los elementos que cumplen `sel`, recorriendo todas las subpestañas de «Mercados».
+const sweepTexts = (page, sel, max = 9999) =>
+  page.evaluate(
+    ([sel, max]) => {
+      const out = [];
+      for (const id of [...document.querySelectorAll("[data-msub]")].map((c) => c.dataset.msub)) {
+        document.querySelector(`[data-msub="${id}"]`)?.click();
+        document
+          .querySelectorAll(sel)
+          .forEach((e) => out.push(e.innerText.replace(/\s+/g, " ").trim().slice(0, max)));
+      }
+      return out;
+    },
+    [sel, max],
+  );
+const sub = async (page, id) => {
+  await page.evaluate((id) => document.querySelector(`[data-msub="${id}"]`)?.click(), id);
+  await page.waitForTimeout(80);
+};
+const tap = async (page, sel) => {
+  await reveal(page, sel);
+  await page.evaluate((sel) => document.querySelector(sel).click(), sel);
+};
 const texts = async (page, sel) => {
   await page.waitForTimeout(100);
   return page.$$eval(sel, (x) => x.map((e) => e.innerText.replace(/\s+/g, " ").trim()));
@@ -624,7 +657,7 @@ section("2. Regla del cupón perdido, Mercados, Agenda y Mis cupones");
   );
   await page.waitForTimeout(150);
   await page.evaluate(() =>
-    [...document.querySelectorAll(".match-tab-content > .mk-card")]
+    [...document.querySelectorAll(".msub-team > .mk-card")]
       .find((e) => e.innerText.includes("Ambos"))
       .querySelector(".mk-btn.lost")
       .click(),
@@ -632,7 +665,7 @@ section("2. Regla del cupón perdido, Mercados, Agenda y Mis cupones");
   await page.waitForTimeout(150);
   check(
     "la ficha no deja pendientes del cupón perdido",
-    (await page.$$(".match-tab-content > .mk-card")).length === 0,
+    (await page.$$(".msub-team > .mk-card")).length === 0,
   );
   check(
     "resumen 'Ya marcados' indica cupón perdido",
@@ -935,7 +968,12 @@ section("9. Barra de progreso de mercados");
   await page.evaluate(() => document.querySelector("#todayList .agenda-match").click());
   await page.waitForTimeout(150);
   const card = (txt) => `.mk-card:has-text("${txt}")`;
-  check("muestra barra solo en mercados de línea", (await page.$$(".match-tab-content .pg")).length === 4);
+  let barras = 0;
+  for (const id of await page.$$eval("[data-msub]", (e) => e.map((x) => x.dataset.msub))) {
+    await sub(page, id);
+    barras += (await page.$$(".match-tab-content .pg")).length;
+  }
+  check("muestra barra solo en mercados de línea", barras === 4, String(barras));
   check(
     "cabecera con el tema de la competición (Champions → estrellas)",
     (await page.$eval(".match-stadium", (e) => e.dataset.pattern)) === "stars",
@@ -1045,8 +1083,9 @@ section("9. Barra de progreso de mercados");
   const pk = await page.evaluate(() => crestNorm("Kylian Mbappe"));
   check(
     "jugador con solo líneas a puerta: el marcador muestra solo 'Remates a puerta'",
-    !/tiros totales/.test(await page.$eval(".live-board", (e) => e.innerText)) &&
-      /Remates a puerta/.test(await page.$eval(".live-board", (e) => e.innerText)),
+    (await reveal(page, ".lb-players")) &&
+      !/tiros totales/.test(await page.$eval(".lb-players", (e) => e.innerText)) &&
+      /Remates a puerta/.test(await page.$eval(".lb-players", (e) => e.innerText)),
   );
   await tap(page, stBtn(`player:${pk}:main:onTarget`));
   await page.waitForTimeout(80);
@@ -1055,7 +1094,7 @@ section("9. Barra de progreso de mercados");
   await page.waitForTimeout(400);
   check(
     "agrega al suplente con su nombre",
-    (await page.$eval(".live-board", (e) => e.innerText)).includes("Endrick"),
+    (await page.$eval(".lb-players", (e) => e.innerText)).includes("Endrick"),
   );
   await tap(page, stBtn(`player:${pk}:sub:onTarget`));
   await page.waitForTimeout(150);
@@ -1960,7 +1999,7 @@ section("18. Valor de la cuota: cierre (CLV), calculadora y comparador");
   await page.waitForTimeout(200);
   page.promptAnswer = "1.30";
   await page.evaluate(() =>
-    [...document.querySelectorAll(".match-tab-content > .mk-card")]
+    [...document.querySelectorAll(".msub-team > .mk-card")]
       .find((e) => e.innerText.includes("Total de goles"))
       .querySelector("[data-close-odd]")
       .click(),
@@ -1968,7 +2007,7 @@ section("18. Valor de la cuota: cierre (CLV), calculadora y comparador");
   await page.waitForTimeout(200);
   const chip = await page.evaluate(
     () =>
-      [...document.querySelectorAll(".match-tab-content > .mk-card")]
+      [...document.querySelectorAll(".msub-team > .mk-card")]
         .find((e) => e.innerText.includes("Total de goles"))
         .querySelector(".clv-chip")?.innerText,
   );
@@ -2692,9 +2731,7 @@ section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
   await page.click('[data-agenda-range="all"]');
   await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click());
   await page.waitForTimeout(200);
-  const cards = await page.$$eval(".match-tab-content > .mk-card", (els) =>
-    els.map((e) => e.innerText.replace(/\s+/g, " ")),
-  );
+  const cards = await sweepTexts(page, ".msub-team > .mk-card");
   check(
     "'Total · Más de 1.5' y 'Total de goles · Más de 1.5' de cupones distintos se ven en una sola tarjeta",
     cards.filter(
@@ -2706,7 +2743,7 @@ section("23. Marcador en vivo compartido entre cupones (goles y jugadores)");
     ).length === 1 && cards.length === 5,
     cards.join(" || "),
   );
-  const board = await page.$eval(".live-board", (e) => e.innerText.replace(/\s+/g, " "));
+  const board = (await sweepTexts(page, ".live-board")).join(" ");
   check(
     "marcador: goles y una ficha de Olise con 'Remates (tiros totales)', 'Remates a puerta' y su suplente",
     /Goles/.test(board) &&
@@ -3287,16 +3324,16 @@ section("26. Ficha del partido: marcador por equipo, resultado automático, IA y
   await page.click('[data-agenda-range="all"]');
   await page.evaluate(() => document.querySelector("#agendaList .agenda-match").click());
   await page.waitForTimeout(250);
+  const cardsAll = await sweepTexts(page, ".msub-team > .mk-card", 60),
+    boardAll = (await sweepTexts(page, ".live-board")).join(" ");
   const ui = await page.evaluate(() => ({
-    cards: [...document.querySelectorAll(".match-tab-content > .mk-card")].map((e) =>
-      e.innerText.replace(/\s+/g, " ").slice(0, 60),
-    ),
     crests: [...document.querySelectorAll(".hero-team img.team-crest")].map((i) => i.dataset.crestUrl),
-    board: document.querySelector(".live-board").innerText.replace(/\s+/g, " "),
     vs: document.querySelector(".hero-vs").textContent,
     finish: !!document.querySelector("[data-pg-finish]"),
     ai: !!document.querySelector("[data-match-ai]"),
   }));
+  ui.cards = cardsAll;
+  ui.board = boardAll;
   check(
     "la ficha junta los dos 'Doble oportunidad' y los dos '+1.5 goles' (5 tarjetas en vez de 7)",
     ui.cards.length === 5 && ui.cards.filter((c) => /Doble oportunidad/.test(c)).length === 1,
@@ -3580,7 +3617,7 @@ section("27. Registros propios de equipos y jugadores (promedios y goleadores)")
   await page.waitForTimeout(150);
   check("tocar un goleador lo quita", (await page.$$(".scorer-chip")).length === 0);
   // Seguir a un jugador sin mercado, anotar goleadores y goles por jugador
-  const bd = await page.$eval(".live-board", (e) => e.innerText.replace(/\s+/g, " "));
+  const bd = (await sweepTexts(page, ".msub-body")).join(" ");
   check(
     "el marcador siempre ofrece '＋ Goleador' y '＋ Seguir jugador' (aunque no haya goles ni mercados del jugador)",
     /＋ Goleador/.test(bd) &&
@@ -3665,6 +3702,7 @@ section("27. Registros propios de equipos y jugadores (promedios y goleadores)")
   page.promptAnswer = "Rodrygo Goes";
   await tap(page, '[data-scorer-add="home"]');
   await page.waitForTimeout(250);
+  await reveal(page, ".lb-player");
   const g4 = await page.evaluate(() => {
     const st = Object.values(db.stats).find((x) => x.tracked?.length);
     return {
@@ -4606,7 +4644,7 @@ section("34. Pestañas del partido y nombres de equipos");
   });
   await tap(page, "[data-open-saved-match]");
   await page.waitForSelector(".match-tabs");
-  const tabs = await page.$$eval(".match-tab", (e) => e.map((x) => x.textContent.trim()));
+  const tabs = await page.$$eval(".match-tabs .match-tab", (e) => e.map((x) => x.textContent.trim()));
   check(
     "la ficha tiene solo Mercados, Resumen y Cupones",
     tabs.length === 3 && /Mercados/.test(tabs[0]) && /Resumen/.test(tabs[1]) && /Cupones/.test(tabs[2]),
@@ -5922,6 +5960,204 @@ Ganancia Total 63.11`;
     ficha.slice(0, 300),
   );
   check("sin errores", !p2.errors.length, p2.errors.join(" | "));
+  await c2.close();
+}
+
+section("41. Mercados por subpestañas y por equipo");
+{
+  const fut = isoDay(Date.now() + 2 * 86400e3);
+  const mk = (market, pick, odd = "1.5") => ({ market, pick, odd, builder: false, settlement: "pending" });
+  const db0 = {
+    coupons: [
+      {
+        id: "S1",
+        name: "S1",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 3,
+        payout: 15,
+        fixtures: [
+          {
+            id: "f",
+            home: "Real Madrid",
+            away: "PSV",
+            competition: "UEFA Champions League",
+            league: "UEFA Champions League",
+            dateISO: fut,
+            time: "14:00",
+            markets: [
+              mk("Total de goles", "Más de 2.5"),
+              mk("Ambos equipos marcan", "Sí"),
+              mk("Total de goles - PSV", "Más de 0.5"),
+              mk("Primer tiempo - Total", "Más de 0.5"),
+              mk("Total Tiros De Esquina", "Menos de 9.5"),
+              mk("Total de tarjetas", "Más de 4.5"),
+              mk("Remates a Puerta (Kylian Mbappe (RMD)) - Incl. suplente", "Más de 1.5"),
+              mk("Faltas (Marc Cucurella (RMA))", "Más de 0.5"),
+              mk("Tarjetas (Luuk de Jong (PSV))", "Más de 0.5"),
+              mk("1x2", "1"),
+              mk("Doble oportunidad", "Empate o PSV"),
+              mk("Hándicap", "PSV (+1,5)"),
+            ],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => openMatchDetails({ couponId: "S1", fixtureIndex: 0 }));
+  await page.waitForSelector(".msub-nav");
+  const chips = await page.$$eval(".msub-chip", (e) => e.map((x) => x.innerText.replace(/\s+/g, " ").trim()));
+  check(
+    "Mercados trae subpestañas con la cuenta de pendientes: Jugadores, Goles, Córners, Tarjetas y 1X2 y Hándicap",
+    chips.join("|") === "👤 Jugadores 3|🥅 Goles 4|⛳ Córners 1|🟨 Tarjetas 1|⚖️ 1X2 y Hándicap 3",
+    chips.join("|"),
+  );
+  const info = async () =>
+    page.$eval(".msub-body", (e) => ({
+      heads: [...e.querySelectorAll(".msub-team-head")].map((h) => h.innerText.replace(/\s+/g, " ").trim()),
+      secciones: [...e.querySelectorAll(".msub-team")].map((sec) =>
+        [...sec.querySelectorAll(":scope > .mk-card .mk-copy")].map((c) =>
+          c.innerText.replace(/\s+/g, " ").trim(),
+        ),
+      ),
+      lb: [...e.querySelectorAll(".lb-player-head b")].map((x) => x.innerText.replace(/\s+/g, " ").trim()),
+      active: document.querySelector(".msub-chip.active")?.dataset.msub,
+    }));
+  const jug = await info();
+  check("abre en la primera subpestaña con pendientes (Jugadores)", jug.active === "players", jug.active);
+  check(
+    "Jugadores: por equipo — los de Real Madrid arriba (Mbappé y Cucurella) y los del PSV después (De Jong)",
+    jug.heads.length === 2 &&
+      /Real Madrid 2/.test(jug.heads[0]) &&
+      /PSV 1/.test(jug.heads[1]) &&
+      jug.secciones[0].length === 2 &&
+      /Mbappe/.test(jug.secciones[0].join()) &&
+      /Cucurella/.test(jug.secciones[0].join()) &&
+      /de Jong/i.test(jug.secciones[1].join()),
+    JSON.stringify(jug),
+  );
+  check(
+    "Jugadores: hay botones para seguir a un jugador de cada equipo y no salen los contadores de goles",
+    (await page.$$("[data-track-add]")).length === 2 && !(await page.$('[data-st-target="goals:home"]')),
+  );
+  await sub(page, "goals");
+  const gol = await info();
+  check(
+    "Goles: el marcador de goles arriba y los mercados por Partido y por equipo (PSV)",
+    gol.active === "goals" &&
+      !!(await page.$('.live-board [data-st-target="goals:home"]')) &&
+      gol.heads.length === 2 &&
+      /Partido 3/.test(gol.heads[0]) &&
+      /PSV 1/.test(gol.heads[1]) &&
+      gol.secciones[0].length === 3 &&
+      /Total de goles/.test(gol.secciones[0][0]) &&
+      /Ambos equipos marcan/.test(gol.secciones[0].join()) &&
+      /Primer tiempo/.test(gol.secciones[0].join()) &&
+      /PSV/.test(gol.secciones[1][0]),
+    JSON.stringify(gol),
+  );
+  await sub(page, "corners");
+  const cor = await info();
+  check(
+    "Córners: su contador por equipo y el mercado de córners",
+    cor.active === "corners" &&
+      !!(await page.$('[data-st-target="corners:home"]')) &&
+      /Tiros De Esquina/.test(cor.secciones.join()),
+    JSON.stringify(cor),
+  );
+  await sub(page, "cards");
+  const tar = await info();
+  check(
+    "Tarjetas: su contador y solo el mercado de tarjetas del partido (las de un jugador están en Jugadores)",
+    tar.active === "cards" &&
+      !!(await page.$('[data-st-target="cards:away"]')) &&
+      tar.secciones.flat().length === 1 &&
+      /Total de tarjetas/.test(tar.secciones.join()),
+    JSON.stringify(tar),
+  );
+  await sub(page, "result");
+  const res = await info();
+  check(
+    "1X2 y Hándicap: por equipo — «1» con Real Madrid; «Empate o PSV» y el hándicap del PSV con el PSV",
+    res.active === "result" &&
+      res.heads.length === 2 &&
+      /Real Madrid 1/.test(res.heads[0]) &&
+      /PSV 2/.test(res.heads[1]) &&
+      /1x2/.test(res.secciones[0].join()) &&
+      /Doble oportunidad/.test(res.secciones[1].join()) &&
+      /Hándicap/.test(res.secciones[1].join()),
+    JSON.stringify(res),
+  );
+  // Marcar un mercado: la subpestaña se mantiene y la cuenta baja
+  await page.evaluate(() => document.querySelector(".msub-team > .mk-card .mk-btn.won").click());
+  await page.waitForTimeout(150);
+  const tras = await page.evaluate(() => ({
+    active: document.querySelector(".msub-chip.active")?.dataset.msub,
+    chip: document.querySelector('[data-msub="result"]').innerText.replace(/\s+/g, " ").trim(),
+    marcados: !!document.querySelector(".marked-fold"),
+  }));
+  check(
+    "al marcar un mercado se queda en la misma subpestaña, baja la cuenta y aparece «Ya marcados»",
+    tras.active === "result" && /1X2 y Hándicap 2/.test(tras.chip) && tras.marcados,
+    JSON.stringify(tras),
+  );
+  check(
+    "la ficha de Mercados no mezcla: en 1X2 no hay marcador de goles ni mercados de jugadores",
+    !(await page.$("[data-st-target]")) && !(await page.$(".lb-player")),
+  );
+  // Seguir a un jugador del PSV: su ficha sale bajo el PSV en Jugadores
+  await page.evaluate(() => {
+    const fk = fixtureKey(db.coupons[0].fixtures[0]);
+    db.stats = {
+      [fk]: {
+        goals: 0,
+        corners: 0,
+        cards: 0,
+        players: {},
+        auto: {},
+        tracked: [{ name: "Johan Bakayoko", side: "away" }],
+        sides: {},
+      },
+    };
+    save();
+    renderAll();
+  });
+  await sub(page, "players");
+  const jug2 = await info();
+  check(
+    "un jugador seguido del PSV aparece con su ficha en el equipo PSV",
+    jug2.heads.some((h) => /PSV/.test(h)) && jug2.lb.some((n) => /Bakayoko/.test(n)),
+    JSON.stringify(jug2),
+  );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+
+  // --- vista previa del cupón: subpestañas sin marcador en vivo
+  const { ctx: c2, page: p2 } = await open(baseDb());
+  await p2.evaluate((d) => {
+    draftSelections = d;
+    openMatchDetails({ draft: true, fixtureIndex: 0 });
+  }, db0.coupons[0].fixtures);
+  await p2.waitForSelector(".msub-nav");
+  const prev = await p2.evaluate(() => ({
+    chips: [...document.querySelectorAll(".msub-chip")].map((x) => x.dataset.msub).join(","),
+    live: !!document.querySelector(".live-board"),
+    aviso: /Vista previa/.test(document.querySelector(".match-tab-content").innerText),
+  }));
+  check(
+    "la vista previa muestra las subpestañas sin marcador en vivo",
+    prev.chips === "players,goals,corners,cards,result" ||
+      prev.chips === "players,corners,cards,result,goals" ||
+      (prev.chips.split(",").length >= 4 && !prev.live && prev.aviso),
+    JSON.stringify(prev),
+  );
+  check("sin errores en la vista previa", !p2.errors.length, p2.errors.join(" | "));
   await c2.close();
 }
 

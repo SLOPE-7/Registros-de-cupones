@@ -363,7 +363,145 @@ function linesFor(fk, filter) {
     )
     .join("");
 }
-function liveBoardHtml(f) {
+function playerBlockHtml(fk, f, st, pk, pl) {
+  const editable = true;
+  const p = st.players?.[pk] || { onTarget: 0, shots: 0 };
+  // Solo los contadores que usan sus líneas: "Remates" si hay líneas de remates, "Remates a puerta" si hay
+  // líneas a puerta. Toca el número para escribirlo (p. ej. copiado de Sofascore).
+  const shotCountersBase = (o, who) =>
+    (pl.stats.has("shots")
+      ? statCounter(
+          fk,
+          "player:" + pk + ":" + who + ":shots",
+          "Remates <small>(tiros totales)</small>",
+          shotsOf(o),
+          editable,
+        )
+      : "") +
+    (pl.stats.has("onTarget")
+      ? statCounter(
+          fk,
+          "player:" + pk + ":" + who + ":onTarget",
+          "🎯 Remates a puerta",
+          Number(o?.onTarget) || 0,
+          editable,
+        )
+      : "");
+  // Tarjetas y paradas del jugador: solo si alguna de sus líneas las usa (o si lo sigues a mano).
+  const extraCounters = (o, who) =>
+    (pl.stats.has("cards")
+      ? statCounter(fk, "player:" + pk + ":" + who + ":cards", "🟨 Tarjetas", Number(o?.cards) || 0, editable)
+      : "") +
+    (pl.stats.has("saves")
+      ? statCounter(fk, "player:" + pk + ":" + who + ":saves", "🧤 Paradas", Number(o?.saves) || 0, editable)
+      : "");
+  const shotCounters = (o, who) => shotCountersBase(o, who) + extraCounters(o, who);
+  const photo = resolveImage(pl.photo);
+  const face = (src, name) =>
+    src
+      ? '<img class="pg-photo" src="' + esc(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+      : '<span class="team-fallback pg-photo">' +
+        esc(
+          String(name || "?")
+            .split(/\s+/)
+            .map((x) => x[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase(),
+        ) +
+        "</span>";
+  const pside = playerSide(fk, pk, pl),
+    pgoals = (Array.isArray(st.scorers) ? st.scorers : []).filter((s) => playerKeyOf(s.name) === pk).length;
+  return (
+    '<div class="lb-player"><div class="lb-player-head">' +
+    face(photo, pl.name) +
+    "<b>" +
+    esc(pl.name) +
+    (pside ? '<small class="muted"> · ' + esc(f[pside]) + "</small>" : "") +
+    "</b>" +
+    '<button type="button" class="pg-mini-btn" data-player-card="' +
+    esc(pk) +
+    '" data-fk="' +
+    esc(fk) +
+    '" aria-label="Ficha de ' +
+    esc(pl.name) +
+    '">📇 Ficha</button>' +
+    '<button type="button" class="pg-mini-btn" data-pp-live data-fk="' +
+    esc(fk) +
+    '" data-pk="' +
+    esc(pk) +
+    '" aria-label="Buscar foto de ' +
+    esc(pl.name) +
+    '">📷</button>' +
+    (pl.tracked && !pl.lines
+      ? '<button type="button" class="pg-mini-btn" data-track-remove data-st-fk="' +
+        esc(fk) +
+        '" data-st-pk="' +
+        esc(pk) +
+        '" aria-label="Quitar jugador">🗑</button>'
+      : "") +
+    "</div>" +
+    shotCounters(p, "main") +
+    '<div class="lb-counter"><span>⚽ Goles</span><button type="button" class="pg-btn" data-player-goal="-1" data-st-fk="' +
+    esc(fk) +
+    '" data-st-pk="' +
+    esc(pk) +
+    '" aria-label="Quitar un gol de ' +
+    esc(pl.name) +
+    '">－</button><b class="pg-num">' +
+    pgoals +
+    '</b><button type="button" class="pg-btn plus" data-player-goal="1" data-st-fk="' +
+    esc(fk) +
+    '" data-st-pk="' +
+    esc(pk) +
+    '" aria-label="Sumar un gol a ' +
+    esc(pl.name) +
+    '">＋</button></div>' +
+    (pl.incl
+      ? p.sub
+        ? '<div class="lb-sub"><div class="lb-player-head">' +
+          face(resolveImage(p.sub.photo), p.sub.name) +
+          "<span><small>Suplente</small> " +
+          esc(p.sub.name) +
+          '</span><button type="button" class="pg-mini-btn" data-st-sub-remove data-st-fk="' +
+          esc(fk) +
+          '" data-st-pk="' +
+          esc(pk) +
+          '" aria-label="Quitar suplente">🗑</button></div>' +
+          shotCounters(p.sub, "sub") +
+          "</div>"
+        : '<button type="button" class="btn sm pg-add-sub" data-st-sub-add data-st-fk="' +
+          esc(fk) +
+          '" data-st-pk="' +
+          esc(pk) +
+          '">＋ Agregar suplente de ' +
+          esc(pl.name.split(" ").slice(-1)[0]) +
+          "</button>"
+      : "") +
+    '<div class="lb-lines">' +
+    linesFor(fk, (k) => k.type === "player" && k.playerKey === pk) +
+    "</div></div>"
+  );
+}
+// Botones "＋ Seguir jugador de …" (uno por equipo).
+function trackButtonsHtml(fk, f) {
+  return (
+    '<div class="lb-sides lb-track">' +
+    SIDES.map(
+      (s) =>
+        '<button type="button" class="btn sm" data-track-add="' +
+        s +
+        '" data-st-fk="' +
+        esc(fk) +
+        '">＋ Seguir jugador de ' +
+        esc(f[s]) +
+        "</button>",
+    ).join("") +
+    "</div>"
+  );
+}
+// part: "goals" | "corners" | "cards" (contadores por equipo), "players" (fichas de jugadores) o nada (todo junto).
+function liveBoardHtml(f, part) {
   if (currentMatchRef?.draft) return "";
   const fk = fixtureKey(f),
     st = statsOf(f);
@@ -377,164 +515,33 @@ function liveBoardHtml(f) {
       });
     }),
   );
-  const players = statsPlayers(fk);
   has.goals = true; // el marcador del partido siempre se puede llevar
-  const editable = true;
-  let html =
-    '<section class="live-board"><div class="lb-head"><b>📊 Marcador en vivo</b><small>Un solo conteo para todos tus cupones de este partido</small></div>';
   const teamStats = [
     ["goals", "🥅 Goles", has.goals],
     ["corners", "⛳ Córners", has.corners],
     ["cards", "🟨 Tarjetas", has.cards],
-  ].filter((x) => x[2]);
+  ].filter((x) => x[2] && (!part || part === x[0]));
+  if (part && part !== "players")
+    return (
+      '<section class="live-board lb-part"><div class="lb-team">' +
+      teamStats.map(([type, label]) => teamRowHtml(fk, f, st, type, label)).join("") +
+      "</div></section>"
+    );
+  if (part === "players")
+    return (
+      '<section class="live-board lb-part">' +
+      [...statsPlayers(fk)].map(([pk, pl]) => playerBlockHtml(fk, f, st, pk, pl)).join("") +
+      trackButtonsHtml(fk, f) +
+      "</section>"
+    );
+  let html =
+    '<section class="live-board"><div class="lb-head"><b>📊 Marcador en vivo</b><small>Un solo conteo para todos tus cupones de este partido</small></div>';
   html +=
     '<div class="lb-team">' +
     teamStats.map(([type, label]) => teamRowHtml(fk, f, st, type, label)).join("") +
     "</div>";
-  for (const [pk, pl] of players) {
-    const p = st.players?.[pk] || { onTarget: 0, shots: 0 };
-    // Solo los contadores que usan sus líneas: "Remates" si hay líneas de remates, "Remates a puerta" si hay
-    // líneas a puerta. Toca el número para escribirlo (p. ej. copiado de Sofascore).
-    const shotCountersBase = (o, who) =>
-      (pl.stats.has("shots")
-        ? statCounter(
-            fk,
-            "player:" + pk + ":" + who + ":shots",
-            "Remates <small>(tiros totales)</small>",
-            shotsOf(o),
-            editable,
-          )
-        : "") +
-      (pl.stats.has("onTarget")
-        ? statCounter(
-            fk,
-            "player:" + pk + ":" + who + ":onTarget",
-            "🎯 Remates a puerta",
-            Number(o?.onTarget) || 0,
-            editable,
-          )
-        : "");
-    // Tarjetas y paradas del jugador: solo si alguna de sus líneas las usa (o si lo sigues a mano).
-    const extraCounters = (o, who) =>
-      (pl.stats.has("cards")
-        ? statCounter(
-            fk,
-            "player:" + pk + ":" + who + ":cards",
-            "🟨 Tarjetas",
-            Number(o?.cards) || 0,
-            editable,
-          )
-        : "") +
-      (pl.stats.has("saves")
-        ? statCounter(
-            fk,
-            "player:" + pk + ":" + who + ":saves",
-            "🧤 Paradas",
-            Number(o?.saves) || 0,
-            editable,
-          )
-        : "");
-    const shotCounters = (o, who) => shotCountersBase(o, who) + extraCounters(o, who);
-    const photo = resolveImage(pl.photo);
-    const face = (src, name) =>
-      src
-        ? '<img class="pg-photo" src="' + esc(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
-        : '<span class="team-fallback pg-photo">' +
-          esc(
-            String(name || "?")
-              .split(/\s+/)
-              .map((x) => x[0])
-              .slice(0, 2)
-              .join("")
-              .toUpperCase(),
-          ) +
-          "</span>";
-    const pside = playerSide(fk, pk, pl),
-      pgoals = (Array.isArray(st.scorers) ? st.scorers : []).filter((s) => playerKeyOf(s.name) === pk).length;
-    html +=
-      '<div class="lb-player"><div class="lb-player-head">' +
-      face(photo, pl.name) +
-      "<b>" +
-      esc(pl.name) +
-      (pside ? '<small class="muted"> · ' + esc(f[pside]) + "</small>" : "") +
-      "</b>" +
-      '<button type="button" class="pg-mini-btn" data-player-card="' +
-      esc(pk) +
-      '" data-fk="' +
-      esc(fk) +
-      '" aria-label="Ficha de ' +
-      esc(pl.name) +
-      '">📇 Ficha</button>' +
-      '<button type="button" class="pg-mini-btn" data-pp-live data-fk="' +
-      esc(fk) +
-      '" data-pk="' +
-      esc(pk) +
-      '" aria-label="Buscar foto de ' +
-      esc(pl.name) +
-      '">📷</button>' +
-      (pl.tracked && !pl.lines
-        ? '<button type="button" class="pg-mini-btn" data-track-remove data-st-fk="' +
-          esc(fk) +
-          '" data-st-pk="' +
-          esc(pk) +
-          '" aria-label="Quitar jugador">🗑</button>'
-        : "") +
-      "</div>" +
-      shotCounters(p, "main") +
-      '<div class="lb-counter"><span>⚽ Goles</span><button type="button" class="pg-btn" data-player-goal="-1" data-st-fk="' +
-      esc(fk) +
-      '" data-st-pk="' +
-      esc(pk) +
-      '" aria-label="Quitar un gol de ' +
-      esc(pl.name) +
-      '">－</button><b class="pg-num">' +
-      pgoals +
-      '</b><button type="button" class="pg-btn plus" data-player-goal="1" data-st-fk="' +
-      esc(fk) +
-      '" data-st-pk="' +
-      esc(pk) +
-      '" aria-label="Sumar un gol a ' +
-      esc(pl.name) +
-      '">＋</button></div>' +
-      (pl.incl
-        ? p.sub
-          ? '<div class="lb-sub"><div class="lb-player-head">' +
-            face(resolveImage(p.sub.photo), p.sub.name) +
-            "<span><small>Suplente</small> " +
-            esc(p.sub.name) +
-            '</span><button type="button" class="pg-mini-btn" data-st-sub-remove data-st-fk="' +
-            esc(fk) +
-            '" data-st-pk="' +
-            esc(pk) +
-            '" aria-label="Quitar suplente">🗑</button></div>' +
-            shotCounters(p.sub, "sub") +
-            "</div>"
-          : '<button type="button" class="btn sm pg-add-sub" data-st-sub-add data-st-fk="' +
-            esc(fk) +
-            '" data-st-pk="' +
-            esc(pk) +
-            '">＋ Agregar suplente de ' +
-            esc(pl.name.split(" ").slice(-1)[0]) +
-            "</button>"
-        : "") +
-      '<div class="lb-lines">' +
-      linesFor(fk, (k) => k.type === "player" && k.playerKey === pk) +
-      "</div></div>";
-  }
-  html +=
-    '<div class="lb-sides lb-track">' +
-    SIDES.map(
-      (s) =>
-        '<button type="button" class="btn sm" data-track-add="' +
-        s +
-        '" data-st-fk="' +
-        esc(fk) +
-        '">＋ Seguir jugador de ' +
-        esc(f[s]) +
-        "</button>",
-    ).join("") +
-    "</div>";
-  return html + "</section>";
+  for (const [pk, pl] of statsPlayers(fk)) html += playerBlockHtml(fk, f, st, pk, pl);
+  return html + trackButtonsHtml(fk, f) + "</section>";
 }
 
 // Escribe directamente un valor (p. ej. lo que dice Sofascore): se aplica como la diferencia con el actual.

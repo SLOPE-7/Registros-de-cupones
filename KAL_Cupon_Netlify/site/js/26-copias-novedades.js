@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "28";
+const APP_VERSION = "29";
 const NOVEDADES = [
+  {
+    v: "29",
+    titulo: "Mercados por subpestañas y por equipo",
+    items: [
+      "Dentro de un partido, Mercados ya no mezcla todo: tiene subpestañas 👤 Jugadores, 🥅 Goles, ⛳ Córners, 🟨 Tarjetas y ⚖️ 1X2 y Hándicap (y ▫️ Otros si hace falta).",
+      "Cada una muestra sus mercados ordenados por equipo (el partido en general, el local y el visitante) y trae su propio marcador en vivo: goles, córners, tarjetas o las fichas de los jugadores.",
+      "Cada botón trae el número de mercados pendientes; al terminar todos aparece ✓. «Ya marcados» queda al final de cada subpestaña.",
+    ],
+  },
   {
     v: "28",
     titulo: "Mercado de faltas y cupones de antes de apostar",

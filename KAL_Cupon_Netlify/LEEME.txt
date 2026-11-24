@@ -566,3 +566,9 @@ VERSIÓN 27 — FAVORITO DE SAFARI (site/js/39-favorito.js)
 VERSIÓN 28 — FALTAS DE UN JUGADOR
 - PLAYER_MARKET_RE reconoce «falta» (y el ruido «faltas/cometidas/recibidas» se quita del nombre); los paréntesis vacíos «(Marc Cucurella ())» se ignoran. LINE_CATEGORIES tiene «faltas» (barra ＋/－ manual; sin contador en el marcador ni ficha de probabilidades todavía).
 - looksLikeBetslip(): una fecha con hora («24/11/2026 • 14:00») ya no se confunde con una línea «mercado: selección», así que los cupones de antes de apostar sin «BB» (Hondubet) se leen.
+
+VERSIÓN 29 — MERCADOS POR SUBPESTAÑAS Y POR EQUIPO (site/js/10-ficha-partido.js, 27-marcador.js)
+- La pestaña Mercados de la ficha del partido se divide en subpestañas: Jugadores, Goles, Córners, Tarjetas, 1X2 y Hándicap, Otros (solo si hay mercados que no encajan). marketGroupOf(x) decide el grupo (jugador → córners → tarjetas → resultado/hándicap → goles → otros); marketTeamOf(x) decide el equipo (home, away, both; los jugadores usan playerSide o «none»).
+- Cada subpestaña ordena sus mercados por equipo y trae su marcador: Goles (goleadores), Córners, Tarjetas (contadores por equipo, liveBoardHtml(f, parte)) y Jugadores (playerBlockHtml por equipo + «＋ Seguir jugador»). 1X2 y Hándicap no tiene contadores. «Ya marcados» queda al final de cada subpestaña.
+- matchSubTab guarda la subpestaña activa (se reinicia al abrir un partido; abre en la primera con pendientes). Cada botón muestra los pendientes (✓ si todo está marcado).
+- Las pruebas usan reveal(page, sel) / sweepTexts(page, sel) para buscar en todas las subpestañas.
