@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "27";
+const APP_VERSION = "28";
 const NOVEDADES = [
+  {
+    v: "28",
+    titulo: "Mercado de faltas y cupones de antes de apostar",
+    items: [
+      "«Faltas (Jugador (CLUB))» ya se reconoce como mercado de jugador: sale en su ficha, en Logos → Jugadores y con su barra de progreso ＋/－.",
+      "El cupón de antes de apostar (sin «BB») con fecha y hora ya se lee bien.",
+      "El favorito de Safari copia el boleto y lo pegas en KAL desde tu icono de inicio, donde están tus datos.",
+    ],
+  },
   {
     v: "27",
     titulo: "Favorito de Safari: leer el boleto desde tu casa",

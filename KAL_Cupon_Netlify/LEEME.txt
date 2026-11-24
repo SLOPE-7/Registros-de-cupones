@@ -562,3 +562,7 @@ VERSIÓN 27 — FAVORITO DE SAFARI (site/js/39-favorito.js)
 - V27.2: el favorito ya no copia el código de estilos (CSS) de los shadow DOM: solo texto (sin <style>/<script>), y únicamente si la página visible no trae ya un «vs». Hay que volver a copiar el código y pegarlo en el favorito.
 - V27.3: el favorito busca el bloque del cupón (el ancestro más pequeño con «vs» del texto «Ganancia total», ignorando script/style) y manda solo ese texto: sin menús, sin pie de página y sin partidos repetidos de la página. Si no lo encuentra, usa el texto visible como antes.
 - V27.4: por defecto el favorito SOLO COPIA el boleto y avisa «boleto copiado (N partidos)»; se pega en KAL desde el icono de inicio (📋 Pegar), donde están los datos. Abrir KAL en una pestaña de Safari (modo "abrir", favoritoCodigo(origen,"abrir")) deja de ser el flujo normal porque Safari guarda sus datos aparte del icono.
+
+VERSIÓN 28 — FALTAS DE UN JUGADOR
+- PLAYER_MARKET_RE reconoce «falta» (y el ruido «faltas/cometidas/recibidas» se quita del nombre); los paréntesis vacíos «(Marc Cucurella ())» se ignoran. LINE_CATEGORIES tiene «faltas» (barra ＋/－ manual; sin contador en el marcador ni ficha de probabilidades todavía).
+- looksLikeBetslip(): una fecha con hora («24/11/2026 • 14:00») ya no se confunde con una línea «mercado: selección», así que los cupones de antes de apostar sin «BB» (Hondubet) se leen.

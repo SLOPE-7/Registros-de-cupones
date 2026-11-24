@@ -135,7 +135,7 @@ function looksLikeBetslip(lines) {
   return (
     lines.filter((l) => BETSLIP_DATE_RE.test(l)).length >= vs &&
     lines.filter((l) => BETSLIP_ODD_RE.test(l)).length >= vs &&
-    !lines.some((l) => /^[^:]{2,70}:\s*\S+/.test(l) && !/^\d{1,2}:\d{2}$/.test(l))
+    !lines.some((l) => /^[^:]{2,70}:\s*\S+/.test(l) && !/^\d{1,2}:\d{2}$/.test(l) && !BETSLIP_DATE_RE.test(l))
   );
 }
 function parseBetslip(lines) {

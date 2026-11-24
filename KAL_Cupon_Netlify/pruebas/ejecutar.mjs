@@ -323,7 +323,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "27");
+        localStorage.setItem("kal_version_vista", "28");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -5774,6 +5774,155 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
   check("un favorito sin texto útil avisa y no deja basura", !rara.errors.length, rara.errors.join("|"));
   check("sin errores en la pantalla principal", !page.errors.length, page.errors.join(" | "));
   await ctx.close();
+}
+
+section("40. Mercado «Faltas» de un jugador");
+{
+  const { ctx, page } = await open(baseDb());
+  const r = await page.evaluate(() => {
+    const txt = `Real Madrid vs PSV
+24/11/2026 • 14:00
+Faltas (Marc Cucurella (RMA))
+Más de 0.5
+1.25
+Manchester City vs Napoli
+24/11/2026 • 14:00
+Faltas (Enzo Fernandez (MNC))
+Más de 0.5
+1.40
+Arsenal vs Borussia Dortmund
+24/11/2026 • 14:00
+Faltas (Nico Schlotterbeck (BVB))
+Más de 0.5
+1.41
+Cuota total 6.31
+Valor total 10.00
+Ganancia Total 63.11`;
+    const p = parseCoupon(txt);
+    const pb = (market, pick = "") => parsePlayerBet({ market, pick }, { home: "Real Madrid", away: "PSV" });
+    const ln = (market, pick) => parseLine({ market, pick }, { home: "Real Madrid", away: "PSV" });
+    const l1 = ln("Faltas (Marc Cucurella ())", "Más de 0,5");
+    return {
+      slip: !!p.meta.betslip,
+      n: p.fixtures.length,
+      mercados: p.fixtures.map((f) => f.markets[0].market + "|" + f.markets[0].pick + "|" + f.markets[0].odd),
+      meta: [p.meta.odds, p.meta.stake, p.meta.payout],
+      codigo: pb("Faltas (Marc Cucurella (RMA))"),
+      vacio: pb("Faltas (Marc Cucurella ())", "Más de 0,5"),
+      guion: pb("Faltas - Marc Cucurella (RMA)"),
+      equipo: pb("Total de faltas - Real Madrid"),
+      total: pb("Total de faltas", "Más de 20.5"),
+      linea: l1 && [l1.cat, l1.dir, l1.line],
+      lineaTotal: (ln("Total de faltas", "Más de 20.5") || {}).cat,
+      remates: pb("Remates a Puerta (Kang In Lee (ATM)) - Incl. suplente", "Más de 0.5"),
+    };
+  });
+  check(
+    "el cupón de antes de apostar con fechas y sin «BB» se lee (3 partidos, cuotas y totales)",
+    r.slip && r.n === 3 && r.meta[0] === 6.31 && r.meta[1] === 10 && r.meta[2] === 63.11,
+    JSON.stringify(r),
+  );
+  check(
+    "cada mercado conserva «Faltas (Jugador (CLUB))», la selección y la cuota",
+    r.mercados[0] === "Faltas (Marc Cucurella (RMA))|Más de 0.5|1.25" &&
+      r.mercados[2] === "Faltas (Nico Schlotterbeck (BVB))|Más de 0.5|1.41",
+    r.mercados.join(" ; "),
+  );
+  check(
+    "«Faltas (Marc Cucurella (RMA))» es un mercado de jugador con su club",
+    r.codigo?.name === "Marc Cucurella" && r.codigo.code === "RMA",
+    JSON.stringify(r.codigo),
+  );
+  check(
+    "con el código vacío «Faltas (Marc Cucurella ())» también reconoce al jugador",
+    r.vacio?.name === "Marc Cucurella",
+    JSON.stringify(r.vacio),
+  );
+  check(
+    "«Faltas - Marc Cucurella (RMA)» también",
+    r.guion?.name === "Marc Cucurella",
+    JSON.stringify(r.guion),
+  );
+  check(
+    "«Total de faltas» y faltas de un equipo no se toman por jugadores",
+    !r.equipo && !r.total,
+    JSON.stringify([r.equipo, r.total]),
+  );
+  check(
+    "la línea de faltas (Más de 0,5) tiene su barra de progreso",
+    r.linea &&
+      r.linea[0] === "faltas" &&
+      r.linea[1] === "over" &&
+      r.linea[2] === 0.5 &&
+      r.lineaTotal === "faltas",
+    JSON.stringify([r.linea, r.lineaTotal]),
+  );
+  check(
+    "los mercados de remates siguen igual",
+    r.remates?.name === "Kang In Lee" && r.remates.code === "ATM",
+    JSON.stringify(r.remates),
+  );
+  await ctx.close();
+
+  // --- el jugador sale en la ficha del partido y en Logos
+  const fut = isoDay(Date.now() + 2 * 86400e3);
+  const db0 = {
+    coupons: [
+      {
+        id: "F1",
+        name: "F1",
+        created: new Date().toISOString(),
+        stake: 10,
+        odds: 1.25,
+        payout: 12.5,
+        fixtures: [
+          {
+            id: "f",
+            home: "Real Madrid",
+            away: "PSV",
+            competition: "UEFA Champions League",
+            league: "UEFA Champions League",
+            dateISO: fut,
+            time: "14:00",
+            markets: [
+              {
+                market: "Faltas (Marc Cucurella ())",
+                pick: "Más de 0,5",
+                odd: "1.25",
+                builder: false,
+                settlement: "pending",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx: c2, page: p2 } = await open(db0);
+  const jug = await p2.evaluate(() => {
+    const x = collectPlayerBets().find((q) => /Cucurella/.test(q.name));
+    return x && { name: x.name, club: x.club, count: x.count };
+  });
+  check(
+    "el jugador de «Faltas» aparece en Logos → Jugadores con su nombre",
+    jug?.name === "Marc Cucurella" && jug.count >= 1,
+    JSON.stringify(jug),
+  );
+  await p2.evaluate(() => openMatchDetails({ couponId: "F1", fixtureIndex: 0 }));
+  await p2.waitForSelector("#matchModal");
+  const ficha = await p2.$eval("#matchModal", (e) => e.innerText.replace(/\s+/g, " "));
+  check(
+    "la ficha del partido muestra el mercado de faltas con la barra de progreso (0 / 1)",
+    /Faltas/.test(ficha) && /Cucurella/.test(ficha) && /0\s*\/\s*1/.test(ficha),
+    ficha.slice(0, 300),
+  );
+  check("sin errores", !p2.errors.length, p2.errors.join(" | "));
+  await c2.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

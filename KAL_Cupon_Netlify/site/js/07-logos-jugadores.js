@@ -343,7 +343,7 @@ function playerIsTrashed(item, trash) {
 // Detecta si un mercado es de un jugador y extrae su nombre y el código del club, por ejemplo "Nico Paz (COM)".
 // Los mercados de equipo o de marcador (por ejemplo "Total de remates - Como" o "Marcador correcto: 2-1") no son jugadores.
 const PLAYER_MARKET_RE =
-  /(remat|goleador|anotador|anotar[aá]?|tiros? a puerta|tiros? al arco|asistenc|shots?|scorer|to score|player prop|jugador|primer marcador|[uú]ltimo marcador|marcar[aá]? en cualquier|tarjeta|amonestad|parada|atajada|portero|guardameta|cards?\b|saves?\b)/i;
+  /(remat|goleador|anotador|anotar[aá]?|tiros? a puerta|tiros? al arco|asistenc|shots?|scorer|to score|player prop|jugador|primer marcador|[uú]ltimo marcador|marcar[aá]? en cualquier|tarjeta|amonestad|falta|parada|atajada|portero|guardameta|cards?\b|saves?\b)/i;
 const TEAM_MARKET_RE =
   /\b(?:equipo|local|visitante|total(?:es)?|partido|ambos|1x2|doble oportunidad|h[aá]ndicap|tiempo|descanso|mitad|c[oó]rners?|tarjetas?|marcador (?:correcto|exacto|final|al descanso))\b/i;
 const PLAYER_NOISE_WORDS = new Set([
@@ -351,6 +351,12 @@ const PLAYER_NOISE_WORDS = new Set([
   "remates",
   "tiro",
   "tiros",
+  "falta",
+  "faltas",
+  "cometida",
+  "cometidas",
+  "recibida",
+  "recibidas",
   "a",
   "al",
   "puerta",
@@ -459,8 +465,9 @@ function cleanPlayerCandidate(value) {
     .trim();
 }
 function parsePlayerBet(market, fixture) {
-  const marketText = String(market?.market || ""),
-    pickText = String(market?.pick || ""),
+  // Algunas casas dejan el código del club vacío: "Faltas (Marc Cucurella ())".
+  const marketText = String(market?.market || "").replace(/\(\s*\)/g, ""),
+    pickText = String(market?.pick || "").replace(/\(\s*\)/g, ""),
     text = (marketText + " " + pickText).trim();
   if (!PLAYER_MARKET_RE.test(text)) return null;
   const nested = text.match(/\(([^()]{3,80})\s*\(([A-Z]{2,5})\)\s*\)/);
