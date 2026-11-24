@@ -5558,6 +5558,11 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
         contentType: "text/html; charset=utf-8",
         body: `<html><body><h1>Doradobet</h1><iframe src="${u.pathname === "/marco" ? "https://casa.test" : "https://otra.test"}/boleto?n=2"></iframe></body></html>`,
       });
+    if (u.pathname === "/duplicado")
+      return r.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<html><body><nav>Deportes · E-Sports · Cerrar apuesta</nav><div>Otro partido vs. Intruso MARCA-XYZ 1.50</div><pre id="b">${raws[0]}</pre><div>Historial: Otro partido vs. Intruso MARCA-XYZ 1.50</div><footer>Apostar · Juego responsable</footer></body></html>`,
+      });
     if (u.pathname === "/sombra")
       return r.fulfill({
         contentType: "text/html; charset=utf-8",
@@ -5601,8 +5606,8 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     );
     if (n === 1)
       check(
-        "el texto de menús y pie de página de la casa no impide leerlo",
-        r.partidos === esperados[0] && /Casino/.test(r.raw),
+        "los menús y el pie de página de la casa no se mandan a KAL, solo el cupón",
+        r.partidos === esperados[0] && !/Casino|Juega con responsabilidad/.test(r.raw),
         String(r.partidos),
       );
     await kal.close();
@@ -5618,13 +5623,35 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     const pop = ctx.waitForEvent("page");
     await casa.evaluate(code.replace(/^javascript:/, ""));
     const kal = await pop;
-    await kal.waitForFunction(() => document.querySelectorAll("#preview .pv-market").length > 0, null, {
-      timeout: 8000,
-    });
+    await kal
+      .waitForFunction(() => document.querySelectorAll("#preview .pv-market").length > 0, null, {
+        timeout: 8000,
+      })
+      .catch(async () => {
+        const txt = await kal.evaluate(() => (window.__kalLastParsedRaw || $("raw").value).slice(0, 200));
+        console.log("   (sin partidos en " + ruta + "; texto recibido: " + JSON.stringify(txt) + ")");
+      });
     check(
       `cupón dentro de ${nombre}: se lee completo y sin código de estilos`,
       (await kal.evaluate(() => draftSelections.length)) === esperados[n - 1] &&
         !(await kal.evaluate(() => /z-index|padding/.test(window.__kalLastParsedRaw || ""))),
+    );
+    await kal.close();
+    await casa.close();
+  }
+  {
+    const casa = await abrirCasa("/duplicado");
+    const pop = ctx.waitForEvent("page");
+    await casa.evaluate(code.replace(/^javascript:/, ""));
+    const kal = await pop;
+    await kal.waitForFunction(() => document.querySelectorAll("#preview .pv-market").length > 0, null, {
+      timeout: 8000,
+    });
+    const r = await kal.evaluate(() => ({ n: draftSelections.length, raw: window.__kalLastParsedRaw || "" }));
+    check(
+      "manda solo el bloque del cupón (el que trae «Ganancia total»): sin menús ni partidos repetidos de la página",
+      r.n === esperados[0] && !/MARCA-XYZ|E-Sports|Apostar/.test(r.raw),
+      r.n + " / " + esperados[0],
     );
     await kal.close();
     await casa.close();
