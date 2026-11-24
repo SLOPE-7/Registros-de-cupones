@@ -8,7 +8,9 @@ const FAV_MAX = 14000;
 
 // Código del favorito. Sin «%», sin saltos de línea y con el «#» escrito como carácter 35 para que no se corte
 // al pegarlo como dirección de un favorito.
-function favoritoCodigo(origen) {
+// modo "copiar" (el de la app): copia el boleto y avisa; lo pegas en KAL desde tu icono de inicio, donde están tus datos.
+// modo "abrir": además abre KAL en una pestaña de Safari con el boleto (Safari guarda sus datos aparte del icono).
+function favoritoCodigo(origen, modo = "copiar") {
   const K = JSON.stringify(origen || location.origin + "/");
   return (
     "javascript:(function(){" +
@@ -32,10 +34,16 @@ function favoritoCodigo(origen) {
     "){i=Math.max(0,i-300);t=t.slice(i,i+" +
     FAV_MAX +
     ")}" +
-    "try{navigator.clipboard.writeText(t)}catch(r){}" +
-    "var b=btoa(unescape(encodeURIComponent(t))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');" +
-    "var u=K+String.fromCharCode(35)+'importar='+b;" +
-    "if(!window.open(u,'_blank'))location.href=u" +
+    (modo === "abrir"
+      ? "try{navigator.clipboard.writeText(t)}catch(r){}" +
+        "var b=btoa(unescape(encodeURIComponent(t))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');" +
+        "var u=K+String.fromCharCode(35)+'importar='+b;" +
+        "if(!window.open(u,'_blank'))location.href=u"
+      : "var ok=0;try{var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;top:0;opacity:0';" +
+        "document.body.appendChild(ta);ta.focus();ta.select();ta.setSelectionRange(0,t.length);ok=document.execCommand('copy');ta.remove()}catch(r){}" +
+        "if(!ok){try{navigator.clipboard.writeText(t);ok=1}catch(r){}}" +
+        "alert('KAL: boleto '+(ok?'copiado':'leído, pero no pude copiarlo')+' ('+(t.match(/\\bvs\\b/gi)||[]).length+' partidos). '+" +
+        "(ok?'Abre KAL desde tu icono, entra en Nuevo cupón y toca Pegar.':'Selecciona el texto del cupón, cópialo y usa Pegar en KAL.'))") +
     "})()"
   );
 }
@@ -99,14 +107,14 @@ async function copiarTexto(txt) {
   box.innerHTML =
     '<summary class="small"><b>🔖 Leer el boleto directo desde tu casa (favorito de Safari)</b></summary>' +
     '<div class="small muted" style="margin-top:8px">' +
-    "<p>Una sola vez: instala el favorito. Después, con tu cupón abierto en la casa, lo tocas y KAL se abre con el boleto ya leído.</p>" +
+    "<p>Una sola vez: instala el favorito. Después, con tu cupón abierto en la casa, lo tocas: copia el boleto. Abres KAL desde tu icono (con todos tus datos) y tocas <b>📋 Pegar</b>.</p>" +
     "<ol>" +
     "<li>Toca <b>Copiar código del favorito</b>.</li>" +
     "<li>En Safari abre cualquier página, toca <b>Compartir → Añadir a favoritos</b> y guárdalo con el nombre <b>KAL</b>.</li>" +
     "<li>Abre Favoritos (icono del libro), toca <b>Editar</b>, entra en <b>KAL</b>, borra la dirección y <b>pega el código</b>. Guarda.</li>" +
-    "<li>En la casa, con el cupón abierto (o la hoja de imprimir), toca Favoritos → <b>KAL</b>.</li>" +
+    "<li>En la casa, con el cupón abierto (o la hoja de imprimir), toca Favoritos → <b>KAL</b>. Dirá «boleto copiado».</li><li>Abre KAL desde tu icono de inicio → Nuevo cupón → <b>📋 Pegar</b>.</li>" +
     "</ol>" +
-    "<p>El favorito solo lee el texto que ves en pantalla (o el que tengas seleccionado). No ve tu contraseña ni envía nada a la casa. También copia el boleto: si usas KAL desde el icono de inicio, ábrelo y toca <b>📋 Pegar</b>.</p>" +
+    "<p>El favorito solo lee el texto que ves en pantalla (o el que tengas seleccionado). No ve tu contraseña ni envía nada a la casa.</p>" +
     "</div>" +
     '<div class="row"><button type="button" class="btn sm" id="favCopy">📋 Copiar código del favorito</button></div>' +
     '<a class="small" id="favLink" href="#" draggable="true">KAL · leer boleto</a> <span class="small muted">(en computador, arrástralo a la barra de favoritos)</span>';

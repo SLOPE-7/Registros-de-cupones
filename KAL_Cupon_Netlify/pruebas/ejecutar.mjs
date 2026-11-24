@@ -5526,7 +5526,8 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     `<html><body><nav>Inicio · Deportes · Casino · Promociones</nav><h1>Doradobet</h1><pre id="b">${cuerpo.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre><footer>Juega con responsabilidad +18</footer></body></html>`;
   const { ctx, page } = await open(baseDb());
   const esperados = await page.evaluate((r) => r.map((t) => parseCoupon(t).fixtures.length), raws);
-  const code = await page.evaluate(() => favoritoCodigo());
+  const code = await page.evaluate(() => favoritoCodigo(null, "abrir"));
+  const codigoCopiar = await page.evaluate(() => favoritoCodigo());
   check(
     "el código del favorito es una sola línea «javascript:», sin % y con la dirección de KAL",
     code.startsWith("javascript:") && !/[%\n\r#]/.test(code) && code.includes(JSON.stringify(BASE)),
@@ -5538,7 +5539,7 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
       (c) =>
         !!document.querySelector("#favBox #favCopy") &&
         document.getElementById("favLink").getAttribute("href") === c,
-      code,
+      codigoCopiar,
     ),
   );
 
@@ -5665,6 +5666,39 @@ section("39. Favorito de Safari: leer el boleto desde la casa");
     ajeno.dialogs.join("|"),
   );
   await ajeno.close();
+
+  // --- modo por defecto: solo copia el boleto (KAL se usa desde el icono de inicio, que tiene los datos)
+  {
+    const casa = await abrirCasa("/duplicado");
+    let abrioKal = false;
+    ctx.once("page", () => (abrioKal = true));
+    await casa.evaluate(codigoCopiar.replace(/^javascript:/, ""));
+    await casa.waitForTimeout(400);
+    const copiado = await casa
+      .evaluate(() => {
+        const ta = document.createElement("textarea");
+        document.body.appendChild(ta);
+        ta.focus();
+        return navigator.clipboard
+          .readText()
+          .catch(() => "")
+          .then((x) => x);
+      })
+      .catch(() => "");
+    check(
+      "el favorito por defecto avisa «boleto copiado» con el número de partidos y no abre otra pestaña",
+      casa.dialogs.some((d) => /boleto (copiado|leído)/.test(d) && /\d+ partidos/.test(d)) && !abrioKal,
+      casa.dialogs.join("|"),
+    );
+    check(
+      "ese aviso explica abrir KAL desde el icono y tocar Pegar",
+      casa.dialogs.some((d) => /icono/.test(d) && /Pegar/.test(d)) ||
+        casa.dialogs.some((d) => /no pude copiarlo/.test(d) && /Pegar/.test(d)),
+      casa.dialogs.join("|"),
+    );
+    void copiado;
+    await casa.close();
+  }
 
   // --- sin boleto en pantalla: avisa y no abre nada
   const vacia = await abrirCasa("/vacio");
