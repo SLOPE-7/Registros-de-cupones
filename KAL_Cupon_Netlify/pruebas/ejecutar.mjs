@@ -5853,6 +5853,16 @@ Ganancia Total 63.11`;
       linea: l1 && [l1.cat, l1.dir, l1.line],
       lineaTotal: (ln("Total de faltas", "Más de 20.5") || {}).cat,
       remates: pb("Remates a Puerta (Kang In Lee (ATM)) - Incl. suplente", "Más de 0.5"),
+      raphinha: parsePlayerBet(
+        { market: "Remates a Puerta (Raphinha ()) - Incl. suplente", pick: "Más de 1,5" },
+        { home: "Sabah FC", away: "Barcelona" },
+      ),
+      vini: pb("Remates (Vinicius (RMA))", "Más de 1.5"),
+      equipoSolo: parsePlayerBet(
+        { market: "Remates (Barcelona)", pick: "Más de 10.5" },
+        { home: "Sabah FC", away: "Barcelona" },
+      ),
+      amarillas: pb("Tarjetas (Amarillas)", "Más de 3.5"),
     };
   });
   check(
@@ -5899,6 +5909,16 @@ Ganancia Total 63.11`;
     "los mercados de remates siguen igual",
     r.remates?.name === "Kang In Lee" && r.remates.code === "ATM",
     JSON.stringify(r.remates),
+  );
+  check(
+    "un jugador de un solo nombre entre paréntesis («Raphinha ()», «Vinicius (RMA)») se reconoce",
+    r.raphinha?.name === "Raphinha" && r.vini?.name === "Vinicius" && r.vini.code === "RMA",
+    JSON.stringify([r.raphinha, r.vini]),
+  );
+  check(
+    "pero no un equipo ni palabras de mercado («Remates (Barcelona)», «Tarjetas (Amarillas)»)",
+    !r.equipoSolo && !r.amarillas,
+    JSON.stringify([r.equipoSolo, r.amarillas]),
   );
   await ctx.close();
 

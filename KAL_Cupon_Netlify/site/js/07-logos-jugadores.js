@@ -464,6 +464,12 @@ function cleanPlayerCandidate(value) {
     .join(" ")
     .trim();
 }
+// Un nombre de una palabra vale como jugador si parece un nombre propio y no es una palabra de mercado.
+const SINGLE_PLAYER_OK = (w) =>
+  /^[A-ZÀ-Ý][a-zà-ÿ'’.]{3,}$/.test(w) &&
+  !/^(amarillas?|rojas?|total(es)?|local|visitante|empate|over|under|impar|par|ambos|equipo|partido|primer|segundo|tiempo|mitad|suplente|incluido|jugador)$/i.test(
+    w,
+  );
 function parsePlayerBet(market, fixture) {
   // Algunas casas dejan el código del club vacío: "Faltas (Marc Cucurella ())".
   const marketText = String(market?.market || "").replace(/\(\s*\)/g, ""),
@@ -476,13 +482,14 @@ function parsePlayerBet(market, fixture) {
     const k = teamEventKey(name);
     return !k || teamKeys.some((t) => t && (k === t || k.includes(t) || t.includes(k)));
   };
-  const accept = (raw, codeHint = "") => {
+  // single: nombre de una sola palabra («Raphinha», «Vinicius») solo si venía entre paréntesis en un mercado de jugador.
+  const accept = (raw, codeHint = "", single = false) => {
     const split = splitPlayerCode(raw),
       name = cleanPlayerCandidate(split.text);
     if (!name || /\d/.test(name) || TEAM_MARKET_RE.test(name)) return null;
     const words = name.split(" ").filter(Boolean),
       code = (codeHint || split.code || "").toUpperCase();
-    if (words.length < 2 && !code) return null;
+    if (words.length < 2 && !code && !(single && SINGLE_PLAYER_OK(name))) return null;
     if (words.some((w) => !/^[A-Za-zÀ-ÿ'’.]+$/.test(w))) return null;
     if (looksLikeTeam(name)) return null;
     return { name, code };
@@ -495,7 +502,7 @@ function parsePlayerBet(market, fixture) {
     .map((m) => m[1].trim())
     .filter((x) => !/^([A-Z]{2,5}|incl\.?.*|suplente)$/i.test(x));
   for (const candidate of [pickText, ...parens, marketText]) {
-    const r = accept(candidate);
+    const r = accept(candidate, "", parens.includes(candidate) && candidate !== pickText);
     if (r) {
       if (!r.code) r.code = splitPlayerCode(text).code;
       return r;

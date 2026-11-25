@@ -572,3 +572,4 @@ VERSIÓN 29 — MERCADOS POR SUBPESTAÑAS Y POR EQUIPO (site/js/10-ficha-partido
 - Cada subpestaña ordena sus mercados por equipo y trae su marcador: Goles (goleadores), Córners, Tarjetas (contadores por equipo, liveBoardHtml(f, parte)) y Jugadores (playerBlockHtml por equipo + «＋ Seguir jugador»). 1X2 y Hándicap no tiene contadores. «Ya marcados» queda al final de cada subpestaña.
 - matchSubTab guarda la subpestaña activa (se reinicia al abrir un partido; abre en la primera con pendientes). Cada botón muestra los pendientes (✓ si todo está marcado).
 - Las pruebas usan reveal(page, sel) / sweepTexts(page, sel) para buscar en todas las subpestañas.
+- V29.1: parsePlayerBet acepta nombres de una sola palabra («Raphinha ()», «Vinicius (RMA)») cuando vienen entre paréntesis y parecen nombre propio (SINGLE_PLAYER_OK excluye amarillas, rojas, total, local…); los equipos del partido siguen descartados.
