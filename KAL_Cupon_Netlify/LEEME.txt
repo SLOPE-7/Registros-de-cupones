@@ -580,3 +580,4 @@ VERSIÓN 30 — PICKS DE LA IA (servidor/analista.mjs modo "picks", site/js/40-p
 - «💵 Apostar de verdad» (betPickForReal): pide la cuota si falta, calcula unidades × unitStake(), avisa (menos de 30 picks de prueba, rendimiento negativo, racha) y lleva el pick a Nuevo cupón con monto, cuota y ganancia.
 - Estadísticas: acierto, probabilidad media vs acierto real, ganancia en unidades y rendimiento; aparte, lo apostado de verdad en lempiras.
 - V30.1: reintento de publicación (la construcción de V30 en Cloudflare falló; el paquete se genera bien con wrangler deploy --dry-run).
+- V30.2: el lector acepta «Pago Anticipado» en su propia línea (entre el mercado y la selección) y un boleto de antes de apostar al que le falta la última cuota (pruebas/previa-pago-anticipado.txt).

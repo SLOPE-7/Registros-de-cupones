@@ -5994,6 +5994,36 @@ Ganancia Total 63.11`;
   await c2.close();
 }
 
+{
+  // Boleto de antes de apostar con «Pago Anticipado» en su propia línea y la última cuota cortada al copiar.
+  const { ctx, page } = await open(baseDb());
+  const txt = fs.readFileSync(path.join(ROOT, "pruebas/previa-pago-anticipado.txt"), "utf8");
+  const r = await page.evaluate((t) => {
+    const p = parseCoupon(t);
+    return {
+      n: p.fixtures.length,
+      f: p.fixtures.map((f) =>
+        [
+          f.home,
+          f.away,
+          f.dateISO,
+          f.time,
+          f.markets.map((m) => [m.market, m.pick, m.odd, !!m.earlyPayout].join("|")).join(),
+        ].join(" · "),
+      ),
+    };
+  }, txt);
+  check(
+    "boleto con «competitor logo» y «Pago Anticipado» aparte: lee los 10 partidos, 1x2, la selección y la cuota",
+    r.n === 10 &&
+      r.f[0] === "Celta · Bournemouth · 2026-11-26 · 11:45 · 1x2|2|2.00|true" &&
+      r.f[4] === "Sunderland · Jagiellonia Bialystok · 2026-11-26 · 14:00 · 1x2|1|1.25|true" &&
+      r.f[9] === "Inter Club de Escaldes · FC Copenhagen · 2026-11-26 · 14:00 · 1x2|2||true",
+    r.f.join(" ;; "),
+  );
+  await ctx.close();
+}
+
 section("41. Mercados por subpestañas y por equipo");
 {
   const fut = isoDay(Date.now() + 2 * 86400e3);

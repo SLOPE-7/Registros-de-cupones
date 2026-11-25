@@ -134,7 +134,8 @@ function looksLikeBetslip(lines) {
   // Simples: "A vs. B", fecha sola y una cuota suelta por partido; sin "mercado: selección" en una línea.
   return (
     lines.filter((l) => BETSLIP_DATE_RE.test(l)).length >= vs &&
-    lines.filter((l) => BETSLIP_ODD_RE.test(l)).length >= vs &&
+    // Al copiar, la última cuota a veces queda fuera: basta con una cuota por partido menos una.
+    lines.filter((l) => BETSLIP_ODD_RE.test(l)).length >= Math.max(1, vs - 1) &&
     !lines.some((l) => /^[^:]{2,70}:\s*\S+/.test(l) && !/^\d{1,2}:\d{2}$/.test(l) && !BETSLIP_DATE_RE.test(l))
   );
 }
@@ -181,6 +182,11 @@ function parseBetslip(lines) {
     }
     if (/^(?:ganancia total|retorno total|pago potencial)\b/i.test(line)) {
       meta.payout = amount(line) ?? meta.payout;
+      continue;
+    }
+    // "Pago Anticipado" en su propia línea (entre el mercado y la selección): es la etiqueta de promoción.
+    if (/^pago anticipado$/i.test(line)) {
+      if (lastMarket) lastMarket.earlyPayout = true;
       continue;
     }
     if (/^BB$/i.test(line)) {
