@@ -279,6 +279,17 @@ const server = http.createServer((req, res) => {
         "- Punto uno\n- Punto <img src=x onerror=alert(1)>\n",
         "## 🎯 Recomendaciones\n1. Combinadas cortas\n",
       ];
+      if (body.modo === "picks")
+        chunks.push(
+          globalThis.__sinPicks
+            ? 'Hoy no hay apuesta buena.\n<kal-json>{"picks":[],"sinApuesta":true}</kal-json>'
+            : 'Orientativo.\n<kal-json>{"picks":[{"partido":"Real Madrid vs PSV","fecha":"' +
+                (globalThis.__pickDay || "2030-01-01") +
+                '","hora":"14:00","competicion":"UEFA Champions League","mercado":"Total de goles","seleccion":"Más de 2.5","cuota":1.62,"cuotaMinima":1.55,"p":0.68,"confianza":"Alta","unidades":1,"motivo":"Los dos llegan con 2.9 goles por partido."},',
+          '{"partido":"Arsenal vs Borussia Dortmund","fecha":"' +
+            (globalThis.__pickDay || "2030-01-01") +
+            '","hora":"14:00","mercado":"Ambos equipos marcan","seleccion":"Sí","cuota":null,"cuotaMinima":1.75,"p":0.6,"confianza":"Media","unidades":0.5,"motivo":"Dortmund marca fuera en 8 de 10."},{"partido":"Como vs AEK","mercado":"1x2","seleccion":"1","cuota":1.4,"p":0.5,"confianza":"Baja","unidades":1}],"sinApuesta":false}</kal-json>',
+        );
       if (body.modo === "cupon")
         chunks.push(
           'Orientativo.\n<kal-json>{"veredicto":"arriesgado","probabilidad":0.4,"selecciones":[{"partido":"Fenerbahce vs Liverpool","mercado":"Total de goles","seleccion":"Más de 1.5","p":0.9,"confianza":"Alta"},',
@@ -323,7 +334,7 @@ async function open(db, { ctxOpts = {}, init } = {}) {
         localStorage.setItem("kal_coupon_organizer_v2", JSON.stringify(d));
       localStorage.setItem("kal_last_backup", String(Date.now()));
       if (extra !== "news" && !localStorage.getItem("kal_version_vista"))
-        localStorage.setItem("kal_version_vista", "29");
+        localStorage.setItem("kal_version_vista", "30");
       if (extra === "push") {
         let perm = "default";
         Object.defineProperty(Notification, "permission", { get: () => perm });
@@ -6179,6 +6190,273 @@ section("41. Mercados por subpestañas y por equipo");
   );
   check("sin errores en la vista previa", !p2.errors.length, p2.errors.join(" | "));
   await c2.close();
+}
+
+section("42. Picks de la IA: modo prueba y apuesta real");
+{
+  // --- servidor: el modo «picks»
+  const A = await import(path.join(ROOT, "servidor/analista.mjs"));
+  const pet = A.construirPeticion("picks", {
+    texto: "Real Madrid vs PSV — Más de 2.5: 1.62\nArsenal vs Dortmund",
+    hoy: "2026-11-25",
+    partidos: [{ local: "Real Madrid", visitante: "PSV", fecha: "2026-11-25" }],
+    picksAnteriores: { resueltos: 12, acertados: 6, probabilidadMediaQueDiste: 0.66, aciertoReal: 0.5 },
+    banca: { unidad: 15, rachaPerdidos: 2 },
+  });
+  check(
+    "servidor: el modo «picks» exige valor (p × cuota − 1 ≥ 0.05), solo simples, máximo 3, y puede decir que no hay apuesta",
+    A.MODOS.includes("picks") &&
+      /p × cuota − 1, y debe ser de 0.05 o más/.test(pet.system) &&
+      /No armes combinadas/.test(pet.system) &&
+      /Máximo 3 picks/.test(pet.system) &&
+      /sinApuesta/.test(pet.system) &&
+      /Nunca un pick con confianza Baja/.test(pet.system),
+  );
+  check(
+    "servidor: recibe los partidos, la banca y cómo le fue con sus picks anteriores; busca en internet",
+    /Real Madrid vs PSV/.test(pet.messages[0].content) &&
+      /picksAnteriores/.test(pet.messages[0].content) &&
+      /"rachaPerdidos":2/.test(pet.messages[0].content) &&
+      pet.tools[0].name === "web_search" &&
+      pet.output_config.effort === "high",
+  );
+  const sinTexto = await A.leerPeticion(
+    new Request("https://x/api/analista", {
+      method: "POST",
+      headers: { "x-kal-clave": "k" },
+      body: JSON.stringify({ modo: "picks", datos: { texto: "" } }),
+    }),
+    { ANTHROPIC_API_KEY: "a", ANALISTA_CLAVE: "k" },
+  );
+  check("servidor: sin partidos responde un error claro", sinTexto.error?.status === 400);
+
+  // --- la app
+  globalThis.__pickDay = isoDay(Date.now() + 2 * 86400e3);
+  const { ctx, page } = await open(baseDb());
+  await page.evaluate(() => localStorage.setItem("kal_analista_v1", JSON.stringify({ clave: "secreto" })));
+  await page.reload();
+  await page.waitForTimeout(500);
+  await view(page, "analyst");
+  check(
+    "el Analista abre con «🎯 Picks de la IA» arriba y explica el modo prueba",
+    await page.$eval("#analystView", (e) => {
+      const c = e.querySelector("#picksCard");
+      return !!c && e.querySelector(".analyst-card") === c && /Modo prueba/.test(c.innerText);
+    }),
+  );
+  const antes = analystPosts.length;
+  await page.fill(
+    "#picksText",
+    "Real Madrid vs PSV\n25/11/2026 • 14:00\nTotal de goles\nMás de 2.5\n1.62\nArsenal vs Borussia Dortmund\n25/11/2026 • 14:00\nAmbos equipos marcan\nSí\n1.70",
+  );
+  await tap(page, "[data-picks-run]");
+  await page.waitForFunction(() => (db.aiPicks || []).length >= 2, null, { timeout: 8000 });
+  await page.waitForTimeout(200);
+  const post = analystPosts[antes];
+  check(
+    "pide los picks con el texto, la lista de partidos y la banca",
+    post?.modo === "picks" &&
+      /Real Madrid vs PSV/.test(post.datos.texto) &&
+      post.datos.partidos?.length === 2 &&
+      typeof post.datos.banca?.rachaPerdidos === "number",
+    JSON.stringify(post?.datos).slice(0, 300),
+  );
+  const reg = await page.evaluate(() => ({
+    n: db.aiPicks.length,
+    picks: db.aiPicks.map((p) =>
+      [p.partido, p.mercado, p.seleccion, p.cuota, p.cuotaMinima, p.unidades, p.result, p.real].join("|"),
+    ),
+    cards: [...document.querySelectorAll("#picksCard .pick-card")].map((e) =>
+      e.innerText.replace(/\s+/g, " "),
+    ),
+    toast: $("toast").textContent,
+    md: document.querySelector("#picksCard .picks-last")?.open,
+  }));
+  check(
+    "registra solos 2 picks en modo prueba (descarta el de confianza Baja)",
+    reg.n === 2 &&
+      reg.picks[0] === "Real Madrid vs PSV|Total de goles|Más de 2.5|1.62|1.55|1|pending|false" &&
+      reg.picks[1] === "Arsenal vs Borussia Dortmund|Ambos equipos marcan|Sí||1.75|0.5|pending|false" &&
+      /2 pick\(s\) registrados en modo prueba/.test(reg.toast),
+    JSON.stringify(reg),
+  );
+  check(
+    "cada pick muestra cuota (o la cuota mínima), probabilidad, valor, confianza y unidades",
+    /Cuota 1.62/.test(reg.cards[0]) &&
+      /≈ 68 %/.test(reg.cards[0]) &&
+      /valor \+10 %/.test(reg.cards[0]) &&
+      /1 unidad/.test(reg.cards[0]) &&
+      /Solo si la cuota es ≥ 1.75/.test(reg.cards[1]) &&
+      /½ unidad/.test(reg.cards[1]) &&
+      reg.md === true,
+    reg.cards.join(" || "),
+  );
+  await tap(page, "[data-picks-run]");
+  await page.waitForTimeout(900);
+  check(
+    "pedirlos otra vez el mismo día no los duplica",
+    (await page.evaluate(() => db.aiPicks.length)) === 2,
+  );
+  // --- apostar de verdad
+  const ids = await page.evaluate(() => db.aiPicks.map((p) => p.id));
+  const unidad = await page.evaluate(() => unitStake());
+  const dlg = [];
+  page.on("dialog", (d) => dlg.push(d.message()));
+  await tap(page, `[data-pick-real="${ids[0]}"]`);
+  await page.waitForTimeout(250);
+  const nuevo = await page.evaluate(() => ({
+    vista: document.querySelector(".view.active")?.id,
+    sel: draftSelections.map(
+      (f) => f.home + "-" + f.away + "|" + f.markets.map((m) => m.market + "·" + m.pick + "·" + m.odd).join(),
+    ),
+    stake: $("stake").value,
+    odds: $("totalOdds").value,
+    payout: $("payout").value,
+    nombre: $("couponName").value,
+    pick: db.aiPicks[0],
+  }));
+  check(
+    "«Apostar de verdad» lleva el pick a Nuevo cupón con 1 unidad, su cuota y la ganancia",
+    nuevo.vista === "view-new" &&
+      nuevo.sel.join() === "Real Madrid-PSV|Total de goles·Más de 2.5·1.62" &&
+      Number(nuevo.stake) === unidad &&
+      nuevo.odds === "1.62" &&
+      Math.abs(Number(nuevo.payout) - unidad * 1.62) < 0.02 &&
+      /Pick IA/.test(nuevo.nombre) &&
+      nuevo.pick.real === true &&
+      nuevo.pick.stake === unidad,
+    JSON.stringify(nuevo).slice(0, 400),
+  );
+  check(
+    "antes de apostar de verdad avisa que la IA aún no tiene 30 picks de prueba",
+    dlg.some((m) => /lleva 0 de 30 picks de prueba/.test(m) && /¿Apostar/.test(m)),
+    dlg.join(" | "),
+  );
+  await view(page, "analyst");
+  // sin cuota: pide la de tu casa (el diálogo de prueba acepta la mínima, 1.75)
+  await tap(page, `[data-pick-real="${ids[1]}"]`);
+  await page.waitForTimeout(250);
+  const p2 = await page.evaluate(() => db.aiPicks[1]);
+  check(
+    "un pick sin cuota pide la de tu casa y apuesta ½ unidad",
+    p2.real === true && p2.cuota === 1.75 && Math.abs(p2.stake - Math.round(unidad * 0.5 * 100) / 100) < 0.01,
+    JSON.stringify(p2),
+  );
+  // --- resultados: uno se resuelve solo con un cupón guardado, el otro a mano
+  await view(page, "analyst");
+  await page.evaluate((day) => {
+    db.coupons.push({
+      id: "PICK1",
+      name: "Pick IA",
+      created: new Date().toISOString(),
+      stake: 15,
+      odds: 1.62,
+      payout: 24.3,
+      fixtures: [
+        {
+          id: "pf",
+          home: "Real Madrid",
+          away: "PSV",
+          dateISO: day,
+          time: "14:00",
+          markets: [{ market: "Total de goles", pick: "Más de 2.5", odd: "1.62", settlement: "won" }],
+        },
+      ],
+    });
+    save();
+    renderAll();
+    renderAnalyst();
+  }, globalThis.__pickDay);
+  await page.waitForTimeout(150);
+  await tap(page, `[data-pick-res="${ids[1]}"][data-v="lost"]`);
+  await page.waitForTimeout(150);
+  const fin = await page.evaluate(() => ({
+    res: db.aiPicks.map((p) => p.result + (p.fromCoupon ? "*" : "")).join(","),
+    stats: [...document.querySelectorAll("#picksCard .ps-box")].map((e) => e.innerText.replace(/\s+/g, " ")),
+    verdict: document.querySelector("#picksCard .notice")?.innerText || "",
+  }));
+  check(
+    "el pick del Real Madrid se marca ganado solo (su cupón ganó) y el del Arsenal perdido a mano",
+    fin.res === "won*,lost",
+    fin.res,
+  );
+  const profitL = Math.round((unidad * 0.62 - Math.round(unidad * 0.5 * 100) / 100) * 100) / 100;
+  check(
+    "estadísticas: 1 de 2 acertados, +0.12 unidades en prueba y la ganancia real en lempiras",
+    /1 de 2 acertados · 50 %/.test(fin.stats[0]) &&
+      /\+0\.12 unidades/.test(fin.stats[1 - 1]) &&
+      fin.stats[1].includes(profitL.toFixed(2)),
+    fin.stats.join(" || ") + " · esperado " + profitL,
+  );
+  check(
+    "con pocos picks avisa que aún es poco para saber si la IA gana",
+    /2 de 30 picks resueltos/.test(fin.verdict),
+    fin.verdict,
+  );
+  // --- persistencia
+  await page.reload();
+  await page.waitForTimeout(500);
+  check(
+    "los picks se guardan (siguen al volver a abrir la app)",
+    (await page.evaluate(() => db.aiPicks.map((p) => p.result).join())) === "won,lost",
+  );
+  // --- sin apuesta
+  globalThis.__sinPicks = true;
+  await view(page, "analyst");
+  await page.fill("#picksText", "Como vs AEK\nSabah FC vs Barcelona");
+  await tap(page, "[data-picks-run]");
+  await page.waitForFunction(() => /no encontró ninguna apuesta/.test($("toast").textContent), null, {
+    timeout: 8000,
+  });
+  check(
+    "si la IA no ve valor lo dice y no registra nada",
+    (await page.evaluate(() => db.aiPicks.length)) === 2,
+  );
+  globalThis.__sinPicks = false;
+  // --- borrar un pick deja constancia para la nube
+  await tap(page, `.picks-done [data-pick-res="${ids[1]}"][data-v="pending"]`);
+  await page.waitForTimeout(100);
+  await tap(page, `[data-pick-del="${ids[1]}"]`);
+  await page.waitForTimeout(100);
+  const borrado = await page.evaluate(
+    (id) => ({ n: db.aiPicks.length, del: db.deleted?.aiPicks?.includes(id) }),
+    ids[1],
+  );
+  check(
+    "borrar un pick lo quita y lo recuerda para que la nube no lo devuelva",
+    borrado.n === 1 && borrado.del,
+    JSON.stringify(borrado),
+  );
+  // --- nube
+  const nube = await page.evaluate(() => {
+    const a = {
+      coupons: [],
+      aiPicks: [
+        { id: "A", updated: "2026-01-02" },
+        { id: "C", updated: "2026-01-01" },
+      ],
+    };
+    const b = {
+      coupons: [],
+      aiPicks: [
+        { id: "B", updated: "2026-01-01" },
+        { id: "A", updated: "2026-01-01", viejo: true },
+      ],
+      deleted: { aiPicks: ["C"] },
+    };
+    const m = mergeDatabases(a, b);
+    return m.aiPicks
+      .map((x) => x.id + (x.viejo ? "v" : ""))
+      .sort()
+      .join();
+  });
+  check(
+    "nube: junta los picks de los dos teléfonos, se queda con el más nuevo y respeta los borrados",
+    nube === "A,B",
+    nube,
+  );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
 }
 
 // ---------- 8. Funciones del servidor (con API simulada) ----------

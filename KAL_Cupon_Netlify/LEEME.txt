@@ -573,3 +573,9 @@ VERSIÓN 29 — MERCADOS POR SUBPESTAÑAS Y POR EQUIPO (site/js/10-ficha-partido
 - matchSubTab guarda la subpestaña activa (se reinicia al abrir un partido; abre en la primera con pendientes). Cada botón muestra los pendientes (✓ si todo está marcado).
 - Las pruebas usan reveal(page, sel) / sweepTexts(page, sel) para buscar en todas las subpestañas.
 - V29.1: parsePlayerBet acepta nombres de una sola palabra («Raphinha ()», «Vinicius (RMA)») cuando vienen entre paréntesis y parecen nombre propio (SINGLE_PLAYER_OK excluye amarillas, rojas, total, local…); los equipos del partido siguen descartados.
+
+VERSIÓN 30 — PICKS DE LA IA (servidor/analista.mjs modo "picks", site/js/40-picks-ia.js)
+- Modo "picks" del Analista: datos.texto (partidos y cuotas que pega la persona) + partidos (lista para consultar football-data), historial, banca, precisionAnalista y picksAnteriores. SISTEMA_PICKS: solo apuestas simples, valor = p × cuota − 1 ≥ 0.05 (o cuotaMinima = 1.05 / p si no hay cuota), p ≥ 0.55, confianza Alta o Media, máximo 3, un partido una vez, 1 unidad (Alta y valor ≥ 0.08) o ½, todo ½ en racha; puede responder sinApuesta. Termina con <kal-json>{"picks":[…],"sinApuesta":…}</kal-json>.
+- db.aiPicks: cada pick { id, partido, home, away, fecha, hora, mercado, seleccion, cuota, cuotaMinima, p, confianza, unidades, motivo, result, real, stake, manual, fromCoupon }. Todos cuentan en el modo prueba (en unidades). Se resuelven solos con findLeg() contra los cupones guardados o a mano. Se sincronizan con la nube (merge por id, borrados en deleted.aiPicks) y entran en respaldos.
+- «💵 Apostar de verdad» (betPickForReal): pide la cuota si falta, calcula unidades × unitStake(), avisa (menos de 30 picks de prueba, rendimiento negativo, racha) y lleva el pick a Nuevo cupón con monto, cuota y ganancia.
+- Estadísticas: acierto, probabilidad media vs acierto real, ganancia en unidades y rendimiento; aparte, lo apostado de verdad en lempiras.

@@ -114,6 +114,34 @@ Lista: "- **Equipo A vs Equipo B** · mercado · selección · cuota aproximada 
 Partidos que no usaste y por qué.
 Cierra con una línea recordando que es un análisis orientativo, no una garantía.`;
 
+const SISTEMA_PICKS = `${BASE}
+
+Tarea: elegir los "Picks de la IA" de hoy. La persona te pasa partidos y, cuando las tiene, las cuotas reales de su casa de apuestas. Ella va a seguir tus picks: primero en modo prueba (sin dinero) y, si con el tiempo resultan rentables, con dinero real. La app guarda cada pick y su resultado, así que tu historial se va a medir con números: sé estricto y honesto.
+
+${METODO}
+
+Reglas de los picks (no las rompas):
+- Un pick es UNA selección (apuesta simple). No armes combinadas.
+- Solo recomiendas un pick si tiene VALOR: valor = p × cuota − 1, y debe ser de 0.05 o más. Si la persona no te dio la cuota de esa selección, calcula la "cuotaMinima" = redondeo hacia arriba de 1.05 / p a dos decimales, y el pick solo vale si su casa paga al menos eso.
+- Probabilidad mínima 0.55 y confianza Alta o Media. Nunca un pick con confianza Baja.
+- Mercados de jugador: solo con titularidad confirmada o muy probable, y como mucho uno al día.
+- Máximo 3 picks por petición; elige los mejores, no rellenes. Un partido no se repite.
+- Si un partido ya empezó o ya se jugó, no lo uses.
+- "Hoy no hay apuesta buena" es una respuesta válida y a veces la mejor. Dilo claramente si no encuentras valor.
+- Montos en unidades: 1 unidad si la confianza es Alta y el valor es 0.08 o más; ½ unidad en los demás casos. Si la persona viene de una racha de pérdidas (rachaPerdidos ≥ 2 en su banca), todo a ½ unidad. Nunca más de 1 unidad.
+- Si precisionAnalista o picksAnteriores dicen que tus probabilidades han sido optimistas, baja tus estimaciones en consecuencia.
+
+Estructura de la respuesta:
+## 🎯 Picks de hoy
+Para cada pick: "- **Equipo A vs Equipo B** · mercado · selección · cuota X (o: apuesta solo si la cuota es ≥ X) → ≈ NN % · valor +N % · confianza Alta/Media · N unidad(es)" y debajo una o dos frases con el dato concreto que lo respalda.
+## 🗑️ Lo que descarté
+Una línea por partido descartado y por qué (sin valor, falta información, cuota demasiado baja…).
+Cierra con una línea recordando que es un análisis orientativo, no una garantía.
+
+Después de esa línea, y como lo último de tu respuesta, añade un bloque de datos para la app (no se le muestra a la persona), con JSON válido en una sola línea:
+<kal-json>{"picks":[{"partido":"Equipo A vs Equipo B","fecha":"AAAA-MM-DD","hora":"HH:MM","competicion":"…","mercado":"…","seleccion":"…","cuota":1.85,"cuotaMinima":1.7,"p":0.62,"confianza":"Alta|Media","unidades":1,"motivo":"una frase"}],"sinApuesta":false}</kal-json>
+"cuota" es la cuota que te dio la persona (null si no la dio). "p" de 0 a 1. Si no hay ningún pick: "picks":[] y "sinApuesta":true. Usa los nombres de los equipos tal como te los dio la persona.`;
+
 const SISTEMA_IMAGEN = `Eres un transcriptor. Recibes una captura de pantalla, una foto o un PDF de un boleto/cupón de apuestas deportivas.
 Tu única tarea es copiar el texto del boleto, tal cual se ve, en texto plano, una línea por dato, en el mismo orden de la imagen.
 Reglas:
@@ -123,7 +151,7 @@ Reglas:
 - No copies datos personales del cliente (nombre de usuario, número de cliente, afiliado, IB, saldo).
 - Si la imagen no es un boleto o cupón de apuestas, responde exactamente: NO_ES_CUPON`;
 
-export const MODOS = ["historial", "cupon", "semana", "armar", "imagen"];
+export const MODOS = ["historial", "cupon", "semana", "armar", "imagen", "picks"];
 const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
 
 export function respuestaJson(status, cuerpo) {
@@ -190,6 +218,10 @@ export async function leerPeticion(req, env) {
   }
   if (modo === "cupon" && !(typeof datos.cupon === "string" && datos.cupon.trim().length >= 10))
     return { error: respuestaJson(400, { error: "Pega el texto del cupón que quieres revisar." }) };
+  if (modo === "picks" && !(typeof datos.texto === "string" && datos.texto.trim().length >= 10))
+    return {
+      error: respuestaJson(400, { error: "Escribe los partidos (y si puedes, las cuotas de tu casa)." }),
+    };
   if (modo === "armar" && !(typeof datos.partidos === "string" && datos.partidos.trim().length >= 10))
     return { error: respuestaJson(400, { error: "Escribe los partidos o picks que estás considerando." }) };
   // Lista opcional de partidos del cupón (para consultar sus datos antes de analizar).
@@ -283,6 +315,34 @@ export function construirPeticion(modo, datos) {
   if (datos.presupuesto) extras.push("Mi presupuesto:\n" + JSON.stringify(datos.presupuesto));
   if (datos.banca) extras.push("Mi gestión de banca:\n" + JSON.stringify(datos.banca));
   if (datos.riesgo) extras.push("Riesgo calculado por la app:\n" + JSON.stringify(datos.riesgo));
+  if (datos.picksAnteriores)
+    extras.push(
+      "picksAnteriores (cómo te ha ido con tus picks anteriores para esta persona):\n" +
+        JSON.stringify(datos.picksAnteriores),
+    );
+  if (modo === "picks") {
+    const n =
+      (Array.isArray(datos.partidos) && datos.partidos.length) ||
+      (datos.texto.match(/\bvs\.?\b/gi) || []).length ||
+      1;
+    return {
+      ...base,
+      max_tokens: 24000,
+      output_config: { effort: "high" },
+      system: SISTEMA_PICKS,
+      tools: [
+        { type: "web_search_20260209", name: "web_search", max_uses: Math.min(12, Math.max(4, n + 2)) },
+      ],
+      messages: [
+        {
+          role: "user",
+          content:
+            `Fecha de hoy: ${hoy}.\nElige los picks de hoy entre estos partidos:\n\n<partidos>\n${datos.texto.trim()}\n</partidos>` +
+            (extras.length ? "\n\n" + extras.join("\n\n") : ""),
+        },
+      ],
+    };
+  }
   if (modo === "armar") {
     return {
       ...base,
@@ -482,7 +542,7 @@ export async function manejar(req, { env, crearCliente, datosDePartido }) {
   const p = await leerPeticion(req, env);
   if (p.error) return p.error;
   return respuestaEnStreaming(async (enviar) => {
-    if (p.modo === "cupon") {
+    if (p.modo === "cupon" || p.modo === "picks") {
       const datosPartidos = await reunirDatosPartidos(p.datos.partidos, datosDePartido, enviar);
       if (datosPartidos.length) p.datos.datosPartidos = datosPartidos;
       enviar({ t: "estado", v: "Analizando…" });

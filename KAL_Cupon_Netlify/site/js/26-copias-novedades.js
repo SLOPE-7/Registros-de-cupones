@@ -205,8 +205,17 @@ async function renderSnapshotBox() {
 }
 
 // ---------- Novedades ----------
-const APP_VERSION = "29";
+const APP_VERSION = "30";
 const NOVEDADES = [
+  {
+    v: "30",
+    titulo: "Picks de la IA (con modo prueba)",
+    items: [
+      "En el Analista: 🎯 Picks de la IA. Pegas los partidos y las cuotas de tu casa, y la IA elige como mucho 3 apuestas simples con valor, o te dice que hoy no hay apuesta buena.",
+      "🧪 Cada pick se registra solo en modo prueba (en unidades, sin dinero) y se resuelve con tus cupones o a mano. Así ves si la IA gana antes de arriesgar.",
+      "💵 «Apostar de verdad» pasa el pick a Nuevo cupón con tu monto (1 o ½ unidad), y avisa si la IA aún no tiene 30 picks de prueba, si va en negativo o si estás en racha de pérdidas.",
+    ],
+  },
   {
     v: "29",
     titulo: "Mercados por subpestañas y por equipo",

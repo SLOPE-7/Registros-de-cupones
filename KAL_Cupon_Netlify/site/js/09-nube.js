@@ -2,7 +2,7 @@
 "use strict";
 function mergeDatabases(local, remote) {
   const deleted = {};
-  for (const k of ["coupons", "houses", "transactions"])
+  for (const k of ["coupons", "houses", "transactions", "aiPicks"])
     deleted[k] = [...new Set([...(local.deleted?.[k] || []), ...(remote.deleted?.[k] || [])])].slice(-2000);
   const latest = (a, b) =>
     [a, b]
@@ -37,6 +37,9 @@ function mergeDatabases(local, remote) {
     coupons,
     houses: merge(local.houses, remote.houses, "houses"),
     transactions: merge(local.transactions, remote.transactions, "transactions"),
+    ...((local.aiPicks || []).length || (remote.aiPicks || []).length
+      ? { aiPicks: merge(local.aiPicks, remote.aiPicks, "aiPicks") }
+      : {}),
     resultHistory: list(local.resultHistory, remote.resultHistory),
     actionHistory: (local.actionHistory || []).slice(-100),
     deleted,
