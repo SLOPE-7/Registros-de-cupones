@@ -6489,6 +6489,124 @@ section("42. Picks de la IA: modo prueba y apuesta real");
   await ctx.close();
 }
 
+section("43. La ficha del partido muestra solo lo que falta");
+{
+  const fut = isoDay(Date.now() + 86400e3);
+  const mk = (market, pick, settlement = "pending") => ({
+    market,
+    pick,
+    odd: "1.5",
+    builder: false,
+    settlement,
+  });
+  const fx = (markets) => ({
+    id: "f",
+    home: "Celta",
+    away: "Bournemouth",
+    competition: "UEFA Europa League",
+    league: "UEFA Europa League",
+    dateISO: fut,
+    time: "11:45",
+    markets,
+  });
+  const db0 = {
+    coupons: [
+      {
+        id: "A",
+        name: "A",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 3,
+        payout: 15,
+        fixtures: [
+          fx([
+            mk("Remates a Puerta (Iago Aspas (CEL)) - Incl. suplente", "Más de 0.5", "won"),
+            mk("Remates a Puerta (Evanilson (BOU)) - Incl. suplente", "Más de 0.5"),
+            mk("Total Tiros De Esquina", "Más de 8.5", "won"),
+            mk("Total de goles", "Más de 1.5", "won"),
+          ]),
+        ],
+      },
+      // cupón perdido por otro partido: su mercado de Munoz ya no cuenta
+      {
+        id: "B",
+        name: "B",
+        created: new Date().toISOString(),
+        stake: 5,
+        odds: 3,
+        payout: 15,
+        fixtures: [
+          fx([mk("Remates a Puerta (Oscar Mingueza (CEL)) - Incl. suplente", "Más de 0.5")]),
+          {
+            id: "g",
+            home: "Roma",
+            away: "Lazio",
+            dateISO: fut,
+            time: "14:00",
+            markets: [mk("1x2", "1", "lost")],
+          },
+        ],
+      },
+    ],
+    houses: [],
+    transactions: [],
+    resultHistory: [],
+    actionHistory: [],
+    statsMigrated: true,
+  };
+  const { ctx, page } = await open(db0);
+  await page.evaluate(() => openMatchDetails({ couponId: "A", fixtureIndex: 0 }));
+  await page.waitForSelector(".msub-nav");
+  await sub(page, "players");
+  const jug = await page.evaluate(() => {
+    const body = document.querySelector(".msub-body");
+    const arriba = [...body.querySelectorAll(":scope > .msub-team .lb-player-head b")].map((x) =>
+      x.innerText.split("·")[0].trim(),
+    );
+    const fold = [...body.querySelectorAll(".marked-fold .lb-player-head b")].map((x) =>
+      x.innerText.split("·")[0].trim(),
+    );
+    const lineas = [...body.querySelectorAll(":scope > .msub-team .lb-line")].map((x) => x.innerText.trim());
+    return { arriba, fold, lineas };
+  });
+  check(
+    "Jugadores: arriba solo el que aún falta (Evanilson); Aspas (ganado) y Mingueza (cupón perdido) pasan a «Ya marcados»",
+    jug.arriba.join() === "Evanilson" &&
+      jug.fold.includes("Iago Aspas") &&
+      jug.fold.includes("Oscar Mingueza"),
+    JSON.stringify(jug),
+  );
+  check(
+    "las líneas bajo los contadores son solo las pendientes",
+    jug.lineas.length === 1 && !/✓|✕/.test(jug.lineas[0]),
+    JSON.stringify(jug.lineas),
+  );
+  await sub(page, "corners");
+  const cor = await page.evaluate(() => {
+    const body = document.querySelector(".msub-body");
+    return {
+      arriba: !!body.querySelector(":scope > .live-board"),
+      fold: !!body.querySelector(".marked-fold .live-board [data-st-target='corners:home']"),
+      todo: /Todo marcado/.test(body.innerText),
+      chip: document.querySelector('[data-msub="corners"]').innerText.replace(/\s+/g, " ").trim(),
+    };
+  });
+  check(
+    "Córners sin pendientes: el contador pasa a «Ya marcados» (para corregir) y el botón muestra ✓",
+    !cor.arriba && cor.fold && cor.todo && /✓/.test(cor.chip),
+    JSON.stringify(cor),
+  );
+  await sub(page, "goals");
+  check(
+    "Goles: el marcador del partido se queda arriba aunque sus mercados ya estén ganados",
+    await page.evaluate(
+      () => !!document.querySelector(".msub-body > .live-board [data-st-target='goals:home']"),
+    ),
+  );
+  check("sin errores", !page.errors.length, page.errors.join(" | "));
+  await ctx.close();
+}
+
 // ---------- 8. Funciones del servidor (con API simulada) ----------
 section("8. Funciones del servidor (API-Football y TheSportsDB)");
 {

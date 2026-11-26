@@ -324,11 +324,14 @@ function statCounter(fk, target, label, value, editable, extraClass = "") {
 function linesFor(fk, filter) {
   const st = db.stats?.[fk] || { goals: 0, corners: 0, cards: 0, players: {}, auto: {} },
     seen = new Set(),
-    rows = [];
+    rows = [],
+    open = openCouponIds();
   db.coupons.forEach((c) =>
     c.fixtures.forEach((f) => {
-      if (fixtureKey(f) !== fk) return;
+      // Solo las líneas que aún faltan: las ganadas, perdidas o de cupones perdidos ya están en «Ya marcados».
+      if (fixtureKey(f) !== fk || !open.has(c.id)) return;
       f.markets.forEach((m) => {
+        if ((m.settlement || "pending") !== "pending") return;
         const info = parseLine(m, f),
           kind = info && statKind(m, f, info);
         if (!kind || !filter(kind)) return;

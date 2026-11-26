@@ -387,13 +387,24 @@ function renderMatchMarkets(merged) {
     marked = groups[active].filter((x) => !alive(x)),
     count = (stt) => marked.filter((x) => x.m.settlement === stt).length;
   let body = "";
-  if (!draft && ["goals", "corners", "cards"].includes(active)) body += liveBoardHtml(f0, active);
+  // Solo lo que aún falta: el marcador de goles siempre (es el resultado), los de córners y tarjetas solo
+  // mientras quede algún mercado suyo pendiente, y las fichas de jugadores solo si les queda algo por cumplir.
+  if (!draft && (active === "goals" || (["corners", "cards"].includes(active) && pend.length)))
+    body += liveBoardHtml(f0, active);
+  const pendingPlayers = new Set();
+  pend.forEach((x) => {
+    const k = statKind(x.m, x.f),
+      bet = parsePlayerBet(x.m, x.f);
+    if (k?.playerKey) pendingPlayers.add(k.playerKey);
+    if (bet) pendingPlayers.add(playerKeyOf(bet.name));
+  });
+  const showPlayer = (pk, pl) => pendingPlayers.has(pk) || (pl.tracked && !pl.lines && !st?.final);
   sideOrder.forEach((side) => {
     const cards = pend.filter((x) => marketTeamOf(x, players) === side),
       blocks =
         active === "players" && !draft
           ? [...players]
-              .filter(([pk, pl]) => (playerSide(fk, pk, pl) || "none") === side)
+              .filter(([pk, pl]) => showPlayer(pk, pl) && (playerSide(fk, pk, pl) || "none") === side)
               .map(([pk, pl]) => playerBlockHtml(fk, f0, st, pk, pl))
           : [];
     if (!cards.length && !blocks.length) return;
@@ -410,7 +421,19 @@ function renderMatchMarkets(merged) {
       '<div class="empty small"><strong>Todo marcado ✓</strong>No quedan mercados pendientes en esta sección.</div>';
   if (!groups[active].length && !["goals", "players"].includes(active))
     body += '<div class="empty small">No tienes mercados de esto en este partido.</div>';
-  if (marked.length)
+  // Lo terminado se adjunta a «Ya marcados»: fichas de jugadores sin pendientes y contadores sin mercados
+  // pendientes (así se puede corregir un toque equivocado).
+  const doneBoard = draft
+    ? ""
+    : active === "players"
+      ? [...players]
+          .filter(([pk, pl]) => !showPlayer(pk, pl))
+          .map(([pk, pl]) => playerBlockHtml(fk, f0, st, pk, pl))
+          .join("")
+      : ["corners", "cards"].includes(active) && !pend.length
+        ? liveBoardHtml(f0, active)
+        : "";
+  if (marked.length || doneBoard)
     body +=
       '<section class="fold marked-fold' +
       (matchMarkedOpen ? " is-open" : "") +
@@ -424,6 +447,11 @@ function renderMatchMarkets(merged) {
         ? '<span class="st st-lost">' + marked.filter((x) => x.closed).length + " cupón perdido</span>"
         : "") +
       '</span><span class="fold-icon" aria-hidden="true">▾</span></button><div class="fold-body">' +
+      (doneBoard
+        ? active === "players"
+          ? '<div class="live-board lb-part lb-players lb-done">' + doneBoard + "</div>"
+          : doneBoard
+        : "") +
       marked.map(matchMarketCard).join("") +
       "</div></section>";
   const allPending = all.filter(alive);
